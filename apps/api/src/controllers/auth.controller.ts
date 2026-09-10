@@ -143,7 +143,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 //Refresh Endpoint
 export const refresh = asyncHandler(async (req:Request,res:Response) =>
 {
-    const refreshToken = req.cookies.refresh_Token;
+    const refreshToken = req.cookies.refresh_token;
 
   if (!refreshToken) throw new ApiError(401, "Refresh token missing");
 
