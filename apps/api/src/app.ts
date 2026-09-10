@@ -6,8 +6,9 @@ import { prisma } from "./utils/db"
 import { errorHandler } from "./utils/errorHandler";
 import { ApiResponse } from "./utils/ApiResponse";
 import { ApiError } from "./utils/ApiError";
-import authRoutes from './routes/auth.routes';
 import cookieParser from "cookie-parser";
+import authRoutes from './routes/auth.routes';
+import memberRoutes from "./routes/member.routes";
 
 const app = express();
 
@@ -20,7 +21,7 @@ app.use(cookieParser());
 
 //routes
 app.use("/api/auth",authRoutes)
-
+app.use("/api/members",memberRoutes)
 
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
