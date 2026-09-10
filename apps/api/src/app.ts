@@ -6,7 +6,8 @@ import { prisma } from "./utils/db"
 import { errorHandler } from "./utils/errorHandler";
 import { ApiResponse } from "./utils/ApiResponse";
 import { ApiError } from "./utils/ApiError";
-
+import authRoutes from './routes/auth.routes';
+import cookieParser from "cookie-parser";
 
 const app = express();
 
@@ -15,6 +16,10 @@ app.use(helmet());
 
 app.use(express.json());
 app.use(urlencoded({extended:true}))
+app.use(cookieParser());
+
+//routes
+app.use("/api/auth",authRoutes)
 
 
 //Health Endpoints

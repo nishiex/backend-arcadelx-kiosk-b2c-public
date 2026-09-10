@@ -6,3 +6,91 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum OrgType {
+  COMPANY
+  DISTRIBUTOR
+  PARTNER
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
+// 1 User can only join 1 Organization at a time
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  
+  membership   Membership?
+
+  // Organizations owned by this user
+  ownedOrganizations Organization[] @relation("OrganizationOwner")
+  tokens       RefreshToken[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+
+model Organization {
+  id                  String   @id @default(uuid())
+  ownerId             String
+
+  name                String
+  type                OrgType
+  state               String
+  city                String
+  pincode             Int
+  address             String
+
+  inviteCode          String?  @unique
+  inviteCodeExpiresAt DateTime?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  owner               User         @relation("OrganizationOwner",fields: [ownerId],references: [id])
+  memberships         Membership[]
+}
+
+
+model Membership {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  organizationId String
+
+  role           Role?
+  status         MembershipStatus @default(PENDING)
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user           User         @relation(fields: [userId],references: [id] )
+
+  organization   Organization @relation(fields: [organizationId],references: [id])
+
+  @@index([organizationId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
