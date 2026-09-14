@@ -88,3 +88,5 @@ ALTER TABLE "Membership" ADD CONSTRAINT "Membership_organizationId_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+CREATE UNIQUE INDEX "only_one_company" ON "Organization" ("type") WHERE "type" = 'COMPANY';
