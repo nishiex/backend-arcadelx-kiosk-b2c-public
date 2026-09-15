@@ -63,6 +63,13 @@ model Organization {
 
   owner               User         @relation("OrganizationOwner",fields: [ownerId],references: [id])
   memberships         Membership[]
+  
+  initiatedConnections NetworkConnection[] @relation("InitiatorOrg")
+  receivedConnections  NetworkConnection[] @relation("ReceiverOrg")
+
+  parentAgreements     Agreement[] @relation("ParentAgreements")
+  childAgreements      Agreement[] @relation("ChildAgreements")
+
 }
 
 
@@ -93,4 +100,56 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])
+}
+
+enum NetworkStatus {
+  PENDING
+  ACTIVE
+}
+
+model NetworkConnection { 
+  id               String        @id @default(uuid())
+  initiatorOrgId   String 
+  receiverOrgId   String 
+  status           NetworkStatus @default(PENDING) //PENDING,ACTIVE
+
+  createdAt       DateTime      @default(now()) // Added
+  updatedAt       DateTime      @updatedAt      // Added
+
+  initiator        Organization  @relation("InitiatorOrg" , fields: [initiatorOrgId] , references: [id] )
+  reciever         Organization  @relation("ReceiverOrg" , fields: [receiverOrgId] ,  references: [id] )
+
+  agreements Agreement[]
+}
+
+enum AgreementStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  TERMINATED
+}
+
+model Agreement {
+  id                  String   @id @default(uuid())
+  networkConnectionId String
+
+  parentOrgId         String
+  childOrgId          String
+
+  parentSharePct      Decimal  @db.Decimal(5,2)
+  childSharePct       Decimal  @db.Decimal(5,2)
+
+  effectiveFrom       DateTime
+  effectiveTo         DateTime?
+  status              AgreementStatus @default(DRAFT)
+  pdfUrl              String?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  networkConnection   NetworkConnection @relation(fields: [networkConnectionId],references: [id])
+
+  parentOrg           Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
+
+  childOrg            Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
 }

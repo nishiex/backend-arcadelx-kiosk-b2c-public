@@ -9,7 +9,8 @@ import { ApiError } from "./utils/ApiError";
 import cookieParser from "cookie-parser";
 import authRoutes from './routes/auth.routes';
 import memberRoutes from "./routes/member.routes";
-
+import networkRoutes from "./routes/Network/network.routes"
+import agreementRoutes from "./routes/Agreements/agreement.routes"
 const app = express();
 
 app.use(cors())
@@ -22,6 +23,8 @@ app.use(cookieParser());
 //routes
 app.use("/api/auth",authRoutes)
 app.use("/api/members",memberRoutes)
+app.use('/api/network', networkRoutes);
+app.use('/api/agreements', agreementRoutes);
 
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
