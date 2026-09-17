@@ -88,3 +88,16 @@ export const requireOrgType = (...allowedTypes: string[]) => {
     next();
   };
 };
+
+/*Allowed Logic, COMPANY ->DISTRIBUTOR
+                         ->PARTNER
+                  DISTRIBUTOR->PARTNER
+
+                        */
+export const requireCanCreateOrganization = (req: Request,res: Response,next: NextFunction) => {
+  if (!req.membership) throw new ApiError(403, "Organization membership required");
+
+  if (req.membership.type !== "COMPANY" && req.membership.type !== "DISTRIBUTOR") throw new ApiError(403,"Your organization cannot create other organizations");
+
+  next();
+};

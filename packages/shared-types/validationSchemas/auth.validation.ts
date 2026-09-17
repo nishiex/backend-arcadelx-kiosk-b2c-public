@@ -55,3 +55,17 @@ export const JoinOrgSchema = z.object({
   password: passwordSchema,
   inviteCode: z.string().trim().max(10, "Invalid invite code"),
 });
+
+
+export const ResetPasswordSchema = z.object({
+  email: z.string().email(),
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+  confirmPassword: z.string().min(8),
+}).refine(
+  (data) => data.newPassword === data.confirmPassword,
+  {
+    message: "New passwords do not match",
+    path: ["confirmPassword"],
+  }
+);

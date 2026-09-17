@@ -51,7 +51,7 @@ export const initiateConnection = asyncHandler(async(req:Request,res:Response)=>
     const targetType = targetOrg.type;
 
     // Only a parent can make request to the child i.e COMPANY -> PARTNER , COMPANY->DISTRIBUOTR , DISTRIBUOR->PARTENR;PARTNER is handled in the route itlsef, as he is restricted to even access this route so now worries
-    if (initiatorType === "DISTRIBUTOR" && targetType === "COMPANY")throw new ApiError(405,`${initiatorType} cannot make connection requests to ${targetType}`);
+    if (initiatorType === "DISTRIBUTOR" && ( targetType === "COMPANY" || targetType === "DISTRIBUTOR"))throw new ApiError(405,`${initiatorType} cannot make connection requests to ${targetType}`);
         
     const existingConnection = await prisma.networkConnection.findFirst({
     where: {
