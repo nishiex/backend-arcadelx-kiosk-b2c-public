@@ -28,7 +28,6 @@ export const RegisterOrgSchema = z.object({
   orgType: z.enum(["DISTRIBUTOR","PARTNER"]), // Notice 'COMPANY' is explicitly excluded
   ownerName: nameSchema,
   ownerEmail: emailSchema,
-  password: passwordSchema,
   state: stateSchema,
   city: citySchema,
   pincode: pincodeSchema,
@@ -69,3 +68,28 @@ export const ResetPasswordSchema = z.object({
     path: ["confirmPassword"],
   }
 );
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const VerifyResetOtpSchema = z.object({
+  email: z.string().email("Invalid email address"),
+
+  otp: z
+    .string()
+    .length(6, "OTP must be 6 digits")
+    .regex(/^\d{6}$/, "OTP must contain only numbers"),
+});
+
+export const CompletePasswordResetSchema = z
+  .object({
+    resetToken: z.string().min(1, "Reset token is required"),
+
+    newPassword: passwordSchema,
+    confirmPassword: passwordSchema
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });

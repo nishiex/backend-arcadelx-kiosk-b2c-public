@@ -3,10 +3,14 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "../utils/db";
 import { asyncHandler } from "../utils/asyncHandler";
-import { RegisterOrgSchema, JoinOrgSchema, LoginSchema,ResetPasswordSchema } from '@shared-types/validationSchemas/auth.validation'; // Adjust import based on your monorepo setup
-import { generateTokens,hashToken,setTokenCookies } from "../utils/token";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
+import { RegisterOrgSchema, JoinOrgSchema, LoginSchema,ResetPasswordSchema,ForgotPasswordSchema,VerifyResetOtpSchema,CompletePasswordResetSchema } from '@shared-types/validationSchemas/auth.validation'; // Adjust import based on your monorepo setup
+import { generateTokens,hashToken,setTokenCookies } from "../utils/token";
+import { sendOrganizationCredentialsEmail } from "../services/email/auth.email";
+import { sendPasswordResetOtpEmail,sendPasswordChangedEmail } from "../services/email/passwordreset.email";
+import {generateOtp,generateResetToken,hashResetValue,} from "../utils/passwordReset";
+
 
 /*
 On the Frontend side  we only give 3 options
@@ -93,14 +97,15 @@ export const registerOrganization = asyncHandler(
     });
 
  
-    // TODO: Send credentials by email
+   // Send credentials by email
+    await sendOrganizationCredentialsEmail({
+      email: user.email,
+      name: user.name,
+      organizationName: org.name,
+      organizationType: org.type,
+      temporaryPassword,
+    });
 
-    // await sendOrganizationCredentialsEmail({
-    //   email: user.email,
-    //   name: user.name,
-    //   organizationName: org.name,
-    //   temporaryPassword,
-    // });
 
     // IMPORTANT:
     // Do NOT generate access/refresh tokens here.
@@ -296,7 +301,7 @@ export const getMe = asyncHandler(async(req:Request,res:Response)=>
     res.status(200).json(new ApiResponse(200,{ user },"User fetched successfully"));
 })
 
-export const resetPassword = asyncHandler(
+export const changePassword = asyncHandler(
   async (req: Request, res: Response) => {
     const {
       email,
@@ -362,6 +367,237 @@ export const resetPassword = asyncHandler(
         200,
         null,
         "Password reset successfully. Please login again."
+      )
+    );
+  }
+);
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+    const { email } = ForgotPasswordSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    /*IMPORTANT:Don't reveal whether the email exists. */
+
+    if (!user) return res.status(200).json(new ApiResponse(200,null,"If an account exists with this email, an OTP has been sent."));
+
+    const otp = generateOtp();
+    const otpHash = hashResetValue(otp);
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    /* Invalidate previous password reset requests.*/
+    await prisma.passwordReset.updateMany({
+      where: {
+        userId: user.id,
+        usedAt: null,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    /* Create new reset request.*/
+    await prisma.passwordReset.create({
+      data: {
+        userId: user.id,
+        otpHash,
+        expiresAt,
+      },
+    });
+
+    /* Send OTP.*/
+    await sendPasswordResetOtpEmail({
+      email: user.email,
+      name: user.name,
+      otp,
+    });
+
+    res.status(200).json(new ApiResponse(200,null,"If an account exists with this email, an OTP has been sent.")
+    );
+  }
+);
+
+export const verifyResetOtp = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email, otp } = VerifyResetOtpSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    /* Don't reveal whether the email exists.*/
+    if (!user) throw new ApiError(400, "Invalid or expired OTP");
+
+    const resetRequest = await prisma.passwordReset.findFirst({
+      where: {
+        userId: user.id,
+        usedAt: null,
+        verifiedAt: null,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!resetRequest) throw new ApiError(400, "Invalid or expired OTP");
+
+    /* Check expiration.*/
+    if (resetRequest.expiresAt < new Date()) {
+      await prisma.passwordReset.update({
+        where: {
+          id: resetRequest.id,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+
+      throw new ApiError(400, "OTP has expired");
+    }
+
+    /* Prevent brute-force attempts.*/
+    if (resetRequest.attempts >= 5) {
+      await prisma.passwordReset.update({
+        where: {
+          id: resetRequest.id,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+
+      throw new ApiError(
+        429,
+        "Too many incorrect attempts. Please request a new OTP."
+      );
+    }
+
+    /*Hash the OTP entered by the user.*/
+    const submittedOtpHash = hashResetValue(otp);
+
+    /*Compare hashes.*/
+    if (submittedOtpHash !== resetRequest.otpHash) {
+      await prisma.passwordReset.update({
+        where: {
+          id: resetRequest.id,
+        },
+        data: {
+          attempts: {
+            increment: 1,
+          },
+        },
+      });
+
+      throw new ApiError(400, "OTP is incorrect");
+    }
+
+    /*
+     * OTP is correct.
+     */
+
+    const resetToken = generateResetToken();
+    const resetTokenHash = hashResetValue(resetToken);
+
+    await prisma.passwordReset.update({
+      where: {
+        id: resetRequest.id,
+      },
+      data: {
+        verifiedAt: new Date(),
+        resetToken: resetTokenHash,
+      },
+    });
+
+    res.status(200).json(new ApiResponse(200,
+        {
+          resetToken,
+        },
+        "OTP verified successfully"
+      )
+    );
+  }
+);
+
+export const completeForgotPassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { resetToken, newPassword } = CompletePasswordResetSchema.parse(req.body);
+
+    // Hash the incoming reset token to compare with the database record
+    const hashedResetToken = hashResetValue(resetToken);
+
+    // Find the valid password reset request using the token
+    const resetRequest = await prisma.passwordReset.findFirst({
+      where: {
+        resetToken: hashedResetToken,
+        usedAt: null,
+        verifiedAt: { not: null }, // Must have successfully verified OTP already
+      },
+    });
+
+    if (!resetRequest) {
+      throw new ApiError(400, "Invalid or expired reset token");
+    }
+
+    // Check if the token has expired (e.g., giving them a 15-min window after OTP verification)
+    if (resetRequest.expiresAt < new Date()) {
+      await prisma.passwordReset.update({
+        where: { id: resetRequest.id },
+        data: { usedAt: new Date() },
+      });
+      throw new ApiError(400, "Reset token has expired. Please request a new OTP.");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: resetRequest.userId },
+    });
+
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Prevent using the same password again
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new ApiError(400, "New password must be different from your current password");
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Perform atomic update: update password, mark reset request as used, and clear active sessions
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newPasswordHash },
+      });
+
+      await tx.passwordReset.update({
+        where: { id: resetRequest.id },
+        data: { usedAt: new Date() },
+      });
+
+      // Invalidate all existing refresh tokens for security
+      await tx.refreshToken.deleteMany({
+        where: { userId: user.id },
+      });
+    });
+
+    await sendPasswordChangedEmail({
+      email: user.email,
+      name: user.name,
+    });
+
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        null,
+        "Password has been reset successfully. Please log in with your new password."
       )
     );
   }
