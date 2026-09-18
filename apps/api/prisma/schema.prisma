@@ -38,9 +38,33 @@ model User {
   // Organizations owned by this user
   ownedOrganizations Organization[] @relation("OrganizationOwner")
   tokens       RefreshToken[]
+  kioskAssignmentsMade KioskAssignment[] // Assignments made to a organization
+
+  passwordResets PasswordReset[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PasswordReset {
+  id           String   @id @default(uuid())
+  userId       String
+
+  otpHash      String
+  resetToken   String?  @unique
+
+  expiresAt    DateTime
+  verifiedAt   DateTime?
+  usedAt       DateTime?
+
+  attempts     Int      @default(0)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 
@@ -69,7 +93,8 @@ model Organization {
 
   parentAgreements     Agreement[] @relation("ParentAgreements")
   childAgreements      Agreement[] @relation("ChildAgreements")
-
+  kiosks             Kiosk[]
+  kioskAssignments   KioskAssignment[]
 }
 
 
@@ -152,4 +177,54 @@ model Agreement {
   parentOrg           Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
 
   childOrg            Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
+}
+
+enum KioskStatus {
+  AVAILABLE
+  RESERVED
+  ASSIGNED
+  INSTALLED 
+  MAINTENANCE
+  RETURNED
+  RETIRED
+}
+
+model Kiosk {
+id                 String  @id @default(uuid())
+  machineCode      String  @unique //eg:ADLX-2026-A048
+  model              String
+  status           KioskStatus  @default(AVAILABLE)
+  location         String?
+  externalDeviceId String?      @unique // Mothership's UUID (The Link)
+
+  currentOrgId     String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  currentOrg       Organization?      @relation(fields: [currentOrgId], references: [id])
+  assignments      KioskAssignment[]
+}
+
+// audit/history ledger for kiosk ownership/assignment movement.
+model KioskAssignment {
+  id             String    @id @default(uuid())
+  kioskId        String
+  organizationId String
+  orderId        String?   
+  assignedById   String    // The User ID who made the assignment
+  
+  assignedFrom   DateTime  @default(now())
+  assignedTo     DateTime? // Null means currently active
+
+  kiosk          Kiosk        @relation(fields: [kioskId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  assignedBy     User         @relation(fields: [assignedById], references: [id])
+
+  @@index([kioskId, assignedTo])
+  @@index([organizationId, assignedTo])
+}
+
+model MachineSequence {
+  year  Int @id
+  value Int @default(0)
 }

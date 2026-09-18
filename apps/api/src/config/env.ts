@@ -12,6 +12,7 @@ const envSchema = z.object({
   REFRESH_SECRET_TOKEN: z.string().min(64),
   ACCESS_EXPIRY: z.string().default('15m'),
   REFRESH_EXPIRY: z.string().default('7d'),
+  INTERNAL_API_SECRET: z.string().min(32, "Internal API secret must be at least 32 characters"),
   NODE_ENV:z.string()
 });
 

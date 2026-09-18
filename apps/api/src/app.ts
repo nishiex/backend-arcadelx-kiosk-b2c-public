@@ -11,6 +11,8 @@ import authRoutes from './routes/auth.routes';
 import memberRoutes from "./routes/member.routes";
 import networkRoutes from "./routes/Network/network.routes"
 import agreementRoutes from "./routes/Agreements/agreement.routes"
+import kioskRoutes from './routes/Kiosk/kiosk.routes';
+import internalRoutes from './routes/Internal/internal.routes';
 const app = express();
 
 app.use(cors())
@@ -25,6 +27,10 @@ app.use("/api/auth",authRoutes)
 app.use("/api/members",memberRoutes)
 app.use('/api/network', networkRoutes);
 app.use('/api/agreements', agreementRoutes);
+app.use('/api/kiosks', kioskRoutes);
+
+// Crucial: These routes bypass standard JWT auth because they are server-to-server
+    app.use('/api/internal', internalRoutes);
 
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
