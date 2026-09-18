@@ -48,7 +48,7 @@ ${process.env.MAIL_FROM_NAME}
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
         
-        <h2>Welcome to ${process.env.MAIL_FROM_NAME}</h2>
+        <h2>Welcome to ${process.env.MAIL_FROM_NAME}-${organizationType}Account Created</h2>
 
         <p>Hello ${name},</p>
 
@@ -56,7 +56,6 @@ ${process.env.MAIL_FROM_NAME}
           Your <strong>${organizationType}</strong> organization account
           has been created successfully.
         </p>
-
         <p>
           <strong>Organization:</strong> ${organizationName}
         </p>
@@ -94,14 +93,17 @@ ${process.env.MAIL_FROM_NAME}
         </p>
 
         <p>
-          For security reasons, please change your password after
-          your first login.
+          Please use the above temporary credentials to log in to your account. For security purposes, we strongly recommend changing your password immediately after your first login.
         </p>
-
+        <P>
+          We look forward to working with you and building the ARCADELX network together.
+        </p>
         <p>
           Regards,<br />
-          ${process.env.MAIL_FROM_NAME}
+          Team ${process.env.MAIL_FROM_NAME}
+          Nilee Games and Future Technologies Pvt. Ltd.
         </p>
+
 
       </div>
     `,

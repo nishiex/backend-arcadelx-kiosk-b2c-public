@@ -15,7 +15,7 @@ export const sendPasswordResetOtpEmail = async ({
     to: email,
     toName: name,
 
-    subject: "Your password reset OTP",
+    subject: "ARCADELX – Your password reset OTP",
 
     text: `
 Hello ${name},
@@ -102,11 +102,12 @@ ${process.env.MAIL_FROM_NAME}
         <p>Hello ${name},</p>
         <p>This is a confirmation that the password for your account has been successfully changed.</p>
         <p style="color: #d9534f; font-weight: bold;">
-          If you did not make this change, please contact support immediately.
+          If you did not initiate this password change, please contact the ARCADELX Support Team immediately to secure your account
         </p>
         <p>
           Regards,<br />
-          ${process.env.MAIL_FROM_NAME}
+          TEAM ${process.env.MAIL_FROM_NAME}
+          Nilee Games and Future Technologies Pvt. Ltd.
         </p>
       </div>
     `,
