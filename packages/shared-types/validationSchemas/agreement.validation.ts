@@ -5,4 +5,7 @@ export const CreateAgreementSchema = z.object({
   childOrgId: z.string().uuid(),
   parentSharePct: z.number().min(0).max(70).optional(), // Optional because Distributor logic overwrites it
   childSharePct: z.number().min(0).max(30).optional(),
+  depositAmountPerMachine:z.number().min(0).optional(),
+  nonRefundableAmountPerMachine:z.number().min(0).optional()
+
 });

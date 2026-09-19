@@ -155,28 +155,31 @@ enum AgreementStatus {
 }
 
 model Agreement {
-  id                  String   @id @default(uuid())
-  networkConnectionId String
+  id                              String   @id @default(uuid())
+  networkConnectionId             String
 
-  parentOrgId         String
-  childOrgId          String
+  parentOrgId                     String
+  childOrgId                      String
 
-  parentSharePct      Decimal  @db.Decimal(5,2)
-  childSharePct       Decimal  @db.Decimal(5,2)
+  parentSharePct                  Decimal  @db.Decimal(5,2)
+  childSharePct                   Decimal  @db.Decimal(5,2)
 
-  effectiveFrom       DateTime
-  effectiveTo         DateTime?
-  status              AgreementStatus @default(DRAFT)
-  pdfUrl              String?
+  effectiveFrom                   DateTime
+  effectiveTo                     DateTime?
+  status                          AgreementStatus @default(DRAFT)
+  pdfUrl                          String?
+  depositAmountPerMachine         Int
+  nonRefundableAmountPerMachine  Int
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
 
-  networkConnection   NetworkConnection @relation(fields: [networkConnectionId],references: [id])
+  networkConnection               NetworkConnection @relation(fields: [networkConnectionId],references: [id])
 
-  parentOrg           Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
+  parentOrg                       Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
 
-  childOrg            Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
+  childOrg                      Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
+
 }
 
 enum KioskStatus {
