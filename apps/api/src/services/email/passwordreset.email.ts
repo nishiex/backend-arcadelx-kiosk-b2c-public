@@ -65,7 +65,8 @@ ${process.env.MAIL_FROM_NAME}
 
         <p>
           Regards,<br />
-          ${process.env.MAIL_FROM_NAME}
+          TEAM ${process.env.MAIL_FROM_NAME},<br />
+          Nilee Games and Future Technologies Pvt. Ltd.
         </p>
 
       </div>
@@ -106,7 +107,7 @@ ${process.env.MAIL_FROM_NAME}
         </p>
         <p>
           Regards,<br />
-          TEAM ${process.env.MAIL_FROM_NAME}
+          TEAM ${process.env.MAIL_FROM_NAME},<br />
           Nilee Games and Future Technologies Pvt. Ltd.
         </p>
       </div>

@@ -100,7 +100,7 @@ ${process.env.MAIL_FROM_NAME}
         </p>
         <p>
           Regards,<br />
-          Team ${process.env.MAIL_FROM_NAME}
+          Team ${process.env.MAIL_FROM_NAME},<br />
           Nilee Games and Future Technologies Pvt. Ltd.
         </p>
 

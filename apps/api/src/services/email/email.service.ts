@@ -1,4 +1,10 @@
 import Mailjet from "node-mailjet";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const mailjet = Mailjet.apiConnect(
   process.env.MAILJET_API_KEY!,
@@ -13,7 +19,6 @@ type SendEmailParams = {
   html: string;
 };
 
-// Define standard disclaimers
 const TEXT_DISCLAIMER = `
 ---
 CONFIDENTIAL – FOR AUTHORIZED RECIPIENT ONLY
@@ -56,9 +61,42 @@ export const sendEmail = async ({
   text,
   html,
 }: SendEmailParams) => {
-  // Automatically append the disclaimer to text and HTML versions
+
   const finalText = text + TEXT_DISCLAIMER;
-  const finalHtml = html + HTML_DISCLAIMER;
+
+  const finalHtml = `
+    <div style="
+      max-width: 600px;
+      margin: 0 auto;
+      font-family: Arial, sans-serif;
+    ">
+
+      <!-- Logo -->
+      <div style="
+        text-align: center;
+        padding: 20px 0;
+      ">
+        <img
+          src="cid:arcadelx-logo"
+          alt="ARCADELX"
+          width="180"
+          style="
+            display: block;
+            margin: 0 auto;
+            max-width: 180px;
+            height: auto;
+          "
+        />
+      </div>
+
+      <!-- Email Content -->
+      ${html}
+
+      <!-- Disclaimer -->
+      ${HTML_DISCLAIMER}
+
+    </div>
+  `;
 
   const request = await mailjet
     .post("send", { version: "v3.1" })
@@ -69,15 +107,34 @@ export const sendEmail = async ({
             Email: process.env.MAIL_FROM_EMAIL!,
             Name: process.env.MAIL_FROM_NAME!,
           },
+
           To: [
             {
               Email: to,
               Name: toName,
             },
           ],
+
           Subject: subject,
+
           TextPart: finalText,
+
           HTMLPart: finalHtml,
+
+          InlinedAttachments: [
+          {
+            ContentType: "image/png",
+            Filename: "arcadelx-logo.png",
+            Base64Content: fs
+              .readFileSync(
+                path.join(__dirname, "../../assets/arcadelx-logo.png")
+              )
+              .toString("base64"),
+
+            ContentID: "arcadelx-logo",
+          },
+          ],
+
         },
       ],
     });
