@@ -17,6 +17,11 @@ type SendEmailParams = {
   subject: string;
   text: string;
   html: string;
+  attachment?: {
+    filename: string;
+    base64Content: string;
+    contentType: string;
+  };
 };
 
 const TEXT_DISCLAIMER = `
@@ -59,7 +64,7 @@ export const sendEmail = async ({
   toName,
   subject,
   text,
-  html,
+  html,attachment
 }: SendEmailParams) => {
 
   const finalText = text + TEXT_DISCLAIMER;
@@ -134,6 +139,13 @@ export const sendEmail = async ({
             ContentID: "arcadelx-logo",
           },
           ],
+          Attachments: attachment ? [
+            {
+              ContentType: attachment.contentType,
+              Filename: attachment.filename,
+              Base64Content: attachment.base64Content,
+            }
+          ] : [],
 
         },
       ],

@@ -95,6 +95,8 @@ model Organization {
   childAgreements      Agreement[] @relation("ChildAgreements")
   kiosks             Kiosk[]
   kioskAssignments   KioskAssignment[]
+  ordersAsParent Order[] @relation("OrderParent")
+  ordersAsChild  Order[] @relation("OrderChild")
 }
 
 
@@ -180,6 +182,7 @@ model Agreement {
 
   childOrg                      Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
 
+  orders Order[]
 }
 
 enum KioskStatus {
@@ -206,6 +209,7 @@ id                 String  @id @default(uuid())
 
   currentOrg       Organization?      @relation(fields: [currentOrgId], references: [id])
   assignments      KioskAssignment[]
+  orderKiosks      OrderKiosk[]  
 }
 
 // audit/history ledger for kiosk ownership/assignment movement.
@@ -222,7 +226,7 @@ model KioskAssignment {
   kiosk          Kiosk        @relation(fields: [kioskId], references: [id])
   organization   Organization @relation(fields: [organizationId], references: [id])
   assignedBy     User         @relation(fields: [assignedById], references: [id])
-
+  order          Order?       @relation(fields: [orderId], references: [id])
   @@index([kioskId, assignedTo])
   @@index([organizationId, assignedTo])
 }
@@ -230,4 +234,70 @@ model KioskAssignment {
 model MachineSequence {
   year  Int @id
   value Int @default(0)
+}
+
+enum OrderType {
+  REQUEST     // Distributor asks Company
+  ALLOCATION  // Parent proactively pushes to Child
+}
+
+enum OrderStatus {
+  UNDER_REVIEW
+  APPROVED
+  DISPATCHED
+  DELIVERED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Order {
+  id                      String      @id @default(uuid())
+  orderNumber             String      @unique // e.g., ORD-2026-0001
+  type                    OrderType
+  status                  OrderStatus @default(UNDER_REVIEW)
+  paymentStatus           PaymentStatus @default(PENDING)
+
+  parentOrgId             String
+  childOrgId              String
+  agreementId             String
+
+  quantity                Int
+  depositPerMachine       Float
+  nonRefundablePerMachine Float
+
+  totalDeposit            Float
+  totalNonRefundable      Float // Without tax
+  taxAmount               Float // 18% GST on the totalNonRefundable
+  grandTotal              Float // totalDeposit + totalNonRefundable + taxAmount
+
+  invoiceUrl              String? // Path to the VPS file
+  invoiceFilename         String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  parentOrg               Organization      @relation("OrderParent", fields: [parentOrgId], references: [id])
+  childOrg                Organization      @relation("OrderChild", fields: [childOrgId], references: [id])
+  agreement               Agreement         @relation(fields: [agreementId], references: [id])
+  
+  dispatchedKiosks        OrderKiosk[]
+  kioskAssignments        KioskAssignment[]
+}
+
+// Kiosks reserved for an order during APPROVED state.
+// These become ASSIGNED when the order is dispatched.
+model OrderKiosk {
+  orderId  String
+  kioskId  String
+
+  order    Order @relation(fields: [orderId], references: [id])
+  kiosk    Kiosk @relation(fields: [kioskId], references: [id])
+
+  @@id([orderId, kioskId])
 }

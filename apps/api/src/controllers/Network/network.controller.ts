@@ -147,7 +147,7 @@ export const acceptConnection = asyncHandler(async (req: Request, res: Response)
   if (typeof connectionId !== "string") throw new ApiError(400, "Invalid connection ID");
 
   const connection = await prisma.networkConnection.findFirst({
-    where: { id: connectionId, receiverOrgId: currentOrgId, status: 'PENDING' }
+    where: { id: connectionId, receeiververOrgId: currentOrgId, status: 'PENDING' }
   });
 
   if (!connection) throw new ApiError(404, 'Pending connection request not found');
