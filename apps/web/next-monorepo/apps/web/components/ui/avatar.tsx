@@ -17,16 +17,12 @@ export default function Avatar({ name = "User" }: { name?: string }) {
   async function handleSignOut() {
     if (signingOut) return
     setSigningOut(true)
-    try {
-      await logout()
-      // Drop any cached identity/data so the next session starts clean.
-      queryClient.clear()
-      toast.success("Signed out")
-      router.replace("/login")
-    } catch {
-      toast.error("Sign out failed")
-      setSigningOut(false)
-    }
+    // Best-effort server call, then always tear down the client session and
+    // leave. logout() never throws, so sign-out can't get stuck on this screen.
+    await logout()
+    queryClient.clear()
+    toast.success("Signed out")
+    router.replace("/login")
   }
 
   return (
@@ -43,7 +39,7 @@ export default function Avatar({ name = "User" }: { name?: string }) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1.5 shadow-lg">
             <Link
-              href="/profile"
+              href="/settings"
               onClick={() => setOpen(false)}
               className="block rounded-lg px-2.5 py-2 text-sm hover:bg-muted"
             >

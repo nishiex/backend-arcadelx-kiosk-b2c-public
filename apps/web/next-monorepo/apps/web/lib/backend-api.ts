@@ -75,15 +75,13 @@ export type Me = {
 
 // ---- Kiosks ----
 export const KIOSK_STATUSES = [
-  'AVAILABLE',
-  'RESERVED',
-  'ASSIGNED',
-  'INSTALLED',
-  'MAINTENANCE',
-  'RETURNED',
-  'RETIRED',
+  'AVAILABLE'
 ] as const;
 export type KioskStatus = (typeof KIOSK_STATUSES)[number];
+
+// Statuses a user may pick in the status dropdowns. RESERVED and ASSIGNED are
+// set by the reserve/assign flows (not manual selection), so they're excluded
+// here while remaining valid KioskStatus values for display of existing kiosks.
 
 /** Minimal, non-sensitive org reference returned alongside a kiosk. */
 export type OrgRef = { id: string; name: string; type: OrgType };
@@ -183,7 +181,12 @@ export type CreateDistributorInput = {
 export type CreateDistributorResult = {
   organization: { id: string; name: string; type: OrgType };
   owner: { id: string; name: string; email: string };
-  credentialsEmailSent: boolean;
+  /**
+   * Whether the backend confirmed the credentials email was sent. The current
+   * register endpoint does not return this flag (and fails the whole request if
+   * the mail send throws), so it is optional — treat "absent" as "unknown".
+   */
+  credentialsEmailSent?: boolean;
 };
 
 /** Creates a DISTRIBUTOR organization (and its owner) via the register endpoint. */
@@ -220,13 +223,24 @@ export type Distributor = {
 };
 
 export async function fetchDistributors(): Promise<Distributor[]> {
-  const res = await apiFetch('/api/distributors', { credentials: 'include' });
+  const res = await apiFetch('/api/network/distributors', { credentials: 'include' });
   const json = await handleRes<{ distributors: Distributor[] }>(res);
   return json.distributors;
 }
 
+// This backend exposes no logout route yet, and the auth cookies are httpOnly
+// (set by setTokenCookies), so client JS cannot clear them. Sign-out is therefore
+// client-side only: we clear the query cache and redirect to /login. This call is
+// best-effort and never throws — if the backend later adds POST /api/auth/logout
+// (to clearCookie + revoke the stored refresh token) it will "just work" and give
+// true server-side session invalidation. Until then the server session lingers
+// until the tokens expire.
 export async function logout(): Promise<void> {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch {
+    // Network/endpoint failure must never block sign-out.
+  }
 }
 
 export async function changePassword(input: {

@@ -8,41 +8,34 @@ import { X, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   updateKioskStatus,
-  KIOSK_STATUSES,
   type Kiosk,
-  type KioskStatus,
 } from "@/lib/backend-api"
-import { StatusBadge, STATUS_META } from "@/components/dashboard/ui"
+import { StatusBadge } from "@/components/dashboard/ui"
 
 export default function KioskDetailDialog({
   kiosk,
   open,
   onOpenChange,
   canEdit,
-  initialStatus,
 }: {
   kiosk: Kiosk | null
   open: boolean
   onOpenChange: (v: boolean) => void
   canEdit: boolean
-  /** Pre-select a target status when opened (e.g. an inline "Installed" hand-off). */
-  initialStatus?: KioskStatus
 }) {
   const queryClient = useQueryClient()
-  const [status, setStatus] = React.useState<KioskStatus>("AVAILABLE")
   const [location, setLocation] = React.useState("")
 
   React.useEffect(() => {
     if (kiosk) {
-      setStatus(initialStatus ?? kiosk.status)
       setLocation(typeof kiosk.location === "string" ? kiosk.location : "")
     }
-  }, [kiosk, initialStatus])
+  }, [kiosk])
 
   const mutation = useMutation({
     mutationFn: () =>
       updateKioskStatus(kiosk!.id, {
-        status,
+        status: kiosk!.status,
         ...(location.trim() ? { location: location.trim() } : {}),
       }),
     onSuccess: () => {
@@ -53,9 +46,6 @@ export default function KioskDetailDialog({
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
   })
-
-  // Backend requires a location when moving to INSTALLED.
-  const needsLocation = status === "INSTALLED" && !location.trim()
 
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -92,24 +82,8 @@ export default function KioskDetailDialog({
               {canEdit ? (
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="status" className="mb-1.5 block text-sm font-medium">Update status</label>
-                    <select
-                      id="status"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as KioskStatus)}
-                      className={cn(
-                        "w-full rounded-lg border border-input px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring/40",
-                        STATUS_META[status]?.pill ?? "bg-background"
-                      )}
-                    >
-                      {KIOSK_STATUSES.map((s) => (
-                        <option key={s} value={s}>{STATUS_META[s]?.label ?? s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
                     <label htmlFor="loc" className="mb-1.5 block text-sm font-medium">
-                      Location {status === "INSTALLED" && <span className="text-destructive">*</span>}
+                      Location
                     </label>
                     <input
                       id="loc"
@@ -118,9 +92,6 @@ export default function KioskDetailDialog({
                       placeholder="e.g. Phoenix Mall, Mumbai"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                     />
-                    {needsLocation && (
-                      <p className="mt-1 text-xs text-destructive">Location is required to mark a machine Installed.</p>
-                    )}
                   </div>
                   <div className="flex justify-end gap-2 pt-1">
                     <RadixDialog.Close className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
@@ -128,7 +99,7 @@ export default function KioskDetailDialog({
                     </RadixDialog.Close>
                     <button
                       onClick={() => mutation.mutate()}
-                      disabled={needsLocation || mutation.isPending}
+                      disabled={mutation.isPending}
                       className={cn(
                         "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90",
                         "disabled:cursor-not-allowed disabled:opacity-60"

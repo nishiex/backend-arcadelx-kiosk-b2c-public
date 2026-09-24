@@ -5,17 +5,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutGrid,
-  Users,
   UserCog,
   MonitorSmartphone,
-  ShoppingCart,
-  IndianRupee,
-  FileText,
-  CreditCard,
-  PieChart,
-  Headphones,
-  ShieldCheck,
-  Shield,
+  Building2,
   Settings,
   Menu,
   X,
@@ -32,19 +24,14 @@ type NavItem = {
   show?: (p: ReturnType<typeof useMe>) => boolean
 }
 
+// Only destinations backed by a live API on this deployment are listed.
+// (Orders, Revenue, Settlements, Payments, Reports, Support, Roles and Audit
+// Logs are hidden until their endpoints exist.)
 const NAV: NavItem[] = [
   { name: "Overview", href: "/", icon: LayoutGrid },
-  { name: "Distributors", href: "/distributors", icon: Users, show: (p) => p.canManageDistributors },
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
-  { name: "Revenue", href: "/revenue", icon: IndianRupee },
-  { name: "Settlements", href: "/settlements", icon: FileText, show: (p) => p.canManageAgreements },
-  { name: "Payments", href: "/payments", icon: CreditCard },
-  { name: "Reports", href: "/reports", icon: PieChart },
-  { name: "Support", href: "/support", icon: Headphones },
-  { name: "Users", href: "/user", icon: UserCog, show: (p) => p.can("STAFF", "VIEW") },
-  { name: "Roles & Permissions", href: "/roles", icon: Shield, show: (p) => p.canManageRoles },
-  { name: "Audit Logs", href: "/audit-logs", icon: ShieldCheck, show: (p) => p.isCompany },
+  { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
+  { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 

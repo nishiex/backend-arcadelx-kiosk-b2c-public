@@ -81,7 +81,7 @@ export default function AddDistributorForm() {
     },
     onSuccess: (data) => {
       toast.success(`Distributor "${data.organization.name}" created`)
-      if (!data.credentialsEmailSent) {
+      if (data.credentialsEmailSent === false) {
         toast.warning("Couldn't email login credentials — configure the mail service to send them.")
       }
       queryClient.invalidateQueries({ queryKey: ["distributors"] })
@@ -190,7 +190,7 @@ export default function AddDistributorForm() {
                 className={inputCls}
                 {...register("pincode", {
                   required: "Postal code is required",
-                  pattern: { value: /^\d{4,10}$/, message: "Enter a valid postal code" },
+                  pattern: { value: /^\d{6}$/, message: "Enter a valid 6-digit PIN code" },
                 })}
               />
             </Field>
@@ -220,7 +220,7 @@ export default function AddDistributorForm() {
             )}
           >
             {mutation.isPending && <Loader2 size={16} className="animate-spin" />}
-            Save Distributor
+            Register Distributor
           </button>
         </div>
       </form>

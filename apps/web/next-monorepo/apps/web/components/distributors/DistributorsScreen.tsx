@@ -34,7 +34,7 @@ export default function DistributorsScreen() {
             href="/distributors/new"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
           >
-            <Plus size={16} /> Add Distributor
+            <Plus size={16} /> Register Distributors
           </Link>
         )}
       </div>

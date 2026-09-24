@@ -1,68 +1,13 @@
 "use client"
 
 import React from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { Search, Eye, MonitorSmartphone, ChevronDown, Loader2 } from "lucide-react"
-import { cn } from "@workspace/ui/lib/utils"
-import { fetchKiosks, updateKioskStatus, KIOSK_STATUSES, type Kiosk, type KioskStatus } from "@/lib/backend-api"
+import { useQuery } from "@tanstack/react-query"
+import { Search, Eye, MonitorSmartphone } from "lucide-react"
+import { fetchKiosks, type Kiosk } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
-import { Skeleton, ErrorState, EmptyState, StatusBadge, STATUS_META } from "@/components/dashboard/ui"
+import { Skeleton, ErrorState, EmptyState, StatusBadge } from "@/components/dashboard/ui"
 import AddMachineDialog from "./AddMachineDialog"
 import KioskDetailDialog from "./KioskDetailDialog"
-
-/**
- * Inline status changer rendered right in the table row. Switches most
- * statuses with a single pick; marking a machine INSTALLED needs a location
- * (backend rule), so that case hands off to the detail dialog instead.
- */
-function InlineStatus({ k, onNeedsLocation }: { k: Kiosk; onNeedsLocation: () => void }) {
-  const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: (status: KioskStatus) => updateKioskStatus(k.id, { status }),
-    onSuccess: (_d, status) => {
-      toast.success(`Marked ${STATUS_META[status]?.label ?? status}`)
-      queryClient.invalidateQueries({ queryKey: ["kiosks"] })
-      queryClient.invalidateQueries({ queryKey: ["inventorySummary"] })
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
-  })
-
-  const change = (next: KioskStatus) => {
-    if (next === k.status) return
-    const hasLocation = typeof k.location === "string" && k.location.trim().length > 0
-    if (next === "INSTALLED" && !hasLocation) {
-      onNeedsLocation()
-      return
-    }
-    mutation.mutate(next)
-  }
-
-  const meta = STATUS_META[k.status]
-  return (
-    <div className="relative inline-flex items-center">
-      <select
-        value={k.status}
-        disabled={mutation.isPending}
-        aria-label="Change status"
-        onChange={(e) => change(e.target.value as KioskStatus)}
-        className={cn(
-          "cursor-pointer appearance-none rounded-full py-1 pl-2.5 pr-7 text-xs font-medium outline-none transition focus:ring-2 focus:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60",
-          meta?.pill ?? "bg-muted text-muted-foreground"
-        )}
-      >
-        {KIOSK_STATUSES.map((s) => (
-          <option key={s} value={s}>{STATUS_META[s]?.label ?? s}</option>
-        ))}
-      </select>
-      {mutation.isPending ? (
-        <Loader2 size={13} className="pointer-events-none absolute right-2 animate-spin opacity-70" />
-      ) : (
-        <ChevronDown size={13} className="pointer-events-none absolute right-2 opacity-60" />
-      )}
-    </div>
-  )
-}
 
 /** Renders the real holder org (and sub-org, if placed further) for a kiosk. */
 function AssignedCell({ k }: { k: Kiosk }) {
@@ -100,21 +45,16 @@ export default function KiosksScreen() {
   })
 
   const [q, setQ] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState<string>("ALL")
   const [selected, setSelected] = React.useState<Kiosk | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
-  const [initialStatus, setInitialStatus] = React.useState<KioskStatus | undefined>(undefined)
 
   const kiosks = data ?? []
   const filtered = kiosks.filter((k) => {
-    const matchesQ = !q || k.machineCode.toLowerCase().includes(q.toLowerCase()) || (k.model ?? "").toLowerCase().includes(q.toLowerCase())
-    const matchesStatus = statusFilter === "ALL" || k.status === statusFilter
-    return matchesQ && matchesStatus
+    return !q || k.machineCode.toLowerCase().includes(q.toLowerCase()) || (k.model ?? "").toLowerCase().includes(q.toLowerCase())
   })
 
-  const openDetail = (k: Kiosk, status?: KioskStatus) => {
+  const openDetail = (k: Kiosk) => {
     setSelected(k)
-    setInitialStatus(status)
     setDetailOpen(true)
   }
 
@@ -143,16 +83,6 @@ export default function KiosksScreen() {
               className="w-full rounded-lg border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
-          >
-            <option value="ALL">All statuses</option>
-            {KIOSK_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
         </div>
 
         {isLoading ? (
@@ -199,9 +129,7 @@ export default function KiosksScreen() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {canTransact
-                        ? <InlineStatus k={k} onNeedsLocation={() => openDetail(k, "INSTALLED")} />
-                        : <StatusBadge status={k.status} />}
+                      <StatusBadge status={k.status} />
                     </td>
                     <td className="px-4 py-3"><AssignedCell k={k} /></td>
                     <td className="px-4 py-3">{typeof k.location === "string" ? k.location : <span className="text-muted-foreground">—</span>}</td>
@@ -233,7 +161,6 @@ export default function KiosksScreen() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         canEdit={canTransact}
-        initialStatus={initialStatus}
       />
     </div>
   )

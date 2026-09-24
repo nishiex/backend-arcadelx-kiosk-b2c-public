@@ -147,7 +147,7 @@ export const acceptConnection = asyncHandler(async (req: Request, res: Response)
   if (typeof connectionId !== "string") throw new ApiError(400, "Invalid connection ID");
 
   const connection = await prisma.networkConnection.findFirst({
-    where: { id: connectionId, receeiververOrgId: currentOrgId, status: 'PENDING' }
+    where: { id: connectionId, receiverOrgId: currentOrgId, status: 'PENDING' }
   });
 
   if (!connection) throw new ApiError(404, 'Pending connection request not found');
@@ -189,4 +189,56 @@ export const deleteConnection = asyncHandler(async (req: Request, res: Response)
   });
 
   res.status(200).json(new ApiResponse(200, null, 'Network connection permanently removed'));
+});
+
+
+/**
+ * List DISTRIBUTOR organizations for the company dashboard.
+ *
+ * Scope: single-company deployment, so every DISTRIBUTOR-type org is visible to
+ * the COMPANY. If multi-company tenancy is introduced later, narrow this by
+ * NetworkConnection (company as initiator/receiver of the link).
+ *
+ * Note: gstNumber / phone / country are not columns on Organization yet
+ * (register does not capture them), so they are returned as null to satisfy the
+ * frontend contract until those fields are added to the schema.
+ */
+export const getDistributors = asyncHandler(async (_req: Request, res: Response) => {
+  const organizations = await prisma.organization.findMany({
+    where: { type: "DISTRIBUTOR" },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      state: true,
+      city: true,
+      pincode: true,
+      createdAt: true,
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      _count: {
+        select: {
+          kiosks: true,
+          memberships: true,
+        },
+      },
+    },
+  });
+
+  const distributors = organizations.map((org) => ({
+    ...org,
+    gstNumber: null,
+    phone: null,
+    country: null,
+  }));
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, { distributors }, "Distributors fetched successfully"));
 });
