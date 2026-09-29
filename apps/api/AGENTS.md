@@ -205,6 +205,15 @@ non-refundable total, and their sum as grand total. Invoice files reside under
 otherwise `process.cwd()/invoices`; persisted URLs use `/api/orders/:orderId/invoice`.
 Downloads require membership in the order's parent or child organization.
 
+Order invoices use a branded A4 layout with embedded Lato fonts (including the
+rupee glyph), Indian currency grouping, charge rows and a GST/total summary.
+Ship `src/assets/fonts` and `src/assets/invoice-logo.png` with the API. Downloads
+render the current design from saved order amounts after the existing access and
+archive-availability checks; archived PDFs and order/payment rows are not changed.
+Newly generated email attachments use the same renderer. Downloads are private
+and not cached. `AUDIT_PHASES=happy,fixes,invoice_layout` verifies generation,
+recovery, refreshed downloads, archive preservation and organization access.
+
 EmailDelivery jobs are created in the same transaction as the organization or
 approved order. PDF/email failure does not turn a committed business operation
 into an HTTP failure: response flags indicate `credentialsEmailSent`, or

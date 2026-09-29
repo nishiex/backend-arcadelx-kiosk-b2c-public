@@ -132,10 +132,11 @@ function sanitize(value: any): any {
 async function http(id: string, actor: any, method: string, route: string, body?: any, expected?: number | number[]) {
   const response = await fetch(base + route, { method, headers: { ...(actor?.cookie ? { Cookie: actor.cookie } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20000) });
   const contentType = response.headers.get('content-type') || '';
-  const data = contentType.includes('json') ? await response.json() : contentType.includes('pdf') ? { bytes: (await response.arrayBuffer()).byteLength, contentType } : (await response.text()).slice(0,500);
+  const pdf = contentType.includes('pdf') ? Buffer.from(await response.arrayBuffer()) : undefined;
+  const data = contentType.includes('json') ? await response.json() : pdf ? { bytes: pdf.byteLength, contentType } : (await response.text()).slice(0,500);
   const cookies = response.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
   record(id, { kind: 'HTTP', actor: actor?.label || 'unauthenticated', method, route, request: sanitize(body), status: response.status, expected, ...(expected === undefined ? {} : { pass: (Array.isArray(expected) ? expected : [expected]).includes(response.status) }), response: sanitize(data) });
-  return { status: response.status, data, cookies };
+  return { status: response.status, data, cookies, pdf, cacheControl: response.headers.get('cache-control') };
 }
 function check(id: string, pass: boolean, details: any = {}) { record(id, { kind: 'assertion', pass, ...details }); }
 async function login(label: string, email: string, pass = password) {

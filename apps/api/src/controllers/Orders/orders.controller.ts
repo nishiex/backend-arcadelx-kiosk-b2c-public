@@ -5,7 +5,7 @@ import { prisma } from "../../utils/db";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { INVOICES_DIR } from "../../services/pdf/invoice.pdf";
+import { INVOICES_DIR, renderInvoicePDF } from "../../services/pdf/invoice.pdf";
 import {
   queueInvoice,
   attemptDelivery,
@@ -350,7 +350,14 @@ export const getOrderInvoice = asyncHandler(async (req, res) => {
   if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { parentOrgId: true, childOrgId: true, invoiceFilename: true },
+    select: {
+      parentOrgId: true, childOrgId: true, invoiceFilename: true,
+      orderNumber: true, createdAt: true, quantity: true,
+      depositPerMachine: true, nonRefundablePerMachine: true,
+      totalDeposit: true, totalNonRefundable: true, taxAmount: true, grandTotal: true,
+      parentOrg: { select: { name: true } },
+      childOrg: { select: { name: true } },
+    },
   });
   if (!order) throw new ApiError(404, "Order not found");
   if (
@@ -364,12 +371,20 @@ export const getOrderInvoice = asyncHandler(async (req, res) => {
   const file = path.resolve(INVOICES_DIR, order.invoiceFilename);
   if (path.dirname(file) !== INVOICES_DIR || !fs.existsSync(file))
     throw new ApiError(404, "Invoice file not found");
+  // Refresh existing invoices from saved amounts without changing their archives.
+  const pdf = await renderInvoicePDF({
+    ...order,
+    parentOrgName: order.parentOrg.name,
+    childOrgName: order.childOrg.name,
+    date: order.createdAt,
+  });
+  res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
     `inline; filename="${path.basename(file)}"`,
   );
-  res.sendFile(file);
+  res.send(pdf);
 });
 
 export const getOrderRequests = asyncHandler(async (req, res) => {
