@@ -127,10 +127,12 @@ const handleRes = async <T,>(res: Response): Promise<T> => {
 // so concurrent calls share one refresh) and replay the original request. If
 // refresh fails the user is genuinely logged out and the 401 propagates.
 let refreshing: Promise<boolean> | null = null;
+let signingOut = false;
 
 function refreshSession(): Promise<boolean> {
+  if (signingOut) return Promise.resolve(false);
   if (!refreshing) {
-    refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+    refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15000) })
       .then((r) => r.ok)
       .catch(() => false)
       .finally(() => {
@@ -228,18 +230,19 @@ export async function fetchDistributors(): Promise<Distributor[]> {
   return json.distributors;
 }
 
-// This backend exposes no logout route yet, and the auth cookies are httpOnly
-// (set by setTokenCookies), so client JS cannot clear them. Sign-out is therefore
-// client-side only: we clear the query cache and redirect to /login. This call is
-// best-effort and never throws — if the backend later adds POST /api/auth/logout
-// (to clearCookie + revoke the stored refresh token) it will "just work" and give
-// true server-side session invalidation. Until then the server session lingers
-// until the tokens expire.
+// The nested path receives the existing path-scoped refresh cookie.
 export async function logout(): Promise<void> {
+  signingOut = true;
   try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-  } catch {
-    // Network/endpoint failure must never block sign-out.
+    // Finish any refresh already in flight before revoking its resulting token.
+    if (refreshing) await refreshing;
+    const res = await fetch('/api/auth/refresh/logout', {
+      method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15000),
+    });
+    await handleRes<null>(res);
+  } catch (error) {
+    signingOut = false;
+    throw error;
   }
 }
 

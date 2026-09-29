@@ -4,20 +4,47 @@ import { z } from "zod";
  * Reusable field schemas
  */
 
-const nameSchema = z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name must not exceed 100 characters");
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, "Name must be at least 2 characters")
+  .max(100, "Name must not exceed 100 characters");
 
-const emailSchema = z.string().trim().toLowerCase().email("Please enter a valid email address").max(254, "Email address is too long");
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Please enter a valid email address")
+  .max(254, "Email address is too long");
 
-const passwordSchema = z.string().min(8, "Password must be at least 8 characters").max(128, "Password must not exceed 128 characters");
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must not exceed 128 characters");
 
-const addressSchema = z.string().trim().min(5, "Address must be at least 5 characters").max(300, "Address must not exceed 300 characters");
+const addressSchema = z
+  .string()
+  .trim()
+  .min(5, "Address must be at least 5 characters")
+  .max(300, "Address must not exceed 300 characters");
 
-const citySchema = z.string().trim().min(2, "City must be at least 2 characters").max(100, "City must not exceed 100 characters");
+const citySchema = z
+  .string()
+  .trim()
+  .min(2, "City must be at least 2 characters")
+  .max(100, "City must not exceed 100 characters");
 
-const stateSchema = z.string().trim().min(2, "State must be at least 2 characters").max(100, "State must not exceed 100 characters");
+const stateSchema = z
+  .string()
+  .trim()
+  .min(2, "State must be at least 2 characters")
+  .max(100, "State must not exceed 100 characters");
 
-const pincodeSchema = z.number().int("Pincode must be a whole number").min(100000, "Invalid pincode").max(999999, "Invalid pincode");
-
+const pincodeSchema = z
+  .number()
+  .int("Pincode must be a whole number")
+  .min(100000, "Invalid pincode")
+  .max(999999, "Invalid pincode");
 
 /**
  * Register Organization
@@ -25,13 +52,16 @@ const pincodeSchema = z.number().int("Pincode must be a whole number").min(10000
 
 export const RegisterOrgSchema = z.object({
   orgName: nameSchema,
-  orgType: z.enum(["DISTRIBUTOR","PARTNER"]), // Notice 'COMPANY' is explicitly excluded
+  orgType: z.enum(["DISTRIBUTOR", "PARTNER"]), // Notice 'COMPANY' is explicitly excluded
   ownerName: nameSchema,
   ownerEmail: emailSchema,
   state: stateSchema,
   city: citySchema,
   pincode: pincodeSchema,
   address: addressSchema,
+  gstNumber: z.string().trim().min(1).max(30).optional(),
+  phone: z.string().trim().min(1).max(32).optional(),
+  country: z.string().trim().min(1).max(100).optional(),
 });
 
 /**
@@ -42,7 +72,6 @@ export const LoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required"),
 });
-
 
 /**
  * Join Organization
@@ -55,19 +84,17 @@ export const JoinOrgSchema = z.object({
   inviteCode: z.string().trim().max(10, "Invalid invite code"),
 });
 
-
-export const ResetPasswordSchema = z.object({
-  email: z.string().email(),
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
-  confirmPassword: z.string().min(8),
-}).refine(
-  (data) => data.newPassword === data.confirmPassword,
-  {
+export const ResetPasswordSchema = z
+  .object({
+    email: z.string().email(),
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
     message: "New passwords do not match",
     path: ["confirmPassword"],
-  }
-);
+  });
 
 export const ForgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -87,7 +114,7 @@ export const CompletePasswordResetSchema = z
     resetToken: z.string().min(1, "Reset token is required"),
 
     newPassword: passwordSchema,
-    confirmPassword: passwordSchema
+    confirmPassword: passwordSchema,
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",

@@ -1,16 +1,35 @@
-import type { Request,Response } from "express";
+import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "../utils/db";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
-import { RegisterOrgSchema, JoinOrgSchema, LoginSchema,ResetPasswordSchema,ForgotPasswordSchema,VerifyResetOtpSchema,CompletePasswordResetSchema } from '@shared-types/validationSchemas/auth.validation'; // Adjust import based on your monorepo setup
-import { generateTokens,hashToken,setTokenCookies } from "../utils/token";
-import { sendOrganizationCredentialsEmail } from "../services/email/auth.email";
-import { sendPasswordResetOtpEmail,sendPasswordChangedEmail } from "../services/email/passwordreset.email";
-import {generateOtp,generateResetToken,hashResetValue,} from "../utils/passwordReset";
-
+import {
+  RegisterOrgSchema,
+  JoinOrgSchema,
+  LoginSchema,
+  ResetPasswordSchema,
+  ForgotPasswordSchema,
+  VerifyResetOtpSchema,
+  CompletePasswordResetSchema,
+} from "@shared-types/validationSchemas/auth.validation"; // Adjust import based on your monorepo setup
+import { generateTokens, hashToken, setTokenCookies, clearTokenCookies } from "../utils/token";
+import {
+  queueCredentials,
+  attemptDelivery,
+  credentialDeliveryKey,
+  retryOwnedDelivery,
+} from "../services/email/delivery.service";
+import {
+  sendPasswordResetOtpEmail,
+  sendPasswordChangedEmail,
+} from "../services/email/passwordreset.email";
+import {
+  generateOtp,
+  generateResetToken,
+  hashResetValue,
+} from "../utils/passwordReset";
 
 /*
 On the Frontend side  we only give 3 options
@@ -28,20 +47,27 @@ export const registerOrganization = asyncHandler(
 
     // Validate what this parent can create
 
-    if (parentOrgType === "COMPANY" && !["DISTRIBUTOR", "PARTNER"].includes(validatedData.orgType)) throw new ApiError(403,"A company can only create Distributor or Partner organizations");
-    
+    if (
+      parentOrgType === "COMPANY" &&
+      !["DISTRIBUTOR", "PARTNER"].includes(validatedData.orgType)
+    )
+      throw new ApiError(
+        403,
+        "A company can only create Distributor or Partner organizations",
+      );
+
     if (
       parentOrgType === "DISTRIBUTOR" &&
       validatedData.orgType !== "PARTNER"
     ) {
       throw new ApiError(
         403,
-        "A Distributor can only create Partner organizations"
+        "A Distributor can only create Partner organizations",
       );
     }
 
-    if (parentOrgType === "PARTNER") throw new ApiError(403,"A Partner cannot create organizations");
-    
+    if (parentOrgType === "PARTNER")
+      throw new ApiError(403, "A Partner cannot create organizations");
 
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -49,18 +75,18 @@ export const registerOrganization = asyncHandler(
       },
     });
 
-    if (existingUser) throw new ApiError(409,"User with this email already exists");
-    
+    if (existingUser)
+      throw new ApiError(409, "User with this email already exists");
+
     // Generate temporary password
 
     const temporaryPassword = crypto.randomBytes(8).toString("base64url");
 
-    const passwordHash = await bcrypt.hash(temporaryPassword,10);
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
     // Create owner + organization + membership
 
     const { user, org } = await prisma.$transaction(async (tx) => {
-
       const newUser = await tx.user.create({
         data: {
           name: validatedData.ownerName,
@@ -77,6 +103,9 @@ export const registerOrganization = asyncHandler(
           city: validatedData.city,
           pincode: validatedData.pincode,
           address: validatedData.address,
+          gstNumber: validatedData.gstNumber ?? null,
+          phone: validatedData.phone ?? null,
+          country: validatedData.country ?? null,
           ownerId: newUser.id,
         },
       });
@@ -90,31 +119,34 @@ export const registerOrganization = asyncHandler(
         },
       });
 
+      await queueCredentials(tx, req.membership!.organizationId, newOrg.id, {
+        email: newUser.email,
+        name: newUser.name,
+        organizationName: newOrg.name,
+        organizationType: newOrg.type,
+        temporaryPassword,
+      });
       return {
         user: newUser,
         org: newOrg,
       };
     });
 
- 
-   // Send credentials by email
-    await sendOrganizationCredentialsEmail({
-      email: user.email,
-      name: user.name,
-      organizationName: org.name,
-      organizationType: org.type,
-      temporaryPassword,
-    });
-
+    // Send credentials by email
+    const credentialsEmailSent = await attemptDelivery(
+      credentialDeliveryKey(org.id),
+    );
 
     // IMPORTANT:
     // Do NOT generate access/refresh tokens here.
     // The parent organization user is already logged in.
 
-    
     // Don't send the temporary password in the API response ,password should go through email service.
-    res.status(201).json(new ApiResponse(201,
+    res.status(201).json(
+      new ApiResponse(
+        201,
         {
+          credentialsEmailSent,
           organization: {
             id: org.id,
             name: org.name,
@@ -126,68 +158,110 @@ export const registerOrganization = asyncHandler(
             email: user.email,
           },
         },
-        "Organization created successfully"
-      )
+        "Organization created successfully",
+      ),
     );
-  }
+  },
 );
 
 //Join Organization(COMPAnY ONLY)
-export const joinOrganization = asyncHandler(async(req:Request,res:Response)=>
-{
+export const joinOrganization = asyncHandler(
+  async (req: Request, res: Response) => {
     const validatedData = JoinOrgSchema.parse(req.body);
 
-     const exsitingUser = await prisma.user.findUnique({where: {email:validatedData.email }});
-    
-    if(exsitingUser)throw new ApiError(409,"User with this email already exists ");
-    
-    const org = await prisma.organization.findUnique({ where: { inviteCode: validatedData.inviteCode } });
+    const exsitingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email },
+    });
 
-    if (org!.type !== "COMPANY")   throw new ApiError(403,"Only Company organizations accept join requests");
+    if (exsitingUser)
+      throw new ApiError(409, "User with this email already exists ");
 
-    if (!org) throw new ApiError(404, 'Invalid invite code');
-  
-    if (org.inviteCodeExpiresAt && org.inviteCodeExpiresAt < new Date()) throw new ApiError(400, 'Invite code has expired');
+    const org = await prisma.organization.findUnique({
+      where: { inviteCode: validatedData.inviteCode },
+    });
+
+    if (!org) throw new ApiError(404, "Invalid invite code");
+    if (org.type !== "COMPANY")
+      throw new ApiError(
+        403,
+        "Only Company organizations accept join requests",
+      );
+
+    if (org.inviteCodeExpiresAt && org.inviteCodeExpiresAt < new Date())
+      throw new ApiError(400, "Invite code has expired");
 
     //Hash the password entered by the user
-    const passwordHash = await bcrypt.hash(validatedData.password,10);
+    const passwordHash = await bcrypt.hash(validatedData.password, 10);
 
     const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: validatedData.name,
+          email: validatedData.email,
+          passwordHash,
+        },
+      });
 
-    const newUser = await tx.user.create({
-      data: { name: validatedData.name, email: validatedData.email, passwordHash }
+      await tx.membership.create({
+        data: { userId: newUser.id, organizationId: org.id, status: "PENDING" }, // No role assigned until approved
+      });
+
+      return newUser;
+    });
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    await prisma.refreshToken.create({
+      data: {
+        token: hashToken(refreshToken),
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
     });
 
-    await tx.membership.create({
-      data: { userId: newUser.id, organizationId: org.id, status: 'PENDING' } // No role assigned until approved
-    });
+    setTokenCookies(res, accessToken, refreshToken);
 
-    return newUser;
-  });
-  const { accessToken, refreshToken } = generateTokens(user.id);
-  
-  await prisma.refreshToken.create({
-    data: {
-      token: hashToken(refreshToken),
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    }
-  });
-
-  setTokenCookies(res, accessToken, refreshToken);
-
-  res.status(201).json(new ApiResponse(201, { user: { id: user.id, email: user.email } }, 'Successfully joined organization. Pending approval.'));
-})
+    res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          { user: { id: user.id, email: user.email } },
+          "Successfully joined organization. Pending approval.",
+        ),
+      );
+  },
+);
 
 //After every login we are rotating the refresh tokens
+export const retryOrganizationCredentials = asyncHandler(async (req, res) => {
+  const id = req.params.organizationId;
+  if (typeof id !== "string")
+    throw new ApiError(400, "Invalid organization ID");
+  const credentialsEmailSent = await retryOwnedDelivery(
+    credentialDeliveryKey(id),
+    req.membership!.organizationId,
+  );
+  res
+    .status(credentialsEmailSent ? 200 : 202)
+    .json(
+      new ApiResponse(
+        credentialsEmailSent ? 200 : 202,
+        { credentialsEmailSent },
+        credentialsEmailSent
+          ? "Credentials delivered"
+          : "Credentials remain queued; retry later",
+      ),
+    );
+});
+
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = LoginSchema.parse(req.body);
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new ApiError(401, 'Invalid email or password');
+  if (!user) throw new ApiError(401, "Invalid email or password");
 
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-  if (!isPasswordValid) throw new ApiError(401, 'Invalid email or password');
+  if (!isPasswordValid) throw new ApiError(401, "Invalid email or password");
 
   const { accessToken, refreshToken } = generateTokens(user.id);
 
@@ -195,19 +269,36 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     data: {
       token: hashToken(refreshToken),
       userId: user.id,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)//7D
-    }
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), //7D
+    },
   });
 
   setTokenCookies(res, accessToken, refreshToken);
 
-  res.status(200).json(new ApiResponse(200, { user: { id: user.id, email: user.email } }, 'Login successful'));
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user: { id: user.id, email: user.email } },
+        "Login successful",
+      ),
+    );
+});
+
+// No access-token or membership gate: expired sessions must also be able to exit.
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refresh_token;
+  if (typeof refreshToken === "string" && refreshToken) {
+    await prisma.refreshToken.deleteMany({ where: { token: hashToken(refreshToken) } });
+  }
+  clearTokenCookies(res);
+  res.status(200).json(new ApiResponse(200, null, "Signed out successfully"));
 });
 
 //Refresh Endpoint
-export const refresh = asyncHandler(async (req:Request,res:Response) =>
-{
-    const refreshToken = req.cookies.refresh_token;
+export const refresh = asyncHandler(async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refresh_token;
 
   if (!refreshToken) throw new ApiError(401, "Refresh token missing");
 
@@ -220,7 +311,6 @@ export const refresh = asyncHandler(async (req:Request,res:Response) =>
   });
 
   if (!storedToken) throw new ApiError(401, "Invalid refresh token");
-  
 
   if (storedToken.expiresAt < new Date()) {
     // Clean up expired token
@@ -234,7 +324,9 @@ export const refresh = asyncHandler(async (req:Request,res:Response) =>
   }
 
   // Generate new token pair
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(storedToken.userId);
+  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
+    storedToken.userId,
+  );
 
   // Rotate refresh token atomically
   await prisma.$transaction(async (tx) => {
@@ -258,56 +350,51 @@ export const refresh = asyncHandler(async (req:Request,res:Response) =>
   // Send new tokens
   setTokenCookies(res, accessToken, newRefreshToken);
 
-  res.status(200).json(new ApiResponse(200,{ accessToken },"Token refreshed successfully"));
-
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, { accessToken }, "Token refreshed successfully"),
+    );
 });
 
 //Routes for frontend...
-export const getMe = asyncHandler(async(req:Request,res:Response)=>
-{
-    const user = await prisma.user.findUnique(
-        {
-            where:{
-                id:req.user!.id,
+export const getMe = asyncHandler(async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: req.user!.id,
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      membership: {
+        select: {
+          organizationId: true,
+          status: true,
+          role: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
             },
-              select:
-              {
-                 id:true,
-                 email:true,
-                 name:true,
-                 membership:
-                 {
-                    select:
-                    {
-                        organizationId:true,
-                        status: true,
-                        role: true,
-                        organization: {
-                                        select: {
-                                            id: true,
-                                            name: true,
-                                            type: true,
-                                        },
-                        }
-                    }
-                 }
+          },
+        },
+      },
+    },
+  });
+  if (!user) throw new ApiError(404, "User not found");
 
-              }
-        }
-    )
-    if (!user) throw new ApiError(404, "User not found");
-
-
-    res.status(200).json(new ApiResponse(200,{ user },"User fetched successfully"));
-})
+  res
+    .status(200)
+    .json(new ApiResponse(200, { user }, "User fetched successfully"));
+});
 
 export const changePassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const {
-      email,
-      currentPassword,
-      newPassword,
-    } = ResetPasswordSchema.parse(req.body);
+    const { email, currentPassword, newPassword } = ResetPasswordSchema.parse(
+      req.body,
+    );
 
     const user = await prisma.user.findUnique({
       where: {
@@ -321,7 +408,7 @@ export const changePassword = asyncHandler(
 
     const isPasswordValid = await bcrypt.compare(
       currentPassword,
-      user.passwordHash
+      user.passwordHash,
     );
 
     if (!isPasswordValid) {
@@ -329,15 +416,12 @@ export const changePassword = asyncHandler(
     }
 
     // Prevent using the same password again
-    const isSamePassword = await bcrypt.compare(
-      newPassword,
-      user.passwordHash
-    );
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
 
     if (isSamePassword) {
       throw new ApiError(
         400,
-        "New password must be different from your current password"
+        "New password must be different from your current password",
       );
     }
 
@@ -362,17 +446,20 @@ export const changePassword = asyncHandler(
       });
     });
 
-    res.status(200).json(
-      new ApiResponse(
-        200,
-        null,
-        "Password reset successfully. Please login again."
-      )
-    );
-  }
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "Password reset successfully. Please login again.",
+        ),
+      );
+  },
 );
 
-export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+export const forgotPassword = asyncHandler(
+  async (req: Request, res: Response) => {
     const { email } = ForgotPasswordSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({
@@ -383,7 +470,16 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
 
     /*IMPORTANT:Don't reveal whether the email exists. */
 
-    if (!user) return res.status(200).json(new ApiResponse(200,null,"If an account exists with this email, an OTP has been sent."));
+    if (!user)
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            null,
+            "If an account exists with this email, an OTP has been sent.",
+          ),
+        );
 
     const otp = generateOtp();
     const otpHash = hashResetValue(otp);
@@ -417,9 +513,16 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
       otp,
     });
 
-    res.status(200).json(new ApiResponse(200,null,"If an account exists with this email, an OTP has been sent.")
-    );
-  }
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "If an account exists with this email, an OTP has been sent.",
+        ),
+      );
+  },
 );
 
 export const verifyResetOtp = asyncHandler(
@@ -475,7 +578,7 @@ export const verifyResetOtp = asyncHandler(
 
       throw new ApiError(
         429,
-        "Too many incorrect attempts. Please request a new OTP."
+        "Too many incorrect attempts. Please request a new OTP.",
       );
     }
 
@@ -515,19 +618,23 @@ export const verifyResetOtp = asyncHandler(
       },
     });
 
-    res.status(200).json(new ApiResponse(200,
+    res.status(200).json(
+      new ApiResponse(
+        200,
         {
           resetToken,
         },
-        "OTP verified successfully"
-      )
+        "OTP verified successfully",
+      ),
     );
-  }
+  },
 );
 
 export const completeForgotPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { resetToken, newPassword } = CompletePasswordResetSchema.parse(req.body);
+    const { resetToken, newPassword } = CompletePasswordResetSchema.parse(
+      req.body,
+    );
 
     // Hash the incoming reset token to compare with the database record
     const hashedResetToken = hashResetValue(resetToken);
@@ -551,7 +658,10 @@ export const completeForgotPassword = asyncHandler(
         where: { id: resetRequest.id },
         data: { usedAt: new Date() },
       });
-      throw new ApiError(400, "Reset token has expired. Please request a new OTP.");
+      throw new ApiError(
+        400,
+        "Reset token has expired. Please request a new OTP.",
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -565,7 +675,10 @@ export const completeForgotPassword = asyncHandler(
     // Prevent using the same password again
     const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
     if (isSamePassword) {
-      throw new ApiError(400, "New password must be different from your current password");
+      throw new ApiError(
+        400,
+        "New password must be different from your current password",
+      );
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
@@ -593,12 +706,14 @@ export const completeForgotPassword = asyncHandler(
       name: user.name,
     });
 
-    res.status(200).json(
-      new ApiResponse(
-        200,
-        null,
-        "Password has been reset successfully. Please log in with your new password."
-      )
-    );
-  }
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "Password has been reset successfully. Please log in with your new password.",
+        ),
+      );
+  },
 );

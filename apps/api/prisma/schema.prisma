@@ -28,92 +28,94 @@ enum MembershipStatus {
 
 // 1 User can only join 1 Organization at a time
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String @id @default(uuid())
+  email        String @unique
   passwordHash String
   name         String
-  
-  membership   Membership?
+
+  membership Membership?
 
   // Organizations owned by this user
-  ownedOrganizations Organization[] @relation("OrganizationOwner")
-  tokens       RefreshToken[]
+  ownedOrganizations   Organization[]    @relation("OrganizationOwner")
+  tokens               RefreshToken[]
   kioskAssignmentsMade KioskAssignment[] // Assignments made to a organization
 
   passwordResets PasswordReset[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PasswordReset {
-  id           String   @id @default(uuid())
-  userId       String
+  id     String @id @default(uuid())
+  userId String
 
-  otpHash      String
-  resetToken   String?  @unique
+  otpHash    String
+  resetToken String? @unique
 
-  expiresAt    DateTime
-  verifiedAt   DateTime?
-  usedAt       DateTime?
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  usedAt     DateTime?
 
-  attempts     Int      @default(0)
+  attempts Int @default(0)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
-
 model Organization {
-  id                  String   @id @default(uuid())
-  ownerId             String
+  id      String @id @default(uuid())
+  ownerId String
 
-  name                String
-  type                OrgType
-  state               String
-  city                String
-  pincode             Int
-  address             String
+  name      String
+  type      OrgType
+  state     String
+  city      String
+  pincode   Int
+  address   String
+  gstNumber String? @db.VarChar(30)
+  phone     String? @db.VarChar(32)
+  country   String? @db.VarChar(100)
 
-  inviteCode          String?  @unique
+  inviteCode          String?   @unique
   inviteCodeExpiresAt DateTime?
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  owner               User         @relation("OrganizationOwner",fields: [ownerId],references: [id])
-  memberships         Membership[]
-  
+  owner       User         @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  memberships Membership[]
+
   initiatedConnections NetworkConnection[] @relation("InitiatorOrg")
   receivedConnections  NetworkConnection[] @relation("ReceiverOrg")
 
-  parentAgreements     Agreement[] @relation("ParentAgreements")
-  childAgreements      Agreement[] @relation("ChildAgreements")
-  kiosks             Kiosk[]
-  kioskAssignments   KioskAssignment[]
-  ordersAsParent Order[] @relation("OrderParent")
-  ordersAsChild  Order[] @relation("OrderChild")
+  parentAgreements Agreement[]       @relation("ParentAgreements")
+  childAgreements  Agreement[]       @relation("ChildAgreements")
+  kiosks           Kiosk[]
+  kioskAssignments KioskAssignment[]
+  ordersAsParent   Order[]           @relation("OrderParent")
+  ordersAsChild    Order[]           @relation("OrderChild")
+  emailDeliveries  EmailDelivery[]
 }
 
-
 model Membership {
-  id             String           @id @default(uuid())
-  userId         String           @unique
+  id             String @id @default(uuid())
+  userId         String @unique
   organizationId String
 
-  role           Role?
-  status         MembershipStatus @default(PENDING)
+  role   Role?
+  status MembershipStatus @default(PENDING)
 
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user           User         @relation(fields: [userId],references: [id] )
+  user User @relation(fields: [userId], references: [id])
 
-  organization   Organization @relation(fields: [organizationId],references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
@@ -126,7 +128,7 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum NetworkStatus {
@@ -134,17 +136,17 @@ enum NetworkStatus {
   ACTIVE
 }
 
-model NetworkConnection { 
-  id               String        @id @default(uuid())
-  initiatorOrgId   String 
-  receiverOrgId   String 
-  status           NetworkStatus @default(PENDING) //PENDING,ACTIVE
+model NetworkConnection {
+  id             String        @id @default(uuid())
+  initiatorOrgId String
+  receiverOrgId  String
+  status         NetworkStatus @default(PENDING) //PENDING,ACTIVE
 
-  createdAt       DateTime      @default(now()) // Added
-  updatedAt       DateTime      @updatedAt      // Added
+  createdAt DateTime @default(now()) // Added
+  updatedAt DateTime @updatedAt // Added
 
-  initiator        Organization  @relation("InitiatorOrg" , fields: [initiatorOrgId] , references: [id] )
-  reciever         Organization  @relation("ReceiverOrg" , fields: [receiverOrgId] ,  references: [id] )
+  initiator Organization @relation("InitiatorOrg", fields: [initiatorOrgId], references: [id])
+  reciever  Organization @relation("ReceiverOrg", fields: [receiverOrgId], references: [id])
 
   agreements Agreement[]
 }
@@ -157,30 +159,30 @@ enum AgreementStatus {
 }
 
 model Agreement {
-  id                              String   @id @default(uuid())
-  networkConnectionId             String
+  id                  String @id @default(uuid())
+  networkConnectionId String
 
-  parentOrgId                     String
-  childOrgId                      String
+  parentOrgId String
+  childOrgId  String
 
-  parentSharePct                  Decimal  @db.Decimal(5,2)
-  childSharePct                   Decimal  @db.Decimal(5,2)
+  parentSharePct Decimal @db.Decimal(5, 2)
+  childSharePct  Decimal @db.Decimal(5, 2)
 
-  effectiveFrom                   DateTime
-  effectiveTo                     DateTime?
-  status                          AgreementStatus @default(DRAFT)
-  pdfUrl                          String?
-  depositAmountPerMachine         Int
-  nonRefundableAmountPerMachine  Int
+  effectiveFrom                 DateTime
+  effectiveTo                   DateTime?
+  status                        AgreementStatus @default(DRAFT)
+  pdfUrl                        String?
+  depositAmountPerMachine       Int
+  nonRefundableAmountPerMachine Int
 
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  networkConnection               NetworkConnection @relation(fields: [networkConnectionId],references: [id])
+  networkConnection NetworkConnection @relation(fields: [networkConnectionId], references: [id])
 
-  parentOrg                       Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
+  parentOrg Organization @relation("ParentAgreements", fields: [parentOrgId], references: [id])
 
-  childOrg                      Organization @relation("ChildAgreements", fields: [childOrgId],references: [id] )
+  childOrg Organization @relation("ChildAgreements", fields: [childOrgId], references: [id])
 
   orders Order[]
 }
@@ -189,44 +191,47 @@ enum KioskStatus {
   AVAILABLE
   RESERVED
   ASSIGNED
-  INSTALLED 
+  INSTALLED
   MAINTENANCE
   RETURNED
   RETIRED
 }
 
 model Kiosk {
-id                 String  @id @default(uuid())
-  machineCode      String  @unique //eg:ADLX-2026-A048
-  model              String
-  status           KioskStatus  @default(AVAILABLE)
+  id               String      @id @default(uuid())
+  machineCode      String      @unique //eg:ADLX-2026-A048
+  model            String
+  status           KioskStatus @default(AVAILABLE)
   location         String?
-  externalDeviceId String?      @unique // Mothership's UUID (The Link)
+  externalDeviceId String?     @unique // Mothership's UUID (The Link)
 
-  currentOrgId     String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  currentOrgId    String?
+  reservedOrderId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  currentOrg       Organization?      @relation(fields: [currentOrgId], references: [id])
-  assignments      KioskAssignment[]
-  orderKiosks      OrderKiosk[]  
+  currentOrg    Organization?     @relation(fields: [currentOrgId], references: [id])
+  assignments   KioskAssignment[]
+  orderKiosks   OrderKiosk[]
+  reservedOrder Order?            @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
 }
 
 // audit/history ledger for kiosk ownership/assignment movement.
 model KioskAssignment {
-  id             String    @id @default(uuid())
+  id             String  @id @default(uuid())
   kioskId        String
   organizationId String
-  orderId        String?   
-  assignedById   String    // The User ID who made the assignment
-  
-  assignedFrom   DateTime  @default(now())
-  assignedTo     DateTime? // Null means currently active
+  orderId        String?
+  assignedById   String // The User ID who made the assignment
 
-  kiosk          Kiosk        @relation(fields: [kioskId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  assignedBy     User         @relation(fields: [assignedById], references: [id])
-  order          Order?       @relation(fields: [orderId], references: [id])
+  assignedFrom DateTime  @default(now())
+  assignedTo   DateTime? // Null means currently active
+
+  kiosk        Kiosk        @relation(fields: [kioskId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  assignedBy   User         @relation(fields: [assignedById], references: [id])
+  order        Order?       @relation(fields: [orderId], references: [id])
+
   @@index([kioskId, assignedTo])
   @@index([organizationId, assignedTo])
 }
@@ -236,9 +241,30 @@ model MachineSequence {
   value Int @default(0)
 }
 
+model OrderSequence {
+  year  Int @id
+  value Int @default(0)
+}
+
+// Payloads are authenticated-encrypted. Sent credentials are erased after delivery.
+model EmailDelivery {
+  id                  String       @id @default(uuid())
+  key                 String       @unique
+  kind                String
+  ownerOrganizationId String
+  payload             String
+  attempts            Int          @default(0)
+  leaseId             String?
+  lockedUntil         DateTime?
+  sentAt              DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  ownerOrganization   Organization @relation(fields: [ownerOrganizationId], references: [id])
+}
+
 enum OrderType {
-  REQUEST     // Distributor asks Company
-  ALLOCATION  // Parent proactively pushes to Child
+  REQUEST // Distributor asks Company
+  ALLOCATION // Parent proactively pushes to Child
 }
 
 enum OrderStatus {
@@ -257,47 +283,48 @@ enum PaymentStatus {
 }
 
 model Order {
-  id                      String      @id @default(uuid())
-  orderNumber             String      @unique // e.g., ORD-2026-0001
-  type                    OrderType
-  status                  OrderStatus @default(UNDER_REVIEW)
-  paymentStatus           PaymentStatus @default(PENDING)
+  id            String        @id @default(uuid())
+  orderNumber   String        @unique // e.g., ORD-2026-0001
+  type          OrderType
+  status        OrderStatus   @default(UNDER_REVIEW)
+  paymentStatus PaymentStatus @default(PENDING)
 
-  parentOrgId             String
-  childOrgId              String
-  agreementId             String
+  parentOrgId String
+  childOrgId  String
+  agreementId String
 
   quantity                Int
   depositPerMachine       Float
   nonRefundablePerMachine Float
 
-  totalDeposit            Float
-  totalNonRefundable      Float // Without tax
-  taxAmount               Float // 18% GST on the totalNonRefundable
-  grandTotal              Float // totalDeposit + totalNonRefundable + taxAmount
+  totalDeposit       Float
+  totalNonRefundable Float // Without tax
+  taxAmount          Float // 18% GST on the totalNonRefundable
+  grandTotal         Float // totalDeposit + totalNonRefundable + taxAmount
 
-  invoiceUrl              String? // Path to the VPS file
-  invoiceFilename         String?
-  
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
+  invoiceUrl      String? // Path to the VPS file
+  invoiceFilename String?
 
-  parentOrg               Organization      @relation("OrderParent", fields: [parentOrgId], references: [id])
-  childOrg                Organization      @relation("OrderChild", fields: [childOrgId], references: [id])
-  agreement               Agreement         @relation(fields: [agreementId], references: [id])
-  
-  dispatchedKiosks        OrderKiosk[]
-  kioskAssignments        KioskAssignment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parentOrg Organization @relation("OrderParent", fields: [parentOrgId], references: [id])
+  childOrg  Organization @relation("OrderChild", fields: [childOrgId], references: [id])
+  agreement Agreement    @relation(fields: [agreementId], references: [id])
+
+  dispatchedKiosks OrderKiosk[]
+  kioskAssignments KioskAssignment[]
+  reservedKiosks   Kiosk[]           @relation("ReservedKiosks")
 }
 
 // Kiosks reserved for an order during APPROVED state.
 // These become ASSIGNED when the order is dispatched.
 model OrderKiosk {
-  orderId  String
-  kioskId  String
+  orderId String
+  kioskId String
 
-  order    Order @relation(fields: [orderId], references: [id])
-  kiosk    Kiosk @relation(fields: [kioskId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+  kiosk Kiosk @relation(fields: [kioskId], references: [id])
 
   @@id([orderId, kioskId])
 }

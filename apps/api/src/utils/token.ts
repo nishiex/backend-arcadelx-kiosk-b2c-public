@@ -2,6 +2,13 @@ import jwt, { type SignOptions } from 'jsonwebtoken';
 import type { StringValue } from 'ms';
 import crypto from 'crypto';
 import { env } from '../config/env';
+import type { Response } from 'express';
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+};
 
 function expiryToMs(expiry: string): number {
   const match = /^(\d+(?:\.\d+)?)([mhd])$/i.exec(expiry);
@@ -42,11 +49,6 @@ export const hashToken = (token: string) => {
 };
 
 export const setTokenCookies = (res: any, accessToken: string, refreshToken: string) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
-  };  
 
   const ACCESS_COOKIE_EXPIRY = expiryToMs(env.ACCESS_EXPIRY);
   const REFRESH_COOKIE_EXPIRY = expiryToMs(env.REFRESH_EXPIRY);
@@ -55,4 +57,9 @@ export const setTokenCookies = (res: any, accessToken: string, refreshToken: str
   res.cookie('access_token', accessToken, { ...cookieOptions, maxAge: ACCESS_COOKIE_EXPIRY }); 
   // Refresh token cookie
   res.cookie('refresh_token', refreshToken, { ...cookieOptions, path: '/api/auth/refresh', maxAge: REFRESH_COOKIE_EXPIRY }); 
+};
+
+export const clearTokenCookies = (res: Response) => {
+  res.clearCookie('access_token', { ...cookieOptions, path: '/' });
+  res.clearCookie('refresh_token', { ...cookieOptions, path: '/api/auth/refresh' });
 };

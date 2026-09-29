@@ -1,32 +1,77 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { requireAuth,loadMembership,requireOrgType,requireRole } from "../../middlewares/auth";
-import { createOrder,approveOrder,getOrderInvoice,getOrderRequests,markOrderAsPaid,dispatchOrder,deliverOrder } from "../../controllers/Orders/orders.controller";
+import {
+  requireAuth,
+  loadMembership,
+  requireOrgType,
+  requireRole,
+} from "../../middlewares/auth";
+import {
+  createOrder,
+  approveOrder,
+  getOrderInvoice,
+  getOrderRequests,
+  markOrderAsPaid,
+  dispatchOrder,
+  deliverOrder,
+  retryOrderInvoice,
+} from "../../controllers/Orders/orders.controller";
 
 const router = Router();
 
-router.use(requireAuth,loadMembership)
+router.use(requireAuth, loadMembership);
 
 // Get orders / requests for current organization
-router.get("/",getOrderRequests);
+router.get("/", getOrderRequests);
 
 //create Orders
-router.post("/create",requireOrgType("COMPANY","DISTRIBUTOR"),requireRole("OWNER","ADMIN"),createOrder);
+router.post(
+  "/create",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  createOrder,
+);
 
 //Only Company can approve order request as only that org type can recuive Order requests , Not the distributor
-router.patch("/:orderId/approve",requireOrgType("COMPANY","DISTRIBUTOR"),requireRole("OWNER","ADMIN"),approveOrder)
+router.patch(
+  "/:orderId/approve",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  approveOrder,
+);
 
 //Mark Order as Paid
-router.patch("/:orderId/paid",requireOrgType("COMPANY","DISTRIBUTOR"),requireRole("OWNER", "ADMIN"),markOrderAsPaid );
+router.patch(
+  "/:orderId/paid",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  markOrderAsPaid,
+);
 
 // Dispatch PAID order
-router.patch("/:orderId/dispatch",requireOrgType("COMPANY","DISTRIBUTOR"),requireRole("OWNER", "ADMIN"),dispatchOrder);
+router.patch(
+  "/:orderId/dispatch",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  dispatchOrder,
+);
 
 // Deliver order / transfer kiosk ownership
-router.patch("/:orderId/deliver",requireOrgType("COMPANY","DISTRIBUTOR"),requireRole("OWNER", "ADMIN"),deliverOrder);
+router.patch(
+  "/:orderId/deliver",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  deliverOrder,
+);
 
 //pdf route for the frontend
-router.get("/:orderId/invoice",getOrderInvoice);
+router.get("/:orderId/invoice", getOrderInvoice);
+router.post(
+  "/:orderId/invoice/retry",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  retryOrderInvoice,
+);
 
 export default router;
 

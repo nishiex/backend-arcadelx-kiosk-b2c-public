@@ -1,17 +1,13 @@
 "use client"
 
 import React from "react"
-import { useQuery } from "@tanstack/react-query"
 import { Box } from "lucide-react"
-import { fetchKiosks } from "@/lib/backend-api"
+import { useOwnedKiosks } from "@/hooks/useOwnedKiosks"
 import { useReveal } from "@/hooks/useReveal"
 import { Panel, Skeleton, ErrorState, EmptyState, StatusBadge } from "./ui"
 
 export default function RecentKiosks() {
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["kiosks"],
-    queryFn: fetchKiosks,
-  })
+  const { data, isLoading, isError, refetch } = useOwnedKiosks()
 
   const kiosks = (data ?? []).slice(0, 8)
   const ref = useReveal<HTMLUListElement>([kiosks.length])
@@ -36,7 +32,7 @@ export default function RecentKiosks() {
       ) : isError ? (
         <ErrorState message="Couldn't load kiosks." onRetry={() => refetch()} />
       ) : !kiosks.length ? (
-        <EmptyState message="No kiosks yet." icon={<Box size={28} />} />
+        <EmptyState message="No kiosks in your inventory." icon={<Box size={28} />} />
       ) : (
         // Cap the list to roughly the Fleet-composition donut height and scroll
         // inside, so the two side-by-side cards stay the same height.

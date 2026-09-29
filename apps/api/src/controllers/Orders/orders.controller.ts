@@ -1,567 +1,395 @@
-import type { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
-import { prisma } from '../../utils/db';
-import { ApiError } from '../../utils/ApiError';
-import { ApiResponse } from '../../utils/ApiResponse';
-import { asyncHandler } from '../../utils/asyncHandler';
-import { generateInvoicePDF,INVOICES_DIR } from '../../services/pdf/invoice.pdf';
-import { sendEmail } from '../../services/email/email.service';
-import { CreateOrderSchema } from '@shared-types/validationSchemas/Orders/order.validation'
+import fs from "node:fs";
+import path from "node:path";
+import { Prisma } from "../../generated/prisma/client";
+import { prisma } from "../../utils/db";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { asyncHandler } from "../../utils/asyncHandler";
+import { INVOICES_DIR } from "../../services/pdf/invoice.pdf";
+import {
+  queueInvoice,
+  attemptDelivery,
+  invoiceDeliveryKey,
+  retryOwnedDelivery,
+} from "../../services/email/delivery.service";
+import { lockAgreementParties } from "../../services/agreement-rules";
+import {
+  CreateOrderSchema,
+  OrderQuerySchema,
+} from "@shared-types/validationSchemas/Orders/order.validation";
 
-const reserveKiosks = async (tx: any,orgId: string,quantity: number,orderId: string) => {
-  const availableKiosks = await tx.kiosk.findMany({
+const reserveKiosks = async (
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  quantity: number,
+  orderId: string,
+) => {
+  const kiosks = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='AVAILABLE' AND "reservedOrderId" IS NULL
+    ORDER BY "createdAt", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
+  if (kiosks.length !== quantity)
+    throw new ApiError(
+      409,
+      "Insufficient unreserved inventory; retry if another allocation is in progress",
+    );
+  const ids = kiosks.map((k) => k.id);
+  const updated = await tx.kiosk.updateMany({
     where: {
+      id: { in: ids },
       currentOrgId: orgId,
-      status: 'AVAILABLE',
+      status: "AVAILABLE",
+      reservedOrderId: null,
     },
-    orderBy: {
-      createdAt: 'asc',
-    },
-    take: quantity,
-    select: {
-      id: true,
-      machineCode: true,
-    },
+    data: { status: "RESERVED", reservedOrderId: orderId },
   });
-
-  if (availableKiosks.length < quantity) throw new ApiError(400,`Insufficient inventory. Available: ${availableKiosks.length}, Requested: ${quantity}.`);
-  
-  const kioskIds = availableKiosks.map((kiosk: any) => kiosk.id);
-
-  await tx.kiosk.updateMany({
-    where: {
-      id: {
-        in: kioskIds,
-      },
-      status: 'AVAILABLE',
-    },
-    data: {
-      status: 'RESERVED',
-    },
-  });
-
+  if (updated.count !== quantity)
+    throw new ApiError(409, "Inventory changed during reservation");
   await tx.orderKiosk.createMany({
-    data: kioskIds.map((kioskId: string) => ({
-      orderId,
-      kioskId,
-    })),
+    data: ids.map((kioskId) => ({ orderId, kioskId })),
   });
-
-  return availableKiosks;
 };
 
-export const createOrder = asyncHandler(async (req: Request, res: Response) => {
+async function lockedOrder(
+  tx: Prisma.TransactionClient,
+  id: string,
+  orgId: string,
+) {
+  await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${id} FOR UPDATE`;
+  const order = await tx.order.findUnique({
+    where: { id },
+    include: {
+      dispatchedKiosks: true,
+      agreement: { include: { networkConnection: true } },
+      parentOrg: { select: { type: true } },
+      childOrg: { select: { type: true } },
+    },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  if (order.parentOrgId !== orgId)
+    throw new ApiError(403, "Unauthorized to modify this order");
+  const network = order.agreement.networkConnection;
+  if (
+    order.parentOrgId === order.childOrgId ||
+    order.agreement.parentOrgId !== order.parentOrgId ||
+    order.agreement.childOrgId !== order.childOrgId ||
+    network.initiatorOrgId !== order.parentOrgId ||
+    network.receiverOrgId !== order.childOrgId ||
+    !(
+      (order.parentOrg.type === "COMPANY" &&
+        ["DISTRIBUTOR", "PARTNER"].includes(order.childOrg.type)) ||
+      (order.parentOrg.type === "DISTRIBUTOR" &&
+        order.childOrg.type === "PARTNER")
+    )
+  ) {
+    throw new ApiError(
+      409,
+      "Order relationship is inconsistent; reconciliation is required",
+    );
+  }
+  return order;
+}
+
+async function lockedStock(
+  tx: Prisma.TransactionClient,
+  order: Awaited<ReturnType<typeof lockedOrder>>,
+  status: "RESERVED" | "ASSIGNED",
+) {
+  const ids = order.dispatchedKiosks.map((row) => row.kioskId);
+  if (ids.length !== order.quantity || ids.length === 0)
+    throw new ApiError(
+      409,
+      "Order does not contain the required number of kiosks",
+    );
+  await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+  const kiosks = await tx.kiosk.findMany({ where: { id: { in: ids } } });
+  if (
+    kiosks.length !== order.quantity ||
+    kiosks.some(
+      (k) =>
+        k.currentOrgId !== order.parentOrgId ||
+        k.status !== status ||
+        k.reservedOrderId !== order.id,
+    )
+  ) {
+    throw new ApiError(
+      409,
+      "Kiosk ownership, state, or reservation no longer matches this order",
+    );
+  }
+  return ids;
+}
+
+export const createOrder = asyncHandler(async (req, res) => {
   const { type, targetOrgId, quantity } = CreateOrderSchema.parse(req.body);
   const currentOrgId = req.membership!.organizationId;
-  const currentOrgType = req.membership!.type;
-
-  // 1. RBAC Gate: Partners cannot initiate orders of any kind
-  if (currentOrgType === 'PARTNER') throw new ApiError(403, 'Partners are not authorized to create or request orders');
-
-  // Determine direction based on action type
-  const parentOrgId = type === 'REQUEST' ? targetOrgId : currentOrgId;
-  const childOrgId = type === 'REQUEST' ? currentOrgId : targetOrgId;
-
-  // 2. Active Agreement Gate
-  const agreement = await prisma.agreement.findFirst({
-    where: {
-      parentOrgId,
-      childOrgId,
-      status: 'ACTIVE'
-    },
-    include: {
-      parentOrg: true,
-      childOrg: true
-    }
-  });
-
-  if (!agreement) throw new ApiError(403, 'Cannot create order: No active agreement exists between these organizations');
-
-  // 3. Financial Math (Inherited strictly from the agreement)
-  const depositPerMachine = Number(agreement.depositAmountPerMachine);
-  const nonRefundablePerMachine = Number(agreement.nonRefundableAmountPerMachine);
-
-  const totalDeposit = depositPerMachine * quantity;
-  const totalNonRefundable = nonRefundablePerMachine * quantity;
-  const taxAmount = totalNonRefundable * 0.18; // 18% GST only on non-refundable
-  const grandTotal = totalDeposit + totalNonRefundable + taxAmount;
-
- // 4 & 5. Generate Order Number and Save to Database (Wrapped in Transaction)
-  const currentYear = new Date().getFullYear();
-  
+  const parentOrgId = type === "REQUEST" ? targetOrgId : currentOrgId;
+  const childOrgId = type === "REQUEST" ? currentOrgId : targetOrgId;
   const order = await prisma.$transaction(async (tx) => {
-  // For ALLOCATION, inventory must be available immediately.
-  if (type === 'ALLOCATION') {
-    const availableCount = await tx.kiosk.count({
-      where: {
-        currentOrgId: parentOrgId,
-        status: 'AVAILABLE',
-      },
+    const candidate = await tx.agreement.findFirst({
+      where: { parentOrgId, childOrgId, status: "ACTIVE" },
     });
-
-    if (availableCount < quantity) throw new ApiError(400,`Insufficient inventory. Available: ${availableCount}, Requested: ${quantity}.`);
-  }
-
-  const currentYear = new Date().getFullYear();
-
-  const lastOrder = await tx.order.findFirst({
-    where: {
-      orderNumber: {
-        startsWith: `ORD-${currentYear}-`,
-      },
-    },
-    orderBy: {
-      orderNumber: 'desc',
-    },
-    select: {
-      orderNumber: true,
-    },
-  });
-
-  let nextSeq = 1;
-
-  if (lastOrder) {
-    const lastSeq = parseInt(
-      lastOrder.orderNumber.split('-')[2]!,
-      10
-    );
-    nextSeq = lastSeq + 1;
-  }
-
-  const orderNumber = `ORD-${currentYear}-${String(nextSeq).padStart(5, '0')}`;
-
-  const createdOrder = await tx.order.create({
-    data: {
-      orderNumber,
-      type,
-      status: type === 'ALLOCATION' ? 'APPROVED' : 'UNDER_REVIEW',
-      parentOrgId,
-      childOrgId,
-      agreementId: agreement.id,
-      quantity,
-      depositPerMachine,
-      nonRefundablePerMachine,
-      totalDeposit,
-      totalNonRefundable,
-      taxAmount,
-      grandTotal,
-    },
-  });
-
-  // ALLOCATION reserves immediately.
-  if (type === 'ALLOCATION') {
-    await reserveKiosks(
+    if (!candidate)
+      throw new ApiError(
+        403,
+        "Cannot create order: No active agreement exists between these organizations",
+      );
+    await lockAgreementParties(
       tx,
       parentOrgId,
-      quantity,
-      createdOrder.id
+      childOrgId,
+      candidate.networkConnectionId,
     );
-  }
-
-  return createdOrder;
-});
-  // If it is just a request, stop here. The Company will generate the invoice upon approval.
-  if (type === 'REQUEST') {
-    return res.status(201).json(new ApiResponse(201, { order }, 'Order requested successfully. Pending approval.'));
-  }
-  
-  // If the Parent is actively allocating machines, generate and send the invoice immediately.
-  // 6. Generate the physical PDF on the VPS
-  const invoiceFilename = await generateInvoicePDF({
-    orderNumber:order.orderNumber,
-    parentOrgName: agreement.parentOrg.name,
-    childOrgName: agreement.childOrg.name,
-    quantity,
-    depositPerMachine,
-    nonRefundablePerMachine,
-    totalDeposit,
-    totalNonRefundable,
-    taxAmount,
-    grandTotal,
-    date: order.createdAt
-  });
-const invoiceUrl = `/orders/${order.id}/invoice`;; // To be served via Express static files
-
-  // 7. Update Order with the invoice URL
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { invoiceUrl,
-            invoiceFilename,
-     }
-  });
-
-  // 8. Dispatch Email with the generated PDF attached
-  const pdfBuffer = fs.readFileSync(path.join(INVOICES_DIR, invoiceFilename));
-  
-  //find the childOrganization email to send him the reciept
-  const organization = await prisma.organization.findUnique({
-  where: {
-    id: childOrgId,
-  },
-  select: {
-    owner: {
-      select: {
-        email: true,
-      },
-    },
-  },
-});
-
-const ChildEmail = organization?.owner?.email;
-
-  await sendEmail({
-    to: ChildEmail!, // Assuming child gets the invoice to pay/review
-    subject: `New ArcadeLX Order Invoice: ${order.orderNumber}`,
-    text: `An order for ${quantity} kiosks has been drafted. The grand total is ₹${grandTotal.toFixed(2)}. Please review the attached invoice.`,
-    html: `<h3>Order ${order.orderNumber} Drafted</h3><p>An order for <b>${quantity}</b> kiosks has been created. Total amount: <b>₹${grandTotal.toFixed(2)}</b>.</p>`,
-    attachment: {
-      filename: invoiceFilename,
-      base64Content: pdfBuffer.toString('base64'),
-      contentType: 'application/pdf'
-    }
-  });
-
-  res.status(201).json(new ApiResponse(201, { order: { ...order, invoiceUrl } }, 'Order created and invoice generated successfully'));
-});
-
-export const approveOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-  const currentOrgId = req.membership!.organizationId;
-
-  /* 1. Get the order*/
-  const order = await prisma.order.findUnique({
-    where: {
-      id: orderId as string,
-    },
-    include: {
-      parentOrg: true,
-      childOrg: {
-        select: {
-          name: true,
-          owner: {
-            select: {
-              email: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!order) throw new ApiError(404, 'Order not found');
-
-  /*2. Only the parent organization can approve*/
-  if (order.parentOrgId !== currentOrgId) throw new ApiError(403, 'Unauthorized to approve this order')
-
-  /* 3. Order must be awaiting approval */
-  if (order.status !== 'UNDER_REVIEW') throw new ApiError(400, `Cannot approve an order that is currently ${order.status}`);
-
-  /* 4. Reserve inventory + approve order atomically */
-  const approvedOrder = await prisma.$transaction(async (tx) => {
-
-    await reserveKiosks(tx,order.parentOrgId,order.quantity,order.id);
-
-    const updatedOrder = await tx.order.update({
-      where: {
-        id: order.id,
-      },
+    const agreement = await tx.agreement.findUniqueOrThrow({
+      where: { id: candidate.id },
+    });
+    if (agreement.status !== "ACTIVE")
+      throw new ApiError(403, "Agreement is no longer active");
+    const year = new Date().getFullYear();
+    const sequence = await tx.$queryRaw<
+      [{ value: number }]
+    >`INSERT INTO "OrderSequence" (year,value) VALUES (${year},1) ON CONFLICT (year) DO UPDATE SET value="OrderSequence".value+1 RETURNING value`;
+    const depositPerMachine = agreement.depositAmountPerMachine;
+    const nonRefundablePerMachine = agreement.nonRefundableAmountPerMachine;
+    const totalDeposit = depositPerMachine * quantity;
+    const totalNonRefundable = nonRefundablePerMachine * quantity;
+    const taxAmount = Math.round(totalNonRefundable * 18) / 100;
+    const row = await tx.order.create({
       data: {
-        status: 'APPROVED',
-        paymentStatus: 'PENDING',
-      },
-      include: {
-        dispatchedKiosks: {
-          include: {
-            kiosk: {
-              select: {
-                id: true,
-                machineCode: true,
-                status: true,
-              },
-            },
-          },
-        },
+        orderNumber: `ORD-${year}-${String(sequence[0].value).padStart(5, "0")}`,
+        type,
+        status: type === "REQUEST" ? "UNDER_REVIEW" : "APPROVED",
+        parentOrgId,
+        childOrgId,
+        agreementId: agreement.id,
+        quantity,
+        depositPerMachine,
+        nonRefundablePerMachine,
+        totalDeposit,
+        totalNonRefundable,
+        taxAmount,
+        grandTotal: totalDeposit + totalNonRefundable + taxAmount,
       },
     });
-
-    return updatedOrder;
+    if (type === "ALLOCATION") {
+      await reserveKiosks(tx, parentOrgId, quantity, row.id);
+      await queueInvoice(tx, parentOrgId, row.id);
+    }
+    return row;
   });
-
-  /* 5. Generate invoice AFTER successful inventory reservation
-   */
-  const invoiceFilename = await generateInvoicePDF({
-    orderNumber: approvedOrder.orderNumber,
-    parentOrgName: order.parentOrg.name,
-    childOrgName: order.childOrg.name,
-    quantity: approvedOrder.quantity,
-    depositPerMachine: approvedOrder.depositPerMachine,
-    nonRefundablePerMachine: approvedOrder.nonRefundablePerMachine,
-    totalDeposit: approvedOrder.totalDeposit,
-    totalNonRefundable: approvedOrder.totalNonRefundable,
-    taxAmount: approvedOrder.taxAmount,
-    grandTotal: approvedOrder.grandTotal,
-    date: new Date(),
+  if (type === "REQUEST")
+    return res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          { order },
+          "Order requested successfully. Pending approval.",
+        ),
+      );
+  const invoiceEmailSent = await attemptDelivery(invoiceDeliveryKey(order.id));
+  const updated = await prisma.order.findUniqueOrThrow({
+    where: { id: order.id },
   });
-
-  /* Protected API URL.*/
-  const invoiceUrl = `/orders/${approvedOrder.id}/invoice`;
-
-  /* 6. Save invoice URL */
-  const updatedOrder = await prisma.order.update({
-    where: {
-      id: approvedOrder.id,
-    },
-    data: {
-      invoiceUrl,
-      invoiceFilename,
-    },
-  });
-
-  /* 7. Read PDF for email*/
-  const pdfBuffer = fs.readFileSync(
-    path.join(INVOICES_DIR, invoiceFilename)
-  );
-
-  /*8. Email invoice*/
-  await sendEmail({
-    to: order.childOrg.owner.email,
-    subject: `Order Approved: Invoice for ${order.orderNumber}`,
-    text: `Your request for ${order.quantity} kiosks has been approved. The grand total is ₹${order.grandTotal.toFixed(2)}. Please review the attached invoice to proceed.`,
-    html: `
-      <h3>Order ${order.orderNumber} Approved</h3>
-      <p>
-        Your request for <b>${order.quantity}</b> kiosks has been approved.
-        Total amount due:
-        <b>₹${order.grandTotal.toFixed(2)}</b>.
-      </p>
-    `,
-    attachment: {
-      filename: invoiceFilename,
-      base64Content: pdfBuffer.toString('base64'),
-      contentType: 'application/pdf',
-    },
-  });
-
-  /*9. Response*/
-  return res.status(200).json(new ApiResponse(200,
-      {
-        order: updatedOrder,
-      },
-      'Order approved, kiosks reserved, and invoice dispatched to the client'
-    )
-  );
+  res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        {
+          order: updated,
+          invoiceEmailSent,
+          invoiceReady: !!updated.invoiceFilename,
+        },
+        "Order created; invoice delivery queued",
+      ),
+    );
 });
 
-export const getOrderInvoice = asyncHandler(async (req: Request, res: Response) => {
-    const { orderId } = req.params;
-    const currentOrgId = req.membership!.organizationId;
+export const approveOrder = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  await prisma.$transaction(async (tx) => {
+    const order = await lockedOrder(tx, id, req.membership!.organizationId);
+    if (order.status !== "UNDER_REVIEW")
+      throw new ApiError(
+        400,
+        `Cannot approve an order that is currently ${order.status}`,
+      );
+    await reserveKiosks(tx, order.parentOrgId, order.quantity, id);
+    await tx.order.update({
+      where: { id },
+      data: { status: "APPROVED", paymentStatus: "PENDING" },
+    });
+    await queueInvoice(tx, order.parentOrgId, id);
+  });
+  const invoiceEmailSent = await attemptDelivery(invoiceDeliveryKey(id));
+  const order = await prisma.order.findUniqueOrThrow({ where: { id } });
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { order, invoiceEmailSent, invoiceReady: !!order.invoiceFilename },
+        "Order approved; invoice delivery queued",
+      ),
+    );
+});
 
-    const order = await prisma.order.findUnique({
-      where: {
-        id: orderId as string,
-      },
-      select: {
-        id: true,
-        parentOrgId: true,
-        childOrgId: true,
-        invoiceFilename: true,
-        orderNumber: true,
+export const retryOrderInvoice = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  const invoiceEmailSent = await retryOwnedDelivery(
+    invoiceDeliveryKey(id),
+    req.membership!.organizationId,
+  );
+  const order = await prisma.order.findUniqueOrThrow({ where: { id } });
+  res
+    .status(invoiceEmailSent ? 200 : 202)
+    .json(
+      new ApiResponse(
+        invoiceEmailSent ? 200 : 202,
+        { order, invoiceEmailSent, invoiceReady: !!order.invoiceFilename },
+        invoiceEmailSent
+          ? "Invoice delivered"
+          : "Invoice delivery remains queued; retry later",
+      ),
+    );
+});
+
+export const markOrderAsPaid = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  const order = await prisma.$transaction(async (tx) => {
+    const current = await lockedOrder(tx, id, req.membership!.organizationId);
+    if (current.status !== "APPROVED" || current.paymentStatus === "PAID")
+      throw new ApiError(400, "Order must be approved and not already paid");
+    return tx.order.update({ where: { id }, data: { paymentStatus: "PAID" } });
+  });
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { order },
+        "Payment verified. Order is ready for dispatch.",
+      ),
+    );
+});
+
+export const dispatchOrder = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  const order = await prisma.$transaction(async (tx) => {
+    const current = await lockedOrder(tx, id, req.membership!.organizationId);
+    if (current.status !== "APPROVED")
+      throw new ApiError(400, "Order must be APPROVED before dispatch");
+    if (current.paymentStatus !== "PAID")
+      throw new ApiError(402, "Order payment status must be PAID");
+    const ids = await lockedStock(tx, current, "RESERVED");
+    await tx.kiosk.updateMany({
+      where: { id: { in: ids } },
+      data: { status: "ASSIGNED" },
+    });
+    return tx.order.update({ where: { id }, data: { status: "DISPATCHED" } });
+  });
+  res.status(200).json(new ApiResponse(200, { order }, "Order dispatched"));
+});
+
+export const deliverOrder = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  const order = await prisma.$transaction(async (tx) => {
+    const current = await lockedOrder(tx, id, req.membership!.organizationId);
+    if (current.status !== "DISPATCHED")
+      throw new ApiError(400, "Order must be DISPATCHED before delivery");
+    const ids = await lockedStock(tx, current, "ASSIGNED");
+    const history = await tx.kioskAssignment.findMany({
+      where: { kioskId: { in: ids }, assignedTo: null },
+    });
+    if (history.some((row) => row.organizationId !== current.parentOrgId))
+      throw new ApiError(
+        409,
+        "Current assignment history does not match the supplier",
+      );
+    await tx.kioskAssignment.updateMany({
+      where: { kioskId: { in: ids }, assignedTo: null },
+      data: { assignedTo: new Date() },
+    });
+    await tx.kioskAssignment.createMany({
+      data: ids.map((kioskId) => ({
+        kioskId,
+        organizationId: current.childOrgId,
+        orderId: id,
+        assignedById: req.user!.id,
+      })),
+    });
+    await tx.kiosk.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        currentOrgId: current.childOrgId,
+        status: "AVAILABLE",
+        location: null,
+        reservedOrderId: null,
       },
     });
+    return tx.order.update({ where: { id }, data: { status: "DELIVERED" } });
+  });
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { order },
+        "Order delivered and kiosk ownership transferred",
+      ),
+    );
+});
 
-    if (!order) throw new ApiError(404, 'Order not found');
-    
-    // Only organizations involved in the order can access the invoice.
-    if (order.parentOrgId !== currentOrgId && order.childOrgId !== currentOrgId ) throw new ApiError(403,'Unauthorized to access this invoice');
-    
+export const getOrderInvoice = asyncHandler(async (req, res) => {
+  const id = req.params.orderId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { parentOrgId: true, childOrgId: true, invoiceFilename: true },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  if (
+    ![order.parentOrgId, order.childOrgId].includes(
+      req.membership!.organizationId,
+    )
+  )
+    throw new ApiError(403, "Unauthorized to access this invoice");
+  if (!order.invoiceFilename)
+    throw new ApiError(404, "Invoice has not been generated yet");
+  const file = path.resolve(INVOICES_DIR, order.invoiceFilename);
+  if (path.dirname(file) !== INVOICES_DIR || !fs.existsSync(file))
+    throw new ApiError(404, "Invoice file not found");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="${path.basename(file)}"`,
+  );
+  res.sendFile(file);
+});
 
-    if (!order.invoiceFilename) throw new ApiError(404,'Invoice has not been generated yet');
-
-    const invoicePath = path.join(INVOICES_DIR,order.invoiceFilename);
-
-    if (!fs.existsSync(invoicePath)) throw new ApiError(404,'Invoice file not found');
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition',`inline; filename="${order.invoiceFilename}"`);
-
-    return res.sendFile(invoicePath);
-  }
-);
-
-//Route for Frontend
-export const getOrderRequests = asyncHandler(async (req: Request, res: Response) => {
-  const currentOrgId = req.membership!.organizationId;
-  const { status, type } = req.query;
-
-  // Build dynamic filters based on query params
-  const whereClause: any = {
-    OR: [
-      { parentOrgId: currentOrgId }, // Orders sent to this org for approval
-      { childOrgId: currentOrgId }   // Orders created by this org
-    ]
-  };
-
-  if (status) whereClause.status = status;
-  if (type) whereClause.type = type;
-
+export const getOrderRequests = asyncHandler(async (req, res) => {
+  const query = OrderQuerySchema.parse(req.query);
+  const organizationId = req.membership!.organizationId;
   const orders = await prisma.order.findMany({
-    where: whereClause,
+    where: {
+      OR: [{ parentOrgId: organizationId }, { childOrgId: organizationId }],
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.type ? { type: query.type } : {}),
+    },
     include: {
       parentOrg: { select: { id: true, name: true } },
       childOrg: { select: { id: true, name: true } },
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: "desc" },
   });
-
-  res.status(200).json(new ApiResponse(200, { orders }, 'Order requests fetched successfully'));
-});
-
-export const markOrderAsPaid = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-  const currentOrgId = req.membership!.organizationId;
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId as string }
-  });
-
-  if (!order) throw new ApiError(404, 'Order not found');
-  if (order.parentOrgId !== currentOrgId) throw new ApiError(403, 'Unauthorized to modify this order');
-  
-  // Guardrails
-  if (order.status !== 'APPROVED') {
-    throw new ApiError(400, `Cannot mark as paid. Order is currently ${order.status}`);
-  }
-  if (order.paymentStatus === 'PAID') {
-    throw new ApiError(400, 'Order is already marked as paid');
-  }
-
-  const updatedOrder = await prisma.order.update({
-    where: { id: orderId as string},
-    data: { paymentStatus: 'PAID' }
-  });
-
-  res.status(200).json(new ApiResponse(200, { order: updatedOrder }, 'Payment verified. Order is now ready for dispatch.'));
-});
-
-export const dispatchOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-  const currentOrgId = req.membership!.organizationId;
-
-  const order = await prisma.order.findUnique({
-    where: {
-      id: orderId as string,
-    },
-    include: {
-      dispatchedKiosks: true,
-    },
-  });
-
-  if (!order) throw new ApiError(404, 'Order not found');
-
-  if (order.parentOrgId !== currentOrgId) throw new ApiError(403,'Unauthorized to dispatch this order');
-
-  if (order.status !== 'APPROVED') throw new ApiError(400,`Cannot dispatch an order that is currently ${order.status}. Must be APPROVED.`);
-
-  if (order.paymentStatus !== 'PAID') throw new ApiError(402,'Cannot dispatch machines. Order payment status must be PAID.');
-
-  const kioskIds = order.dispatchedKiosks.map((orderKiosk) => orderKiosk.kioskId);
-
-  if (kioskIds.length === 0) throw new ApiError(400,'No kiosks are attached to this order');
-
-  const updatedOrder = await prisma.$transaction(async (tx) => {
-
-    const result = await tx.kiosk.updateMany({
-      where: {
-        id: {
-          in: kioskIds,
-        },
-        status: 'RESERVED',
-        currentOrgId: order.parentOrgId,
-      },
-      data: {
-        status: 'ASSIGNED',
-      },
-    });
-
-    if (result.count !== kioskIds.length) throw new ApiError(400,'Some kiosks are no longer reserved for this order');
-
-    return await tx.order.update({
-      where: {
-        id: orderId as string,
-      },
-      data: {
-        status: 'DISPATCHED',
-      },
-    });
-  });
-
-  return res.status(200).json(new ApiResponse(200,{order: updatedOrder,},'Order successfully dispatched. Machines are now in transit.'));
-});
-
-export const deliverOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-  const currentOrgId = req.membership!.organizationId;
-  const currentUserId = req.user!.id;
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId as string },
-    include: { dispatchedKiosks: true }
-  });
-
-  if (!order) throw new ApiError(404, 'Order not found');
-  if (order.parentOrgId !== currentOrgId) throw new ApiError(403, 'Unauthorized to mark this order as delivered');
-
-  // Strict Gate: Must be DISPATCHED before it can be DELIVERED
-  if (order.status !== 'DISPATCHED') {
-    throw new ApiError(400, `Cannot deliver an order that is currently ${order.status}. Must be DISPATCHED first.`);
-  }
-
-  const kioskIds = order.dispatchedKiosks.map(ok => ok.kioskId);
-
-  // The critical write-path for Ownership Transfer
-  const deliveredOrder = await prisma.$transaction(async (tx) => {
-    
-    // 1. Close any currently active assignment history rows for these machines
-    await tx.kioskAssignment.updateMany({
-      where: {
-        kioskId: { in: kioskIds },
-        assignedTo: null // null means it is the currently active record
-      },
-      data: {
-        assignedTo: new Date() // Close it by marking the end date
-      }
-    });
-
-    // 2. Create the brand new assignment history rows transferring it to the Child Org
-    const newAssignments = kioskIds.map(kioskId => ({
-      kioskId,
-      organizationId: order.childOrgId,
-      orderId: order.id,
-      assignedById: currentUserId
-    }));
-
-    await tx.kioskAssignment.createMany({
-      data: newAssignments
-    });
-
-    // 3. Shift the actual current ownership of the Kiosk and set to AVAILABLE for the child
-    await tx.kiosk.updateMany({
-      where: { id: { in: kioskIds } },
-      data: {
-        currentOrgId: order.childOrgId,
-        status: 'AVAILABLE', // Now sitting in the Child's inventory ready to be used
-        location: null // Clear out any old physical location string
-      }
-    });
-
-    // 4. Finalize Order Status
-    return await tx.order.update({
-      where: { id: order.id },
-      data: { status: 'DELIVERED' },
-      include: { childOrg: { select: { name: true } } }
-    });
-  });
-
-  res.status(200).json(new ApiResponse(200, { order: deliveredOrder }, `Order delivered! Ownership of ${kioskIds.length} machines successfully transferred to ${deliveredOrder.childOrg.name}.`));
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, { orders }, "Order requests fetched successfully"),
+    );
 });
