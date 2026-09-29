@@ -1,22 +1,37 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import path from 'node:path';
 
 dotenv.config();
 
 
 const envSchema = z.object({
-  PORT: z.string().default('3000'),
+  PORT: z.string().regex(/^\d+$/).refine(value => Number(value) > 0 && Number(value) <= 65535, 'Invalid port').default('4000'),
   DATABASE_URL: z.string().url("Must be a valid Postgres URL"),
   DIRECT_URL: z.string().url("Must be a valid Postgres URL"),
   ACCESS_SECRET_TOKEN: z.string().min(64),
   REFRESH_SECRET_TOKEN: z.string().min(64),
-  ACCESS_EXPIRY: z.string().default('15m'),
-  REFRESH_EXPIRY: z.string().default('7d'),
+  ACCESS_EXPIRY: z.string().regex(/^[1-9]\d*[mhd]$/).default('15m'),
+  REFRESH_EXPIRY: z.string().regex(/^[1-9]\d*[mhd]$/).default('7d'),
   INTERNAL_API_SECRET: z.string().min(32, "Internal API secret must be at least 32 characters"),
-  NODE_ENV:z.string()
+  NODE_ENV: z.enum(['development', 'test', 'production']),
+  INVOICES_DIR: z.string().optional(),
+  MAILJET_API_KEY: z.string().optional(),
+  MAILJET_SECRET_KEY: z.string().optional(),
+  MAIL_FROM_EMAIL: z.string().optional(),
+  MAIL_FROM_NAME: z.string().optional(),
+  FRONTEND_LOGIN_URL: z.string().optional(),
 });
 
-const _env = envSchema.safeParse(process.env);
+const productionSchema = envSchema.extend({
+  INVOICES_DIR: z.string().refine(path.isAbsolute, 'Use an absolute path on persistent storage'),
+  MAILJET_API_KEY: z.string().min(1),
+  MAILJET_SECRET_KEY: z.string().min(1),
+  MAIL_FROM_EMAIL: z.string().email(),
+  MAIL_FROM_NAME: z.string().min(1),
+  FRONTEND_LOGIN_URL: z.string().url().refine(value => value.startsWith('https://'), 'Production login URL must use HTTPS'),
+});
+const _env = (process.env.NODE_ENV === 'production' ? productionSchema : envSchema).safeParse(process.env);
 
 if (!_env.success) {
   console.error(' Invalid environment variables:', _env.error.format());

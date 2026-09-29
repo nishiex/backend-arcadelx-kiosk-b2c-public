@@ -22,6 +22,16 @@ pre-fix implementation; current behavior, evidence and deployment status are in
 
 ## Environment and deployment status
 
+Production preparation after commit `9b5ef9a` adds `npm run build`, `npm start`,
+`npm run typecheck`, and `npm run db:migrate` in the API workspace. `tsx` and
+`cookie-parser` are runtime dependencies. Build with development dependencies,
+generate Prisma before pruning, and retain source/shared validators/assets.
+Production startup validates mail configuration, HTTPS `FRONTEND_LOGIN_URL`,
+port/expiry syntax, and an absolute `INVOICES_DIR` on operator-provided persistent
+storage. The directory defaults to `process.cwd()/invoices` outside production.
+These changes do not reconcile or migrate the configured database. See
+[production audit and deployment recipe](../../audits/PRODUCTION_READINESS.md).
+
 The root environment currently targets **Supabase**, superseding the connection
 description in the root setup document. This checkout has ten migrations,
 including the new, unapplied `20260929100000_protect_distributor_lifecycle`.
@@ -191,7 +201,8 @@ It never silently deletes history to satisfy constraints.
 
 Financial snapshots use agreement amounts times quantity, 18% GST on the
 non-refundable total, and their sum as grand total. Invoice files reside under
-`process.cwd()/invoices`; persisted URLs use `/api/orders/:orderId/invoice`.
+`INVOICES_DIR` when configured (required absolute persistent path in production),
+otherwise `process.cwd()/invoices`; persisted URLs use `/api/orders/:orderId/invoice`.
 Downloads require membership in the order's parent or child organization.
 
 EmailDelivery jobs are created in the same transaction as the organization or

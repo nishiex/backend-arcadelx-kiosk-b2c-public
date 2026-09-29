@@ -1,9 +1,10 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import { env } from '../../config/env';
 
 // Ensure the directory exists when the server starts
-export const INVOICES_DIR = path.resolve(process.cwd(), 'invoices');
+export const INVOICES_DIR = path.resolve(env.INVOICES_DIR ?? path.join(process.cwd(), 'invoices'));
 if (!fs.existsSync(INVOICES_DIR)) {
   fs.mkdirSync(INVOICES_DIR, { recursive: true });
 }
