@@ -22,6 +22,63 @@ pre-fix implementation; current behavior, evidence and deployment status are in
 
 ## Environment and deployment status
 
+### Company seed (2026-09-30)
+
+`prisma/seed.ts` persists the initial Company, owner and ACTIVE OWNER membership in
+one transaction. New setup reads validated `SEED_*` values from the root `.env` or
+process environment; see `.env.example`. It has no hardcoded company credentials
+and never logs passwords. Existing companies are verified without overwriting
+their data, and simultaneous seed runs serialize with a transaction advisory lock.
+Missing required insert schema or inconsistent existing ownership is reported;
+the seed does not repair or migrate the database automatically. Existing-company
+checks select only required columns for compatibility with missing profile fields.
+Run `npx tsx --tsconfig apps/api/tsconfig.json apps/api/prisma/seed.ts --check` from
+the root for a database-enforced read-only check. The configured database passed;
+eleven isolated persistence checks and the API typecheck passed. See
+[seed behavior and evidence](../../audits/SEED_PERSISTENCE.md).
+
+### Approval/rejection updates (2026-09-30)
+
+Member decisions now atomically update only scoped PENDING memberships; duplicate
+or racing decisions return 400. Rejection retains the user/membership and clears
+its role. Join selects only Organization ID/type/invite expiry for compatibility
+with absent optional profile columns. Member pagination uses an ID tie-breaker
+and a repeatable-read count/list snapshot.
+
+Network rejection: recipient OWNER/ADMIN, PENDING -> REJECTED, POST
+`/api/network/:connectionId/reject`. Agreement rejection: recipient OWNER,
+PENDING_APPROVAL -> REJECTED, PATCH `/api/agreements/:agreementId/reject`, sharing
+approval's child-organization lock. Rejected history is retained; rejected network
+rows cannot be deleted/reopened. A new agreement proposal can follow rejection.
+GET `/api/network` and `/api/agreements` return paginated, party-scoped history to
+active OWNER/ADMIN members, with safe organization projections.
+
+Order rejection: supplier COMPANY/DISTRIBUTOR OWNER/ADMIN, PATCH
+`/api/orders/:orderId/reject`; only an unpaid REQUEST under review with no inventory
+history/reservations qualifies. It never releases approved stock or alters money.
+Order create/approve/reject check workflow schema availability and return 503
+while unavailable. GET `/api/workflows` exposes readiness to active members.
+
+The independent `20260930070000_request_rejections` enum migration was applied
+to Supabase on 30 September after a local upgrade/Prisma-registration rehearsal;
+only its two enum additions were applied, then recorded via `prisma migrate resolve`.
+Both rejection readiness flags are now true. Business rows and all old migration
+records were preserved. The order lifecycle migration remains unapplied.
+See [rejection deployment](../../audits/REQUEST_REJECTION_DEPLOYMENT.md).
+On 30 September the user
+selected returning ORD-2026-721401-59 to UNDER_REVIEW. That single guarded repair
+was tested locally, snapshotted, committed and verified remotely; quantity 20,
+payment PENDING, amounts, invoice references and inventory/history were preserved.
+All twelve post-repair integrity preflight counts are zero. Nine older migration
+checksums match after LF normalization; the two historical transaction migration
+sources remain unavailable after the expanded search. See
+[current fixes/tests](../../audits/APPROVAL_REJECTION_FIXES.md) and
+[reconciliation plan](../../audits/SCHEMA_RECONCILIATION_PLAN.md).
+
+Isolated phases `members`, `approval_edges`, and `rejections` cover these flows.
+Run each separately; the last two create their own COMPANY fixtures. The existing
+`happy,fixes,distributor_invites,invite_generation_compat` suite also passes.
+
 Production preparation after commit `9b5ef9a` adds `npm run build`, `npm start`,
 `npm run typecheck`, and `npm run db:migrate` in the API workspace. `tsx` and
 `cookie-parser` are runtime dependencies. Build with development dependencies,
@@ -33,16 +90,18 @@ These changes do not reconcile or migrate the configured database. See
 [production audit and deployment recipe](../../audits/PRODUCTION_READINESS.md).
 
 The root environment currently targets **Supabase**, superseding the connection
-description in the root setup document. This checkout has ten migrations,
-including the new, unapplied `20260929100000_protect_distributor_lifecycle`.
-The configured database has eleven historical migrations, including two absent
+description in the root setup document. This checkout has twelve migrations.
+`20260929100000_protect_distributor_lifecycle` remains unapplied;
+`20260929123000_distributor_access_status` was applied independently on 2026-09-29
+and recorded with Prisma after the user requested enabling the disabled controls.
+The configured database has thirteen recorded migrations, including two absent
 from this checkout. Local Docker `arcadelx-pg` on port 5433 has an older `arcadelx`
 database with six migrations. Do not assume either schema matches the new client.
 
-Read-only preflight found one existing approved/dispatched order with an incorrect
-linked-kiosk count. The new migration intentionally refuses that data. Reconcile
-the order and database-only migration sources before deploying. No remote repair
-or migration was performed. Regression tests use newly created local databases.
+The original preflight found one approved order with an incorrect linked-kiosk
+count. Its user-selected repair is now complete, with all integrity counts zero.
+Recover the two database-only migration sources before deploying the lifecycle
+fix. Regression tests use newly created local databases.
 
 Subsequent user-requested test setup in the configured database added a dedicated
 ACTIVE Distributor ADMIN login and three standalone kiosk assignments to
@@ -50,6 +109,22 @@ ACTIVE Distributor ADMIN login and three standalone kiosk assignments to
 These are direct test-data assignments with `orderId = null`, not paid/delivered
 orders; the existing 20-kiosk order and migration blockers are unchanged.
 See [running test assignment evidence](../../audits/distributor-lifecycle/running-model-transfer/README.md).
+
+Distributor activation is organization-wide. Only COMPANY OWNER/ADMIN can call
+`PATCH /api/network/distributors/:distributorId/status` with `{isActive: boolean}`.
+The independent additive status migration defaults all existing organizations to
+active. Deactivation increments the access version and marks every member's
+refresh session revoked under an organization row lock shared with login/refresh.
+Deactivation must delete no records, including session records. Every
+authenticated request checks current access; inactive Distributors receive 403,
+and old access tokens remain invalid after reactivation. Reactivation requires a
+fresh login; membership approval, roles, kiosks and commercial history are retained.
+The frontend shows status/control confirmations and polls Distributor identity
+every 30 seconds while open. Logout stays available without an access gate.
+On an older database without this migration, legacy access reads remain compatible
+and status writes return 503; the UI disables status controls. The configured
+database now has the status migration and its controls are enabled. See
+[status implementation and deployment state](../../audits/distributor-lifecycle/DISTRIBUTOR_STATUS.md).
 
 The Distributor list now tolerates older or partially migrated profile columns:
 it reads column availability and selects only fields that exist, returning null
@@ -100,6 +175,20 @@ data. Roles are OWNER > ADMIN > MANAGER > STAFF. Types are COMPANY, DISTRIBUTOR,
 PARTNER. Organization registration creates owner, organization, active owner
 membership and credential-delivery job in one transaction; it does not switch
 the creator's login session.
+
+Distributor registration additionally requires a nonblank `inviteCode` (maximum
+10 characters) from the authenticated Company. It reuses the code generated by
+`POST /api/members/generateInviteCode`; code, Company ID/type and expiry are
+validated in an atomic conditional update before creating any records. Success
+clears the code and expiry in the registration transaction, so it cannot be
+reused. Failed creation rolls consumption back. Invalid, expired, consumed or
+wrong-Company codes return 400. Existing null-expiry codes retain the join flow's
+non-expiring semantics. Partner registration and Company join logic are unchanged;
+generate a new code after a Distributor consumes the current Company invite.
+Invite generation explicitly selects only the stored code and expiry, so it
+also works on the configured database without GST/phone/country profile columns.
+Returning the entire Organization from this update causes Prisma P2022 and HTTP
+500 on that schema. No migration is needed for invite generation itself.
 
 | Base path | Gates in addition to authentication and active membership |
 | --- | --- |
@@ -183,6 +272,14 @@ and begins APPROVED. OrderSequence allocates unique per-year numbers atomically.
    history, creates child assignments, transfers ownership, resets AVAILABLE and
    location, clears reservation and marks DELIVERED atomically.
 
+The Orders frontend lists real orders only, including completed deliveries;
+standalone assignments with no order do not become synthetic orders. The list
+returns safe organization references (`id`, `name`, `type`). `GET /api/orders/:orderId`
+validates a UUID and scopes access to an active member of either original order
+party, returning 404 otherwise. Linked kiosks expose only id, machine code, model
+and current status; visibility does not depend on current kiosk ownership.
+See [Orders view verification](../../audits/distributor-lifecycle/ORDERS_VIEW.md).
+
 Manual status updates lock stock and cannot enter/leave RESERVED or ASSIGNED or
 alter an order reservation. Other transitions are explicitly listed in the kiosk
 controller; RETIRED cannot be reactivated. Installation still requires location.
@@ -230,10 +327,12 @@ There is no automatic background retry worker or new frontend retry button.
 
 ## Remaining boundaries and verification
 
-F13 browser UI lifecycle is outside this backend fix. REJECTED orders and
-FAILED/REFUNDED payments still have no dedicated transition handlers. Existing
-refresh-token same-second generation, revoked-token handling and configured
-expiry discrepancies were not changed. Password changes still verify the supplied
+F13 browser UI lifecycle was outside the original backend fix. Order rejection
+now has the restricted transition described above; FAILED/REFUNDED payments
+still have no dedicated transition handlers. Existing
+refresh-token expiry discrepancies were not changed. The Distributor status work
+adds unique refresh JWT IDs and checks revoked state to prevent old session reuse.
+Password changes still verify the supplied
 email/password; they were not redesigned around authenticated user ID.
 
 Run from repo root against isolated test databases:
@@ -244,10 +343,18 @@ npx.cmd tsx --tsconfig apps/api/tsconfig.json audits/distributor-lifecycle/harne
 npx.cmd tsx --tsconfig apps/api/tsconfig.json audits/distributor-lifecycle/harness/migration-upgrade.ts
 ```
 
-Main regression defaults to `happy,fixes`, captures email in memory and fails on
+Main regression defaults to `happy,fixes,distributor_invites,invite_generation_compat`, captures email in memory and fails on
 unexpected results. The old negative/concurrency/integrity audit phases reproduce
 historical defects and should not be treated as post-fix expectations. See
 FIXES.md for exact evidence and explicit read-only preflight command.
+
+The `distributor_invites` phase covers valid OWNER/ADMIN registration, missing,
+invalid, expired, consumed and wrong-Company codes, permissions, rollback,
+concurrent consumption and unchanged Partner/join flows. Its second-Company
+adversarial fixture temporarily relaxes the single-Company index only in the new
+local audit database, then restores it; application schema constraints are unchanged.
+`invite_generation_compat` checks code generation, rotation, expiry and permission
+gates with and without the profile columns, restoring renamed test columns afterward.
 
 For schema changes validate Prisma, inspect the new migration and data impact,
 then regenerate via Prisma CLI. Do not reset a database as validation. The current

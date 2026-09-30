@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../utils/db";
 import { ApiError } from "../utils/ApiError";
 import { asyncHandler } from "../utils/asyncHandler";
+import { getUserOrganizationAccess, assertOrganizationActive } from "../services/organization-access";
+import { clearTokenCookies } from "../utils/token";
 
 declare global {
   namespace Express {
@@ -24,6 +26,7 @@ const ACCESS_SECRET_TOKEN = process.env.ACCESS_SECRET_TOKEN!;
 
 type AccessTokenPayload = {
   id: string;
+  organizationAccessVersion?: number;
 };
 
 export const requireAuth = asyncHandler(async (req: Request, res: Response, next: NextFunction) => 
@@ -32,17 +35,24 @@ export const requireAuth = asyncHandler(async (req: Request, res: Response, next
 
     if (!token) throw new ApiError(401, "Unauthorized request");
 
+    let decoded: AccessTokenPayload;
     try {
-      const decoded = jwt.verify(token,ACCESS_SECRET_TOKEN) as AccessTokenPayload;
-
-      req.user = {
-        id: decoded.id,
-      };
-
-      next();
+      decoded = jwt.verify(token,ACCESS_SECRET_TOKEN) as AccessTokenPayload;
     } catch {
       throw new ApiError( 401,"Invalid or expired access token");
     }
+    const access = await getUserOrganizationAccess(decoded.id);
+    try {
+      assertOrganizationActive(access);
+      if (access?.type === "DISTRIBUTOR" && (decoded.organizationAccessVersion ?? 0) !== access.accessVersion) {
+        throw new ApiError(401, "Your session has ended. Please log in again.");
+      }
+    } catch (error) {
+      clearTokenCookies(res);
+      throw error;
+    }
+    req.user = { id: decoded.id };
+    next();
   }
 );
 

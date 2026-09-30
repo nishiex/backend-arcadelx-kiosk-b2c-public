@@ -54,11 +54,11 @@ export default function DashboardScreen() {
 
           <StatGrid />
 
-          <div ref={gridRef} className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-            <div data-reveal>
+          <div ref={gridRef} className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div data-reveal className="min-w-0">
               <InventoryBreakdown />
             </div>
-            <div data-reveal>
+            <div data-reveal className="min-w-0">
               <RecentKiosks />
             </div>
           </div>

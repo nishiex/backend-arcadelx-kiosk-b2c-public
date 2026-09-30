@@ -81,6 +81,9 @@ model Organization {
   phone     String? @db.VarChar(32)
   country   String? @db.VarChar(100)
 
+  isActive      Boolean @default(true)
+  accessVersion Int     @default(0)
+
   inviteCode          String?   @unique
   inviteCodeExpiresAt DateTime?
 
@@ -134,6 +137,7 @@ model RefreshToken {
 enum NetworkStatus {
   PENDING
   ACTIVE
+  REJECTED
 }
 
 model NetworkConnection {
@@ -156,6 +160,7 @@ enum AgreementStatus {
   PENDING_APPROVAL
   ACTIVE
   TERMINATED
+  REJECTED
 }
 
 model Agreement {

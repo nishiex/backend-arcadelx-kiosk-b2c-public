@@ -21,21 +21,27 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function UsersScreen() {
   const qc = useQueryClient()
-  const { canManageMembers, isLoading: meLoading } = useMe()
+  const { me, role, canManageMembers, isLoading: meLoading } = useMe()
+  const [page, setPage] = React.useState(1)
+  const pageSize = 50
+  const organizationId = me?.membership?.organizationId
+  const [pageOrganizationId, setPageOrganizationId] = React.useState(organizationId)
+  const allowedRoles = MANAGEABLE_ROLES.filter(value => role === "OWNER" || value !== "ADMIN")
 
   const [error, setError] = React.useState<string | null>(null)
   const [approveRole, setApproveRole] = React.useState<Record<string, ManageableRole>>({})
 
   const pendingQ = useQuery({
-    queryKey: ["pending-members"],
-    queryFn: () => fetchPendingMembers(1, 50),
+    queryKey: ["pending-members", organizationId, page, pageSize],
+    queryFn: () => fetchPendingMembers(page, pageSize),
     enabled: canManageMembers,
+    refetchInterval: 10_000,
   })
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["pending-members"] })
     // Keep the dashboard's "Pending Members" stat in sync.
-    qc.invalidateQueries({ queryKey: ["pendingMembers", 1, 1] })
+    qc.invalidateQueries({ queryKey: ["pendingMembers"] })
   }
 
   const approveMut = useMutation({
@@ -45,10 +51,17 @@ export default function UsersScreen() {
       setError(null)
       invalidate()
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => { setError(e.message); invalidate() },
   })
 
   const pending = pendingQ.data?.data ?? []
+  const total = pendingQ.data?.meta.total ?? 0
+  const totalPages = Math.max(1, pendingQ.data?.meta.totalPages ?? 1)
+  // Adjust before rendering children when the scope or last available page changes.
+  if (pageOrganizationId !== organizationId) {
+    setPageOrganizationId(organizationId)
+    setPage(1)
+  } else if (pendingQ.data && page > totalPages) setPage(totalPages)
 
   if (meLoading) {
     return (
@@ -90,9 +103,9 @@ export default function UsersScreen() {
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold tracking-tight">
             Pending Join Requests
-            {pending.length > 0 && (
+            {total > 0 && (
               <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                {pending.length}
+                {total}
               </span>
             )}
           </h2>
@@ -115,7 +128,8 @@ export default function UsersScreen() {
         ) : (
           <ul className="divide-y divide-border/60">
             {pending.map((req) => {
-              const chosen = approveRole[req.id] ?? "STAFF"
+              const selectedRole = approveRole[req.id] ?? "STAFF"
+              const chosen = allowedRoles.includes(selectedRole) ? selectedRole : "STAFF"
               return (
                 <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
@@ -126,13 +140,15 @@ export default function UsersScreen() {
                     <div className="truncate text-xs text-muted-foreground">{req.user?.email ?? "—"}</div>
                   </div>
                   <select
+                    aria-label={`Role for ${req.user?.name ?? "member"}`}
+                    disabled={approveMut.isPending}
                     value={chosen}
                     onChange={(e) =>
                       setApproveRole((p) => ({ ...p, [req.id]: e.target.value as ManageableRole }))
                     }
                     className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary/40"
                   >
-                    {MANAGEABLE_ROLES.map((r) => (
+                    {allowedRoles.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
                       </option>
@@ -156,6 +172,15 @@ export default function UsersScreen() {
               )
             })}
           </ul>
+        )}
+        {!pendingQ.isLoading && !pendingQ.isError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            <p role="status">{total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total} requests` : "0 pending requests"} · Page {page} of {totalPages}{pendingQ.isFetching && " · Updating…"}</p>
+            <nav aria-label="Member request pagination" className="flex gap-2">
+              <button type="button" disabled={page <= 1 || pendingQ.isFetching || approveMut.isPending} onClick={() => setPage(value => value - 1)} className="rounded-md border border-border px-3 py-2 hover:bg-muted disabled:opacity-50">Previous</button>
+              <button type="button" disabled={page >= totalPages || pendingQ.isFetching || approveMut.isPending} onClick={() => setPage(value => value + 1)} className="rounded-md border border-border px-3 py-2 hover:bg-muted disabled:opacity-50">Next</button>
+            </nav>
+          </div>
         )}
       </div>
     </div>

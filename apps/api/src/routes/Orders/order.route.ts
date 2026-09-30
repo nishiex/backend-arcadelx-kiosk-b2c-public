@@ -9,8 +9,10 @@ import {
 import {
   createOrder,
   approveOrder,
+  rejectOrder,
   getOrderInvoice,
   getOrderRequests,
+  getOrderDetails,
   markOrderAsPaid,
   dispatchOrder,
   deliverOrder,
@@ -23,6 +25,7 @@ router.use(requireAuth, loadMembership);
 
 // Get orders / requests for current organization
 router.get("/", getOrderRequests);
+router.get("/:orderId", getOrderDetails);
 
 //create Orders
 router.post(
@@ -39,6 +42,8 @@ router.patch(
   requireRole("OWNER", "ADMIN"),
   approveOrder,
 );
+
+router.patch('/:orderId/reject', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), rejectOrder);
 
 //Mark Order as Paid
 router.patch(

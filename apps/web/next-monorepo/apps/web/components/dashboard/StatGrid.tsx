@@ -88,7 +88,7 @@ export default function StatGrid() {
 
   if (inventory.isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-[112px]" />
         ))}
@@ -107,7 +107,7 @@ export default function StatGrid() {
   return (
     <div
       ref={ref}
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]"
+      className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-6  2xl:grid-cols-6"
     >
       {cards.map((c) => (
         <StatCard

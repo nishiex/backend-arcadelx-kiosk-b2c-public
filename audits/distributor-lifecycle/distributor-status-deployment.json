@@ -1,0 +1,46 @@
+{
+  "appliedAt": "2026-09-29T12:15:35.589Z",
+  "migration": "20260929123000_distributor_access_status",
+  "checksum": "f0b34edd3ab79caf325c860a4bb5e9768913fad7b02dac508e474ab803faf2d1",
+  "before": {
+    "count": 4,
+    "digest": "b6a0dbdd377323778e8f2e8d8ba3031d"
+  },
+  "after": {
+    "count": 4,
+    "digest": "b6a0dbdd377323778e8f2e8d8ba3031d"
+  },
+  "states": [
+    {
+      "type": "COMPANY",
+      "count": 1,
+      "allActive": true,
+      "initialVersion": true
+    },
+    {
+      "type": "DISTRIBUTOR",
+      "count": 2,
+      "allActive": true,
+      "initialVersion": true
+    },
+    {
+      "type": "PARTNER",
+      "count": 1,
+      "allActive": true,
+      "initialVersion": true
+    }
+  ],
+  "constraints": [
+    {
+      "conname": "Organization_accessVersion_nonnegative",
+      "definition": "CHECK ((\"accessVersion\" >= 0))"
+    },
+    {
+      "conname": "Organization_only_distributor_inactive",
+      "definition": "CHECK (((type = 'DISTRIBUTOR'::\"OrgType\") OR \"isActive\"))"
+    }
+  ],
+  "prismaRecordPending": false,
+  "prismaRecordedWith": "prisma migrate resolve --applied 20260929123000_distributor_access_status",
+  "scope": "Only the independent status migration; existing organization fields retained; no account deactivated"
+}

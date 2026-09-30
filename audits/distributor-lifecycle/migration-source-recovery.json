@@ -1,0 +1,15 @@
+{
+  "candidates": 72,
+  "result": [
+    {
+      "name": "20260928063729_implement_transactions_schema",
+      "recovered": false,
+      "expectedChecksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3"
+    },
+    {
+      "name": "20260928073023_remove_payu_retries",
+      "recovered": false,
+      "expectedChecksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49"
+    }
+  ]
+}

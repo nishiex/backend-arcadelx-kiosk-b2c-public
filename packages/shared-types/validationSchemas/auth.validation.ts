@@ -50,9 +50,8 @@ const pincodeSchema = z
  * Register Organization
  */
 
-export const RegisterOrgSchema = z.object({
+const RegisterOrgFields = z.object({
   orgName: nameSchema,
-  orgType: z.enum(["DISTRIBUTOR", "PARTNER"]), // Notice 'COMPANY' is explicitly excluded
   ownerName: nameSchema,
   ownerEmail: emailSchema,
   state: stateSchema,
@@ -63,6 +62,20 @@ export const RegisterOrgSchema = z.object({
   phone: z.string().trim().min(1).max(32).optional(),
   country: z.string().trim().min(1).max(100).optional(),
 });
+
+export const RegisterOrgSchema = z.discriminatedUnion("orgType", [
+  RegisterOrgFields.extend({
+    orgType: z.literal("DISTRIBUTOR"),
+    inviteCode: z
+      .string({ error: "Invite code is required" })
+      .trim()
+      .min(1, "Invite code is required")
+      .max(10, "Invalid invite code"),
+  }),
+  RegisterOrgFields.extend({ orgType: z.literal("PARTNER") }),
+]);
+
+export type RegisterOrgInput = z.infer<typeof RegisterOrgSchema>;
 
 /**
  * Login

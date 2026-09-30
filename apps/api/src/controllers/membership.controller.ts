@@ -26,7 +26,9 @@ export const generateInviteCode = asyncHandler(async(req:Request,res:Response) =
         data:{
             inviteCode:code,
             inviteCodeExpiresAt:expiresAt
-        }
+        },
+        // Only return invite fields: older databases may lack profile columns.
+        select:{inviteCode:true,inviteCodeExpiresAt:true}
     })
 
     res.status(201).json(new ApiResponse(201,{inviteCode: org.inviteCode,expiresAt: org.inviteCodeExpiresAt},"New invite code generated successfully"))
@@ -46,9 +48,9 @@ export const getPendingRequests = asyncHandler(async (req: Request, res: Respons
       include: {
         user: { select: { id: true, name: true, email: true, createdAt: true } }
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
     })
-  ]);
+  ], { isolationLevel: 'RepeatableRead' });
 
   res.status(200).json(new ApiResponse(200, { 
     data: requests, 
@@ -68,40 +70,23 @@ export const handleJoinRequest = asyncHandler(async(req:Request,res:Response)=>
         new ApiError(400,'Invalid membership ID')
     );
 }
-    const targetMembership = await prisma.membership.findFirst(
-        {
-            where:{
-                    id:membershipId,
-                    organizationId:orgId,
-                    status:"PENDING",
-                }
-        })
-        if(!targetMembership)throw new ApiError(400,"Pending request not found!")
-        
-        if (action === 'REJECT') 
-        {
-             await prisma.membership.update({
-                where: { id: membershipId },
-                    data: { status: 'REJECTED' }
-            });
-            return res.status(200).json(new ApiResponse(200, null, 'Join request rejected'));
-        }
-
-        if (!role || !(role in ROLE_WEIGHT)) throw new ApiError(400, "Invalid role");
-
-        const targetRoleWeight = ROLE_WEIGHT[role];
-        const actingRoleWeight = ROLE_WEIGHT[actingRole];
-
-        if (targetRoleWeight === undefined || actingRoleWeight === undefined) throw new ApiError(400, "Invalid role");
-        
-
-        if (targetRoleWeight >= actingRoleWeight) throw new ApiError(403,`You cannot assign a role equal to or higher than your own (${actingRole})`);
-        
-        const updatedMembership = await prisma.membership.update({ where: { id: membershipId },
-            data: { status: 'ACTIVE', role }
-        });
-
-        res.status(200).json(new ApiResponse(200, { membership: updatedMembership }, 'Member approved and role assigned'));
+    if (action === 'APPROVE') {
+      if (!role || ROLE_WEIGHT[role] === undefined || ROLE_WEIGHT[actingRole] === undefined)
+        throw new ApiError(400, 'Invalid role');
+      if (ROLE_WEIGHT[role]! >= ROLE_WEIGHT[actingRole]!)
+        throw new ApiError(403, `You cannot assign a role equal to or higher than your own (${actingRole})`);
+    }
+    const updatedMembership = await prisma.$transaction(async tx => {
+      const changed = await tx.membership.updateMany({
+        where: { id: membershipId, organizationId: orgId, status: 'PENDING' },
+        data: action === 'APPROVE' ? { status: 'ACTIVE', role: role! } : { status: 'REJECTED', role: null },
+      });
+      if (changed.count !== 1) throw new ApiError(400, 'Request already processed or not found');
+      return tx.membership.findUniqueOrThrow({ where: { id: membershipId } });
+    });
+    res.status(200).json(new ApiResponse(200,
+      action === 'APPROVE' ? { membership: updatedMembership } : null,
+      action === 'APPROVE' ? 'Member approved and role assigned' : 'Join request rejected'));
     
 })
 

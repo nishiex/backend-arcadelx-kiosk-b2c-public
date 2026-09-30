@@ -8,6 +8,7 @@ import {
   UserCog,
   MonitorSmartphone,
   Building2,
+  ClipboardList,
   Settings,
   Menu,
   X,
@@ -25,13 +26,15 @@ type NavItem = {
 }
 
 // Only destinations backed by a live API on this deployment are listed.
-// (Orders, Revenue, Settlements, Payments, Reports, Support, Roles and Audit
+// (Revenue, Settlements, Payments, Reports, Support, Roles and Audit
 // Logs are hidden until their endpoints exist.)
 const NAV: NavItem[] = [
   { name: "Overview", href: "/", icon: LayoutGrid },
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
+  { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
+  { name: "Requests", href: "/requests", icon: ClipboardList, show: (p) => p.canReviewRequests },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -85,7 +88,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
         <Brand />
         <NavLinks />
         <div className="mt-4 px-1 text-xs text-muted-foreground">v1.0.0</div>

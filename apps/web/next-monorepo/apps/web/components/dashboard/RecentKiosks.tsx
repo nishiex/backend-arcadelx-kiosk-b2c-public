@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import { Box } from "lucide-react"
 import { useOwnedKiosks } from "@/hooks/useOwnedKiosks"
 import { useReveal } from "@/hooks/useReveal"
@@ -16,6 +17,8 @@ export default function RecentKiosks() {
     <Panel
       title="Recent kiosks"
       subtitle="Latest machines added to the fleet"
+      className="h-full"
+      action={<Link href="/kiosks" className="shrink-0 rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">View all</Link>}
     >
       {isLoading ? (
         <div className="space-y-2.5">
@@ -34,9 +37,12 @@ export default function RecentKiosks() {
       ) : !kiosks.length ? (
         <EmptyState message="No kiosks in your inventory." icon={<Box size={28} />} />
       ) : (
-        // Cap the list to roughly the Fleet-composition donut height and scroll
-        // inside, so the two side-by-side cards stay the same height.
-        <ul ref={ref} className="scrollbar-hide max-h-[168px] divide-y divide-border overflow-y-auto overflow-x-hidden pr-1">
+        <ul
+          ref={ref}
+          aria-label="Recent kiosks"
+          tabIndex={0}
+          className="scrollbar-hide max-h-72 divide-y divide-border overflow-y-auto overflow-x-hidden rounded-md pr-2 focus-visible:outline-2 focus-visible:outline-ring"
+        >
           {kiosks.map((k) => {
             const holder =
               k.currentOrg && k.currentOrg.type !== "COMPANY" ? k.currentOrg.name : null
@@ -47,7 +53,7 @@ export default function RecentKiosks() {
               <li
                 key={k.id}
                 data-reveal
-                className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors first:pt-0 last:pb-0 hover:bg-muted/50"
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors first:pt-0 last:pb-0 hover:bg-muted/50"
               >
                 <div className="min-w-0">
                   <p className="truncate font-mono text-sm font-medium">{k.machineCode}</p>

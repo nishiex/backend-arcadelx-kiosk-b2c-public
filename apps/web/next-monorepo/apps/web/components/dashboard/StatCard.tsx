@@ -56,7 +56,7 @@ export default function StatCard({
         {icon && (
           <span
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
               iconClass ?? "bg-primary/10 text-primary"
             )}
           >

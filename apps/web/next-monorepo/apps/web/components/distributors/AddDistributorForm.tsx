@@ -8,11 +8,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { createDistributor, type CreateDistributorInput } from "@/lib/backend-api"
+import { createDistributor, type CompanyInviteCode, type CreateDistributorInput } from "@/lib/backend-api"
 import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
 import { useMe } from "@/hooks/useMe"
+import CompanyInviteCodeDialog, { companyInviteCodeKey } from "./CompanyInviteCodeDialog"
 
 type FormValues = {
+  inviteCode: string
   orgName: string
   gstNumber: string
   ownerName: string
@@ -49,7 +51,8 @@ function Field({
 export default function AddDistributorForm() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { canManageDistributors, isLoading } = useMe()
+  const { canManageDistributors, isLoading, me } = useMe()
+  const inviteKey = companyInviteCodeKey(me?.membership?.organizationId)
 
   const {
     register,
@@ -57,7 +60,10 @@ export default function AddDistributorForm() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<FormValues>({ defaultValues: { country: "India" } })
+  } = useForm<FormValues>({ defaultValues: {
+    country: "India",
+    inviteCode: queryClient.getQueryData<CompanyInviteCode>(inviteKey)?.inviteCode ?? "",
+  } })
 
   // City list cascades off the chosen state.
   const selectedState = watch("state")
@@ -66,6 +72,7 @@ export default function AddDistributorForm() {
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const payload: CreateDistributorInput = {
+        inviteCode: values.inviteCode.trim(),
         orgName: values.orgName,
         ownerName: values.ownerName,
         ownerEmail: values.ownerEmail,
@@ -80,14 +87,15 @@ export default function AddDistributorForm() {
       return createDistributor(payload)
     },
     onSuccess: (data) => {
-      toast.success(`Distributor "${data.organization.name}" created`)
+      queryClient.removeQueries({ queryKey: inviteKey })
+      toast.success(`Distributor "${data.organization.name}" registered`)
       if (data.credentialsEmailSent === false) {
         toast.warning("Couldn't email login credentials — configure the mail service to send them.")
       }
       queryClient.invalidateQueries({ queryKey: ["distributors"] })
       router.push("/distributors")
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create distributor"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to register distributor"),
   })
 
   // Guard: only company admin/super-admin.
@@ -95,7 +103,7 @@ export default function AddDistributorForm() {
     return (
       <div className="mx-auto max-w-3xl">
         <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          You don't have permission to add distributors.
+          You don't have permission to register distributors.
         </div>
       </div>
     )
@@ -107,7 +115,7 @@ export default function AddDistributorForm() {
         <Link href="/distributors" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft size={16} /> Back
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Add Distributor</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Register Distributor</h1>
       </div>
 
       <form
@@ -117,6 +125,22 @@ export default function AddDistributorForm() {
         {/* Distributor Information */}
         <h2 className="mb-4 text-sm font-semibold">Distributor Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Company Invite Code" error={errors.inviteCode?.message}>
+            <div className="space-y-2">
+              <input
+                aria-label="Company Invite Code"
+                autoCapitalize="none"
+                spellCheck={false}
+                className={inputCls}
+                {...register("inviteCode", {
+                  required: "Invite code is required",
+                  setValueAs: (value: string) => value.trim(),
+                  maxLength: { value: 10, message: "Invalid invite code" },
+                })}
+              />
+              <CompanyInviteCodeDialog disabled={mutation.isPending} onUseCode={code => setValue("inviteCode", code, { shouldValidate: true, shouldDirty: true })} />
+            </div>
+          </Field>
           <Field label="Business Name" error={errors.orgName?.message}>
             <input className={inputCls} {...register("orgName", { required: "Business name is required" })} />
           </Field>

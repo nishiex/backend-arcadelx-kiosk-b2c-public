@@ -38,9 +38,9 @@ function expiryToMs(expiry: string): number {
 
 
 
-export const generateTokens = (userId: string) => {
-  const accessToken = jwt.sign({ id: userId }, env.ACCESS_SECRET_TOKEN, { expiresIn: env.ACCESS_EXPIRY as StringValue});
-  const refreshToken = jwt.sign({ id: userId }, env.REFRESH_SECRET_TOKEN, { expiresIn: env.REFRESH_EXPIRY as StringValue});
+export const generateTokens = (userId: string, organizationAccessVersion = 0) => {
+  const accessToken = jwt.sign({ id: userId, organizationAccessVersion }, env.ACCESS_SECRET_TOKEN, { expiresIn: env.ACCESS_EXPIRY as StringValue});
+  const refreshToken = jwt.sign({ id: userId }, env.REFRESH_SECRET_TOKEN, { expiresIn: env.REFRESH_EXPIRY as StringValue, jwtid: crypto.randomUUID() });
   return { accessToken, refreshToken };
 };
 

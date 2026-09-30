@@ -1,7 +1,7 @@
 import AddDistributorForm from "@/components/distributors/AddDistributorForm"
 
 export const metadata = {
-  title: "Add Distributor · ArcadeLX",
+  title: "Register Distributor · ArcadeLX",
 }
 
 export default function AddDistributorPage() {

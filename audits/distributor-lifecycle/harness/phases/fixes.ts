@@ -76,7 +76,7 @@ export async function run(c:any) {
   // Failure remains queued, successful retry uses the identical password and
   // recipient; a retry can never recreate an organization or rotate credentials.
   c.setFailMail(true);
-  const input=c.registration('recoverable-credentials');
+  const input={...c.registration('recoverable-credentials'),inviteCode:await c.invite(co)};
   const created=await hit('F6-create-with-mail-failure',co,'POST','/api/auth/register',input,201);
   c.setFailMail(false);
   const org=created.data.data.organization;

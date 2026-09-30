@@ -1,14 +1,7 @@
-import { ShoppingCart } from "lucide-react"
-import PlaceholderPage from "@/components/common/PlaceholderPage"
+import OrdersScreen from "@/components/orders/OrdersScreen"
 
 export const metadata = { title: "Orders · ArcadeLX" }
 
 export default function OrdersPage() {
-  return (
-    <PlaceholderPage
-      title="Orders"
-      description="Track kiosk orders and fulfilment across the network."
-      icon={<ShoppingCart size={28} />}
-    />
-  )
+  return <OrdersScreen />
 }

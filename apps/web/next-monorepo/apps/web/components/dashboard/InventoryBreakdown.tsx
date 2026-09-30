@@ -99,6 +99,7 @@ export default function InventoryBreakdown() {
   return (
     <Panel
       title="Fleet composition"
+      className="flex h-full flex-col"
       subtitle={total ? `${inField}% of your fleet is installed in the field` : undefined}
     >
       {isLoading ? (
@@ -117,10 +118,10 @@ export default function InventoryBreakdown() {
       ) : (
         <div
           ref={rootRef}
-          className="flex flex-col items-center gap-6 sm:flex-row sm:gap-8"
+          className="flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row sm:gap-8"
         >
           <Donut segments={segments} total={total} />
-          <ul className="grid w-full flex-1 grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
+          <ul className="grid w-full min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-2.5">
             {segments.map(({ status, count, pct }) => {
               const meta = STATUS_META[status]
               return (

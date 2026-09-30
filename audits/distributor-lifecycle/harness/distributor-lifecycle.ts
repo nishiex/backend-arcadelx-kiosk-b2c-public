@@ -126,7 +126,7 @@ const actors: Record<string, any> = {};
 let seq = 0;
 function sanitize(value: any): any {
   if (Array.isArray(value)) return value.map(sanitize);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, /password|token|cookie|secret/i.test(k) ? '[redacted]' : sanitize(v)]));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, /password|token|cookie|secret|inviteCode/i.test(k) ? '[redacted]' : sanitize(v)]));
   return value;
 }
 async function http(id: string, actor: any, method: string, route: string, body?: any, expected?: number | number[]) {
@@ -157,8 +157,13 @@ async function fixture(label: string, type: any, orgId?: string, role: any = 'OW
   return login(label, email);
 }
 function registration(label: string, type = 'DISTRIBUTOR') { return { orgName: label, ownerName: label, ownerEmail: `${label}@example.invalid`, orgType: type, city: 'Mumbai', state: 'Maharashtra', pincode: 400001, address: 'Audit organization address' }; }
+async function invite(parent: any) {
+  const r = await http(`generate-invite-${++seq}`, parent, 'POST', '/api/members/generateInviteCode', undefined, 201);
+  if (r.status !== 201) throw new Error('Invite generation prerequisite failed');
+  return r.data.data.inviteCode as string;
+}
 async function register(label: string, parent: any, type = 'DISTRIBUTOR', extra = {}) {
-  const body = { ...registration(label, type), ...extra };
+  const body = { ...registration(label, type), ...(type === 'DISTRIBUTOR' ? { inviteCode: await invite(parent) } : {}), ...extra };
   const r = await http(`register-${label}`, parent, 'POST', '/api/auth/register', body, 201);
   if (r.status !== 201) throw new Error(`Registration prerequisite failed: ${label}`);
   const message = mails.findLast(m => m.To[0].Email === body.ownerEmail);
@@ -197,9 +202,9 @@ async function snapshot(id: string, rowId: string) {
   return row;
 }
 
-const ctx: any = { prisma, sql, auditUrl, record, check, http, login, fixture, registration, register, connect, terms, agreement, order, finishOrder, snapshot, actors, mails, setFailMail: (v: boolean) => { failMail = v; }, password, outDir, next: () => ++seq };
+const ctx: any = { prisma, sql, auditUrl, record, check, http, login, fixture, registration, invite, register, connect, terms, agreement, order, finishOrder, snapshot, actors, mails, setFailMail: (v: boolean) => { failMail = v; }, password, outDir, next: () => ++seq };
 try {
-  for (const phase of (process.env.AUDIT_PHASES || 'happy,fixes').split(',')) {
+  for (const phase of (process.env.AUDIT_PHASES || 'happy,fixes,distributor_invites,invite_generation_compat').split(',')) {
     console.log(`BEGIN PHASE ${phase}`);
     const module = await import(`./phases/${phase}.ts`);
     await module.run(ctx);

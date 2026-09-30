@@ -8,13 +8,17 @@ import { fetchDistributors } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Skeleton, ErrorState, EmptyState } from "@/components/dashboard/ui"
+import DistributorStatusDialog from "./DistributorStatusDialog"
+import CompanyInviteCodeDialog from "./CompanyInviteCodeDialog"
 
 export default function DistributorsScreen() {
-  const { canManageDistributors, can } = useMe()
+  const { canManageDistributors, can, isCompany, me } = useMe()
   const canAdd = canManageDistributors && can("DISTRIBUTORS", "CREATE")
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["distributors"],
+    queryKey: ["distributors", me?.membership?.organizationId],
     queryFn: fetchDistributors,
+    enabled: isCompany,
+    refetchInterval: 30000,
   })
 
   const distributors = data ?? []
@@ -30,15 +34,19 @@ export default function DistributorsScreen() {
           </p>
         </div>
         {canAdd && (
-          <Link
-            href="/distributors/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-          >
-            <Plus size={16} /> Register Distributors
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <CompanyInviteCodeDialog />
+            <Link
+              href="/distributors/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            >
+              <Plus size={16} /> Register Distributor
+            </Link>
+          </div>
         )}
       </div>
 
+      {canManageDistributors && distributors.some(d => !d.statusManagementAvailable) && <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Status controls will be available after the database update.</p>}
       <div className="rounded-xl border border-border bg-card">
         {isLoading ? (
           <div className="divide-y divide-border">
@@ -59,7 +67,7 @@ export default function DistributorsScreen() {
             icon={<Building2 size={30} />}
             message={
               canAdd
-                ? "No distributors yet. Use \"Add Distributor\" to create one."
+                ? "No distributors yet. Use \"Register Distributor\" to register one."
                 : "No distributors to show."
             }
           />
@@ -74,6 +82,8 @@ export default function DistributorsScreen() {
                   <th className="px-4 py-3 font-medium">Phone</th>
                   <th className="px-4 py-3 text-right font-medium">Kiosks</th>
                   <th className="px-4 py-3 text-right font-medium">Members</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  {canManageDistributors && <th className="px-4 py-3 text-right font-medium">Actions</th>}
                 </tr>
               </thead>
               <tbody ref={bodyRef}>
@@ -103,6 +113,8 @@ export default function DistributorsScreen() {
                     <td className="px-4 py-3">{d.phone ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{d._count.kiosks}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{d._count.memberships}</td>
+                    <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${d.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-red-500/10 text-red-700 dark:text-red-300"}`}>{d.isActive ? "Active" : "Inactive"}</span></td>
+                    {canManageDistributors && <td className="px-4 py-3 text-right"><DistributorStatusDialog distributor={d} /></td>}
                   </tr>
                 ))}
               </tbody>

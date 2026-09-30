@@ -14,6 +14,9 @@ import agreementRoutes from "./routes/Agreements/agreement.routes"
 import kioskRoutes from './routes/Kiosk/kiosk.routes';
 import internalRoutes from './routes/Internal/internal.routes';
 import orderRoutes from './routes/Orders/order.route'
+import { requireAuth, loadMembership } from './middlewares/auth';
+import { asyncHandler } from './utils/asyncHandler';
+import { workflowReadiness } from './services/workflow-readiness';
 const app = express();
 
 app.use(cors())
@@ -22,6 +25,9 @@ app.use(helmet());
 app.use(express.json());
 app.use(urlencoded({extended:true}))
 app.use(cookieParser());
+app.get('/api/workflows', requireAuth, loadMembership, asyncHandler(async (_req, res) => {
+  res.json(new ApiResponse(200, await workflowReadiness()));
+}));
 
 //routes
 app.use("/api/auth",authRoutes)

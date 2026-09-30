@@ -5,6 +5,7 @@ import { prisma } from "../utils/db";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
+import { getUserOrganizationAccess, assertOrganizationActive } from "../services/organization-access";
 import {
   RegisterOrgSchema,
   JoinOrgSchema,
@@ -87,6 +88,29 @@ export const registerOrganization = asyncHandler(
     // Create owner + organization + membership
 
     const { user, org } = await prisma.$transaction(async (tx) => {
+      if (validatedData.orgType === "DISTRIBUTOR") {
+        // Validate and consume the existing Company invite atomically. A failed
+        // creation rolls this back; concurrent requests cannot reuse the code.
+        const invite = await tx.organization.updateMany({
+          where: {
+            id: req.membership!.organizationId,
+            type: "COMPANY",
+            inviteCode: validatedData.inviteCode,
+            OR: [
+              { inviteCodeExpiresAt: null },
+              { inviteCodeExpiresAt: { gt: new Date() } },
+            ],
+          },
+          data: { inviteCode: null, inviteCodeExpiresAt: null },
+        });
+        if (invite.count !== 1) {
+          throw new ApiError(
+            400,
+            "Invalid, expired, or already-used invite code for your Company",
+          );
+        }
+      }
+
       const newUser = await tx.user.create({
         data: {
           name: validatedData.ownerName,
@@ -178,6 +202,7 @@ export const joinOrganization = asyncHandler(
 
     const org = await prisma.organization.findUnique({
       where: { inviteCode: validatedData.inviteCode },
+      select: { id: true, type: true, inviteCodeExpiresAt: true },
     });
 
     if (!org) throw new ApiError(404, "Invalid invite code");
@@ -263,14 +288,19 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
   if (!isPasswordValid) throw new ApiError(401, "Invalid email or password");
 
-  const { accessToken, refreshToken } = generateTokens(user.id);
-
-  await prisma.refreshToken.create({
-    data: {
-      token: hashToken(refreshToken),
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), //7D
-    },
+  const { accessToken, refreshToken } = await prisma.$transaction(async (tx) => {
+    // Serialize session creation with Company activation/deactivation.
+    const access = await getUserOrganizationAccess(user.id, tx, true);
+    assertOrganizationActive(access);
+    const tokens = generateTokens(user.id, access?.accessVersion ?? 0);
+    await tx.refreshToken.create({
+      data: {
+        token: hashToken(tokens.refreshToken),
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+    return tokens;
   });
 
   setTokenCookies(res, accessToken, refreshToken);
@@ -310,7 +340,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  if (!storedToken) throw new ApiError(401, "Invalid refresh token");
+  if (!storedToken || storedToken.revoked) throw new ApiError(401, "Invalid refresh token");
 
   if (storedToken.expiresAt < new Date()) {
     // Clean up expired token
@@ -323,28 +353,26 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, "Refresh token expired, Please Login Again");
   }
 
-  // Generate new token pair
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-    storedToken.userId,
-  );
-
-  // Rotate refresh token atomically
-  await prisma.$transaction(async (tx) => {
-    // Revoke old refresh token
-    await tx.refreshToken.delete({
-      where: {
-        id: storedToken.id,
-      },
+  // Recheck after taking the organization lock: deactivation may have revoked
+  // the token while this request was waiting. It must never mint a new session.
+  const { accessToken, refreshToken: newRefreshToken } = await prisma.$transaction(async (tx) => {
+    const access = await getUserOrganizationAccess(storedToken.userId, tx, true);
+    assertOrganizationActive(access);
+    const consumed = await tx.refreshToken.deleteMany({
+      where: { id: storedToken.id, revoked: false, expiresAt: { gt: new Date() } },
     });
+    if (consumed.count !== 1) throw new ApiError(401, "Invalid refresh token");
+    const tokens = generateTokens(storedToken.userId, access?.accessVersion ?? 0);
 
     // Store new refresh token
     await tx.refreshToken.create({
       data: {
-        token: hashToken(newRefreshToken),
+        token: hashToken(tokens.refreshToken),
         userId: storedToken.userId,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+    return tokens;
   });
 
   // Send new tokens

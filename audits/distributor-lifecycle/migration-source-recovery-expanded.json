@@ -1,0 +1,126 @@
+{
+  "candidateHashes": 102,
+  "sources": [
+    {
+      "git": "C:\\Users\\Abcom\\Desktop\\backend-arcadelx-kiosk-b2c",
+      "blobs": 36
+    },
+    {
+      "git": "C:\\Users\\Abcom\\Desktop\\worked\\backend-arcadelx-kiosk-b2c",
+      "blobs": 10
+    },
+    {
+      "git": "C:\\Users\\Abcom\\Arcadelx\\backend-arcadelx-kiosk-b2c",
+      "blobs": 7
+    },
+    {
+      "diskSQLFiles": 37
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\AppData\\Local\\Temp\\arcadelx-poppler.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Desktop\\arcadelx-cleanup-backups\\cleanup-20260929-175737.zip",
+      "sqlEntries": 9
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Desktop\\arcadelx-cleanup-backups\\cleanup-20260929-185425.zip",
+      "sqlEntries": 4
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Desktop\\arcadelx-cleanup-backups\\json-cleanup-20260929-185810.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\Admin-UI-main.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\arcadelx-gallery-clean.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\backend-arcadelx-kiosk-b2c-Backend.zip",
+      "sqlEntries": 6
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\Bricolage_Grotesque,Space_Grotesk (1).zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\Bricolage_Grotesque,Space_Grotesk.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\drive-download-20260917T125944Z-1-001.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\New-folder-main (1).zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\next-shadcn-dashboard-main.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\Space_Grotesk.zip",
+      "sqlEntries": 0
+    },
+    {
+      "archive": "C:\\Users\\Abcom\\Downloads\\WhatsApp Unknown 2026-09-18 at 3.13.07 AM.zip",
+      "sqlEntries": 0
+    }
+  ],
+  "errors": [
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260909095919_add_user_organization_membership_refresh_tokens\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260914132819_implement_agreement_and_network_connection_schemas\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260916124637_implement_kiosk_and_kioskassignment\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260917091838_add_password_reset\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260917132138_add_kiosk_location_and_assignment_model\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260922000000_add_kiosk_hardware_details\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260922010000_add_org_business_details\\migration.sql",
+      "error": "Unreadable"
+    },
+    {
+      "file": "C:\\Users\\Abcom\\OneDrive\\Desktop\\New folder\\backend-arcadelx-kiosk-b2c\\apps\\api\\prisma\\migrations\\20260922020000_add_support_tickets\\migration.sql",
+      "error": "Unreadable"
+    }
+  ],
+  "result": [
+    {
+      "name": "20260928063729_implement_transactions_schema",
+      "expectedChecksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3",
+      "recovered": false
+    },
+    {
+      "name": "20260928073023_remove_payu_retries",
+      "expectedChecksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49",
+      "recovered": false
+    }
+  ]
+}

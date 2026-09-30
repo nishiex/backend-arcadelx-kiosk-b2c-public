@@ -13,9 +13,11 @@ import {
   retryOwnedDelivery,
 } from "../../services/email/delivery.service";
 import { lockAgreementParties } from "../../services/agreement-rules";
+import { requireWorkflow } from '../../services/workflow-readiness';
 import {
   CreateOrderSchema,
   OrderQuerySchema,
+  OrderParamsSchema,
 } from "@shared-types/validationSchemas/Orders/order.validation";
 
 const reserveKiosks = async (
@@ -120,6 +122,7 @@ async function lockedStock(
 }
 
 export const createOrder = asyncHandler(async (req, res) => {
+  await requireWorkflow('orderDecisions');
   const { type, targetOrgId, quantity } = CreateOrderSchema.parse(req.body);
   const currentOrgId = req.membership!.organizationId;
   const parentOrgId = type === "REQUEST" ? targetOrgId : currentOrgId;
@@ -206,6 +209,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 });
 
 export const approveOrder = asyncHandler(async (req, res) => {
+  await requireWorkflow('orderDecisions');
   const id = req.params.orderId;
   if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
   await prisma.$transaction(async (tx) => {
@@ -233,6 +237,23 @@ export const approveOrder = asyncHandler(async (req, res) => {
         "Order approved; invoice delivery queued",
       ),
     );
+});
+
+// Rejection precedes approval; it never cancels stock or payment commitments.
+export const rejectOrder = asyncHandler(async (req, res) => {
+  await requireWorkflow('orderDecisions');
+  const { orderId } = OrderParamsSchema.parse(req.params);
+  const order = await prisma.$transaction(async tx => {
+    const current = await lockedOrder(tx, orderId, req.membership!.organizationId);
+    if (current.type !== 'REQUEST' || current.status !== 'UNDER_REVIEW' || current.paymentStatus !== 'PENDING')
+      throw new ApiError(409, 'Only an unpaid request under review can be rejected');
+    if (current.dispatchedKiosks.length ||
+      await tx.kiosk.count({ where: { reservedOrderId: orderId } }) ||
+      await tx.kioskAssignment.count({ where: { orderId } }))
+      throw new ApiError(409, 'This request has inventory history and requires reconciliation');
+    return tx.order.update({ where: { id: orderId }, data: { status: 'REJECTED' } });
+  });
+  res.json(new ApiResponse(200, { order }, 'Order request rejected; inventory unchanged'));
 });
 
 export const retryOrderInvoice = asyncHandler(async (req, res) => {
@@ -397,8 +418,8 @@ export const getOrderRequests = asyncHandler(async (req, res) => {
       ...(query.type ? { type: query.type } : {}),
     },
     include: {
-      parentOrg: { select: { id: true, name: true } },
-      childOrg: { select: { id: true, name: true } },
+      parentOrg: { select: { id: true, name: true, type: true } },
+      childOrg: { select: { id: true, name: true, type: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -407,4 +428,28 @@ export const getOrderRequests = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(200, { orders }, "Order requests fetched successfully"),
     );
+});
+
+export const getOrderDetails = asyncHandler(async (req, res) => {
+  const { orderId } = OrderParamsSchema.parse(req.params);
+  const organizationId = req.membership!.organizationId;
+  // Order parties remain the historical participants after kiosks change owners.
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      OR: [{ parentOrgId: organizationId }, { childOrgId: organizationId }],
+    },
+    include: {
+      parentOrg: { select: { id: true, name: true, type: true } },
+      childOrg: { select: { id: true, name: true, type: true } },
+      dispatchedKiosks: {
+        select: {
+          kiosk: { select: { id: true, machineCode: true, model: true, status: true } },
+        },
+        orderBy: { kioskId: "asc" },
+      },
+    },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  res.status(200).json(new ApiResponse(200, { order }, "Order details fetched successfully"));
 });

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const OrderParamsSchema = z.object({ orderId: z.string().uuid() });
+
 export const CreateOrderSchema = z.object({
   type: z.enum(["REQUEST", "ALLOCATION"]),
   targetOrgId: z.string().uuid(), // If REQUEST, this is the parent you are asking. If ALLOCATION, this is the child you are sending to.

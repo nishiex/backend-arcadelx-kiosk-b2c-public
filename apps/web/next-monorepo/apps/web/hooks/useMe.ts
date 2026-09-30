@@ -30,6 +30,7 @@ export type Permissions = {
   canManageNetwork: boolean
   canManageAgreements: boolean
   canManageDistributors: boolean
+  canReviewRequests: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
   /** Fine-grained matrix check. OWNER always passes (never locked out). */
@@ -41,6 +42,9 @@ export function useMe(): Permissions {
     queryKey: ["me"],
     queryFn: fetchMe,
     staleTime: 1000 * 60 * 5,
+    // Recheck organization access while a Distributor has the dashboard open.
+    refetchInterval: query => query.state.data?.membership?.organization.type === "DISTRIBUTOR" ? 30000 : false,
+    refetchOnWindowFocus: "always",
     retry: 1,
   })
 
@@ -74,6 +78,7 @@ export function useMe(): Permissions {
     canManageAgreements: canTransact && role === "OWNER",
     /** Only a company admin/super-admin (OWNER/ADMIN) may add distributors. */
     canManageDistributors: isCompany && isOwnerOrAdmin,
+    canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
     permissions,
     can,
   }

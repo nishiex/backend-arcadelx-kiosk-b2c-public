@@ -1,0 +1,104 @@
+{
+  "checkedAt": "2026-09-30T07:19:23.985Z",
+  "mode": "apply",
+  "orderId": "afd69339-3d50-4fb5-b176-cd0322b1ae79",
+  "intendedStatus": "UNDER_REVIEW",
+  "remoteCommitted": true,
+  "preparedEvidence": "audits\\distributor-lifecycle\\order-repair-20260930071835762.json",
+  "repair": {
+    "before": {
+      "id": "afd69339-3d50-4fb5-b176-cd0322b1ae79",
+      "type": "REQUEST",
+      "status": "APPROVED",
+      "quantity": 20,
+      "createdAt": "2026-09-21T12:28:41.405",
+      "taxAmount": 180000,
+      "updatedAt": "2026-09-21T12:40:17.041",
+      "childOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "grandTotal": 3180000,
+      "invoiceUrl": "/static/invoices/ORD-2026-721401-59-1789994416985.pdf",
+      "agreementId": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+      "orderNumber": "ORD-2026-721401-59",
+      "parentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "totalDeposit": 2000000,
+      "paymentStatus": "PENDING",
+      "invoiceFilename": null,
+      "depositPerMachine": 100000,
+      "totalNonRefundable": 1000000,
+      "nonRefundablePerMachine": 50000
+    },
+    "after": {
+      "id": "afd69339-3d50-4fb5-b176-cd0322b1ae79",
+      "type": "REQUEST",
+      "status": "UNDER_REVIEW",
+      "quantity": 20,
+      "createdAt": "2026-09-21T12:28:41.405",
+      "taxAmount": 180000,
+      "updatedAt": "2026-09-30T07:19:27.155",
+      "childOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "grandTotal": 3180000,
+      "invoiceUrl": "/static/invoices/ORD-2026-721401-59-1789994416985.pdf",
+      "agreementId": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+      "orderNumber": "ORD-2026-721401-59",
+      "parentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "totalDeposit": 2000000,
+      "paymentStatus": "PENDING",
+      "invoiceFilename": null,
+      "depositPerMachine": 100000,
+      "totalNonRefundable": 1000000,
+      "nonRefundablePerMachine": 50000
+    },
+    "otherRowsUnchanged": true,
+    "fingerprints": {
+      "Order": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "OrderKiosk": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "KioskAssignment": {
+        "count": 3,
+        "digest": "0376f3937905b28b5692740ca582315e"
+      },
+      "Kiosk": {
+        "count": 131,
+        "digest": "c1fa106bf0b67ed4b1b2daf390793e68"
+      },
+      "Agreement": {
+        "count": 1,
+        "digest": "4ea428aafda3b42cb3849a07fb5f8cc8"
+      },
+      "NetworkConnection": {
+        "count": 2,
+        "digest": "4b145cfe1fab40c0946733e5d9590b1f"
+      },
+      "_prisma_migrations": {
+        "count": 12,
+        "digest": "8b7fc46c5790109342f5f8a9214fd2f2"
+      }
+    }
+  },
+  "verifiedAfterCommit": {
+    "id": "afd69339-3d50-4fb5-b176-cd0322b1ae79",
+    "type": "REQUEST",
+    "status": "UNDER_REVIEW",
+    "quantity": 20,
+    "createdAt": "2026-09-21T12:28:41.405",
+    "taxAmount": 180000,
+    "updatedAt": "2026-09-30T07:19:27.155",
+    "childOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+    "grandTotal": 3180000,
+    "invoiceUrl": "/static/invoices/ORD-2026-721401-59-1789994416985.pdf",
+    "agreementId": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+    "orderNumber": "ORD-2026-721401-59",
+    "parentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+    "totalDeposit": 2000000,
+    "paymentStatus": "PENDING",
+    "invoiceFilename": null,
+    "depositPerMachine": 100000,
+    "totalNonRefundable": 1000000,
+    "nonRefundablePerMachine": 50000
+  }
+}

@@ -157,6 +157,46 @@ export async function fetchInventorySummary(): Promise<InventorySummaryResponse>
   return handleRes<InventorySummaryResponse>(res);
 }
 
+// Orders belong to the supplier/customer relationship, even after kiosk delivery.
+export const ORDER_STATUSES = ['UNDER_REVIEW', 'APPROVED', 'DISPATCHED', 'DELIVERED', 'REJECTED'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type KioskOrder = {
+  id: string;
+  orderNumber: string;
+  type: 'REQUEST' | 'ALLOCATION';
+  status: OrderStatus;
+  paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  parentOrgId: string;
+  childOrgId: string;
+  parentOrg: OrgRef;
+  childOrg: OrgRef;
+  quantity: number;
+  depositPerMachine: number;
+  nonRefundablePerMachine: number;
+  totalDeposit: number;
+  totalNonRefundable: number;
+  taxAmount: number;
+  grandTotal: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type KioskOrderDetails = KioskOrder & {
+  dispatchedKiosks: Array<{
+    kiosk: { id: string; machineCode: string; model: string | null; status: string };
+  }>;
+};
+
+export async function fetchOrders(status?: OrderStatus, signal?: AbortSignal): Promise<KioskOrder[]> {
+  const query = status ? `?${new URLSearchParams({ status })}` : '';
+  const res = await apiFetch(`/api/orders${query}`, { signal, cache: 'no-store' });
+  return (await handleRes<{ orders: KioskOrder[] }>(res)).orders;
+}
+
+export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): Promise<KioskOrderDetails> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}`, { signal, cache: 'no-store' });
+  return (await handleRes<{ order: KioskOrderDetails }>(res)).order;
+}
+
 export async function fetchPendingMembers(page = 1, limit = 10): Promise<PendingMembersResponse> {
   const res = await apiFetch(`/api/members/requests?page=${page}&limit=${limit}`, { credentials: 'include' });
   return handleRes<PendingMembersResponse>(res);
@@ -167,7 +207,38 @@ export async function fetchNetworkRequests(page = 1, limit = 10): Promise<Networ
   return handleRes<NetworkRequestsResponse>(res);
 }
 
+export type WorkflowReadiness = { networkRejection: boolean; agreementRejection: boolean; orderDecisions: boolean };
+export async function fetchWorkflowReadiness(): Promise<WorkflowReadiness> {
+  return handleRes<WorkflowReadiness>(await apiFetch('/api/workflows'));
+}
+export type ReviewRequest = {
+  id: string; status: string; from: OrgRef; to: OrgRef; createdAt: string;
+  parentSharePct?: string | number; childSharePct?: string | number;
+  depositAmountPerMachine?: number; nonRefundableAmountPerMachine?: number;
+};
+export async function fetchReviewRequests(kind: 'network' | 'agreements', page = 1): Promise<{ requests: ReviewRequest[]; meta: PaginationMeta }> {
+  const res = await apiFetch(`/api/${kind}?page=${page}&limit=20`);
+  if (kind === 'network') {
+    const data = await handleRes<{ requests: Array<Omit<ReviewRequest, 'from' | 'to'> & { initiator: OrgRef; reciever: OrgRef }>; meta: PaginationMeta }>(res);
+    return { meta: data.meta, requests: data.requests.map(row => ({ ...row, from: row.initiator, to: row.reciever })) };
+  }
+  const data = await handleRes<{ agreements: Array<Omit<ReviewRequest, 'from' | 'to'> & { parentOrg: OrgRef; childOrg: OrgRef }>; meta: PaginationMeta }>(res);
+  return { meta: data.meta, requests: data.agreements.map(row => ({ ...row, from: row.parentOrg, to: row.childOrg })) };
+}
+export async function decideRequest(kind: 'network' | 'agreements' | 'orders', id: string, action: 'approve' | 'reject'): Promise<void> {
+  const operation = kind === 'network' && action === 'approve' ? 'accept' : action;
+  await handleRes(await apiFetch(`/api/${kind}/${encodeURIComponent(id)}/${operation}`, { method: kind === 'network' ? 'POST' : 'PATCH' }));
+}
+
+export type CompanyInviteCode = { inviteCode: string; expiresAt: string };
+
+export async function generateCompanyInviteCode(): Promise<CompanyInviteCode> {
+  const res = await apiFetch('/api/members/generateInviteCode', { method: 'POST' });
+  return handleRes<CompanyInviteCode>(res);
+}
+
 export type CreateDistributorInput = {
+  inviteCode: string;
   orgName: string;
   ownerName: string;
   ownerEmail: string;
@@ -212,6 +283,8 @@ export async function createDistributor(
 export type Distributor = {
   id: string;
   name: string;
+  isActive: boolean;
+  statusManagementAvailable: boolean;
   type: OrgType;
   city: string;
   state: string;
@@ -228,6 +301,15 @@ export async function fetchDistributors(): Promise<Distributor[]> {
   const res = await apiFetch('/api/network/distributors', { credentials: 'include' });
   const json = await handleRes<{ distributors: Distributor[] }>(res);
   return json.distributors;
+}
+
+export async function setDistributorStatus(id: string, isActive: boolean): Promise<void> {
+  const res = await apiFetch(`/api/network/distributors/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isActive }),
+  });
+  await handleRes(res);
 }
 
 // The nested path receives the existing path-scoped refresh cookie.

@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { Search, Bell, Users, Share2 } from "lucide-react"
 import Avatar from "@/components/ui/avatar"
@@ -10,7 +11,7 @@ import { fetchPendingMembers, fetchNetworkRequests } from "@/lib/backend-api"
 import { gsap, prefersReducedMotion } from "@/lib/gsap"
 
 export default function Header() {
-  const { me, canManageMembers, canManageNetwork } = useMe()
+  const { me, canManageMembers, canReviewRequests } = useMe()
   const [open, setOpen] = React.useState(false)
   const bellRef = React.useRef<HTMLButtonElement>(null)
 
@@ -18,15 +19,17 @@ export default function Header() {
     queryKey: ["pendingMembers", 1, 1],
     queryFn: () => fetchPendingMembers(1, 1),
     enabled: canManageMembers,
+    refetchInterval: 10_000,
   })
   const network = useQuery({
     queryKey: ["networkRequests", 1, 1],
     queryFn: () => fetchNetworkRequests(1, 1),
-    enabled: canManageNetwork,
+    enabled: canReviewRequests,
+    refetchInterval: 10_000,
   })
 
   const memberCount = canManageMembers ? members.data?.meta?.total ?? 0 : 0
-  const networkCount = canManageNetwork ? network.data?.meta?.total ?? 0 : 0
+  const networkCount = canReviewRequests ? network.data?.meta?.total ?? 0 : 0
   const total = memberCount + networkCount
 
   // Pop the badge when the count first becomes positive.
@@ -38,7 +41,7 @@ export default function Header() {
   }, [total])
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-6 py-4 backdrop-blur">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-4 py-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
         {/* Brand — logo only on desktop (the sidebar already carries the wordmark). */}
         <a href="/" className="hidden items-center md:flex" aria-label="ArcadeLX home">
@@ -56,7 +59,7 @@ export default function Header() {
 
       <div className="ml-auto flex items-center gap-2 sm:gap-4">
         <ThemeToggle />
-        {(canManageMembers || canManageNetwork) && (
+        {(canManageMembers || canReviewRequests) && (
           <div className="relative">
             <button
               ref={bellRef}
@@ -86,13 +89,13 @@ export default function Header() {
                     <ul className="space-y-0.5">
                       {canManageMembers && (
                         <li className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-muted">
-                          <span className="inline-flex items-center gap-2"><Users size={15} /> Member requests</span>
+                          <Link href="/user" onClick={() => setOpen(false)} className="inline-flex items-center gap-2"><Users size={15} /> Member requests</Link>
                           <span className="font-semibold tabular-nums">{memberCount}</span>
                         </li>
                       )}
-                      {canManageNetwork && (
+                      {canReviewRequests && (
                         <li className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-muted">
-                          <span className="inline-flex items-center gap-2"><Share2 size={15} /> Network requests</span>
+                          <Link href="/requests" onClick={() => setOpen(false)} className="inline-flex items-center gap-2"><Share2 size={15} /> Network requests</Link>
                           <span className="font-semibold tabular-nums">{networkCount}</span>
                         </li>
                       )}

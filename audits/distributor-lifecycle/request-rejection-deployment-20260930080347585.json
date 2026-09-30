@@ -1,0 +1,304 @@
+{
+  "mode": "apply",
+  "migration": "20260930070000_request_rejections",
+  "checksum": "8ac7b3e1b927646a5c435af7112a45e24e397eb8cda54a4158bb74fb1f9fc0f2",
+  "targetHash": "a5aba91039072f6dbc8c179675954089bae09920a9af6d43c279cb2e253671e1",
+  "checkedAt": "2026-09-30T08:03:47.588Z",
+  "remoteDDLCommitted": true,
+  "prismaRecorded": true,
+  "preparedEvidence": "audits\\distributor-lifecycle\\request-rejection-deployment-20260930080253048.json",
+  "dataPreservation": {
+    "before": {
+      "Agreement": {
+        "count": 1,
+        "digest": "4ea428aafda3b42cb3849a07fb5f8cc8"
+      },
+      "Kiosk": {
+        "count": 131,
+        "digest": "c1fa106bf0b67ed4b1b2daf390793e68"
+      },
+      "KioskAssignment": {
+        "count": 3,
+        "digest": "0376f3937905b28b5692740ca582315e"
+      },
+      "MachineSequence": {
+        "count": 1,
+        "digest": "34dd79cdf92638fabe6ba0e57c8d5ce6"
+      },
+      "Membership": {
+        "count": 5,
+        "digest": "646e4a578f3fb236c06b91fae0e498f9"
+      },
+      "NetworkConnection": {
+        "count": 2,
+        "digest": "4b145cfe1fab40c0946733e5d9590b1f"
+      },
+      "Order": {
+        "count": 1,
+        "digest": "a3c421fe21b1d1d33683c3cdecc95a16"
+      },
+      "OrderKiosk": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Organization": {
+        "count": 4,
+        "digest": "e625121750d6e0b2bdb10b342c3157b7"
+      },
+      "RevenueSyncRunLog": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Transaction": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "User": {
+        "count": 5,
+        "digest": "b6261a1a04698e1e3c5f7eb6d504e74c"
+      }
+    },
+    "after": {
+      "Agreement": {
+        "count": 1,
+        "digest": "4ea428aafda3b42cb3849a07fb5f8cc8"
+      },
+      "Kiosk": {
+        "count": 131,
+        "digest": "c1fa106bf0b67ed4b1b2daf390793e68"
+      },
+      "KioskAssignment": {
+        "count": 3,
+        "digest": "0376f3937905b28b5692740ca582315e"
+      },
+      "MachineSequence": {
+        "count": 1,
+        "digest": "34dd79cdf92638fabe6ba0e57c8d5ce6"
+      },
+      "Membership": {
+        "count": 5,
+        "digest": "646e4a578f3fb236c06b91fae0e498f9"
+      },
+      "NetworkConnection": {
+        "count": 2,
+        "digest": "4b145cfe1fab40c0946733e5d9590b1f"
+      },
+      "Order": {
+        "count": 1,
+        "digest": "a3c421fe21b1d1d33683c3cdecc95a16"
+      },
+      "OrderKiosk": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Organization": {
+        "count": 4,
+        "digest": "e625121750d6e0b2bdb10b342c3157b7"
+      },
+      "RevenueSyncRunLog": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Transaction": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "User": {
+        "count": 5,
+        "digest": "b6261a1a04698e1e3c5f7eb6d504e74c"
+      }
+    }
+  },
+  "historyBefore": [
+    {
+      "migration_name": "20260909095919_add_user_organization_membership_refresh_tokens",
+      "checksum": "1aa4ff774a2460c1b1527efe5fdf215e5ca7faecbfab72c401947db6001a6c8c",
+      "finished_at": "2026-09-14T13:25:41.183Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260914132819_implement_agreement_and_network_connection_schemas",
+      "checksum": "a4f8aae27c031368df7a5c3554e1c7cac68bee29a9a1171989d2d25198ab5160",
+      "finished_at": "2026-09-14T13:28:25.305Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260916124637_implement_kiosk_and_kioskassignment",
+      "checksum": "6ab6760a9089626e4a409cda83a4660f3c116c884dabca554e5cf7404ea8a781",
+      "finished_at": "2026-09-17T09:18:05.611Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260917091838_add_password_reset",
+      "checksum": "a231bc2776b9104f39685619db0cb45a34bde52cf479235969264964e3f7b03d",
+      "finished_at": "2026-09-17T09:18:43.434Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260917132138_add_kiosk_location_and_assignment_model",
+      "checksum": "e245b95cda40d93fc94d75f6fd3d46ec897b51c3addb312e6a5831feb894cd5b",
+      "finished_at": "2026-09-17T13:21:42.941Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+      "checksum": "670c88f032899d5d2d7f4eb1af64061a4fdfe778f21aa75ddad0ae5e5543563e",
+      "finished_at": "2026-09-18T13:24:03.576Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260921095532_implement_order_and_order_kiosk_schemas",
+      "checksum": "b888bdc69ab36b0a0d61ac35362350950c869b7d7e2693cfce6d440d2e93eb6e",
+      "finished_at": "2026-09-21T09:55:39.740Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260922135228_implement_payment_status_in_orders",
+      "checksum": "59221b192d25a62c236db9cb5fcbf51d136adbd327cdf9bb27562f70737830cb",
+      "finished_at": "2026-09-22T13:52:32.421Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260922151453_add_invoice_filename",
+      "checksum": "4c37792fdc1c5f595bff47c146971a3a9f6f6199336b752e3e8104b592452095",
+      "finished_at": "2026-09-22T15:14:57.794Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928063729_implement_transactions_schema",
+      "checksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3",
+      "finished_at": "2026-09-28T06:37:35.352Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928073023_remove_payu_retries",
+      "checksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49",
+      "finished_at": "2026-09-28T07:30:27.524Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260929123000_distributor_access_status",
+      "checksum": "f0b34edd3ab79caf325c860a4bb5e9768913fad7b02dac508e474ab803faf2d1",
+      "finished_at": "2026-09-29T12:16:54.673Z",
+      "rolled_back_at": null
+    }
+  ],
+  "enumsBefore": [
+    {
+      "typname": "AgreementStatus",
+      "labels": [
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "ACTIVE",
+        "TERMINATED"
+      ]
+    },
+    {
+      "typname": "NetworkStatus",
+      "labels": [
+        "PENDING",
+        "ACTIVE"
+      ]
+    }
+  ],
+  "historyAfter": [
+    {
+      "migration_name": "20260909095919_add_user_organization_membership_refresh_tokens",
+      "checksum": "1aa4ff774a2460c1b1527efe5fdf215e5ca7faecbfab72c401947db6001a6c8c",
+      "finished_at": "2026-09-14T13:25:41.183Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260914132819_implement_agreement_and_network_connection_schemas",
+      "checksum": "a4f8aae27c031368df7a5c3554e1c7cac68bee29a9a1171989d2d25198ab5160",
+      "finished_at": "2026-09-14T13:28:25.305Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260916124637_implement_kiosk_and_kioskassignment",
+      "checksum": "6ab6760a9089626e4a409cda83a4660f3c116c884dabca554e5cf7404ea8a781",
+      "finished_at": "2026-09-17T09:18:05.611Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260917091838_add_password_reset",
+      "checksum": "a231bc2776b9104f39685619db0cb45a34bde52cf479235969264964e3f7b03d",
+      "finished_at": "2026-09-17T09:18:43.434Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260917132138_add_kiosk_location_and_assignment_model",
+      "checksum": "e245b95cda40d93fc94d75f6fd3d46ec897b51c3addb312e6a5831feb894cd5b",
+      "finished_at": "2026-09-17T13:21:42.941Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+      "checksum": "670c88f032899d5d2d7f4eb1af64061a4fdfe778f21aa75ddad0ae5e5543563e",
+      "finished_at": "2026-09-18T13:24:03.576Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260921095532_implement_order_and_order_kiosk_schemas",
+      "checksum": "b888bdc69ab36b0a0d61ac35362350950c869b7d7e2693cfce6d440d2e93eb6e",
+      "finished_at": "2026-09-21T09:55:39.740Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260922135228_implement_payment_status_in_orders",
+      "checksum": "59221b192d25a62c236db9cb5fcbf51d136adbd327cdf9bb27562f70737830cb",
+      "finished_at": "2026-09-22T13:52:32.421Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260922151453_add_invoice_filename",
+      "checksum": "4c37792fdc1c5f595bff47c146971a3a9f6f6199336b752e3e8104b592452095",
+      "finished_at": "2026-09-22T15:14:57.794Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928063729_implement_transactions_schema",
+      "checksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3",
+      "finished_at": "2026-09-28T06:37:35.352Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928073023_remove_payu_retries",
+      "checksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49",
+      "finished_at": "2026-09-28T07:30:27.524Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260929123000_distributor_access_status",
+      "checksum": "f0b34edd3ab79caf325c860a4bb5e9768913fad7b02dac508e474ab803faf2d1",
+      "finished_at": "2026-09-29T12:16:54.673Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260930070000_request_rejections",
+      "checksum": "8ac7b3e1b927646a5c435af7112a45e24e397eb8cda54a4158bb74fb1f9fc0f2",
+      "finished_at": "2026-09-30T08:04:13.895Z",
+      "rolled_back_at": null
+    }
+  ],
+  "enumsAfter": [
+    {
+      "typname": "AgreementStatus",
+      "labels": [
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "ACTIVE",
+        "TERMINATED",
+        "REJECTED"
+      ]
+    },
+    {
+      "typname": "NetworkStatus",
+      "labels": [
+        "PENDING",
+        "ACTIVE",
+        "REJECTED"
+      ]
+    }
+  ]
+}
