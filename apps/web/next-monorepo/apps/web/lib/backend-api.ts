@@ -708,6 +708,10 @@ export type OrgMember = {
   permissionRole: { id: string; name: string } | null;
 };
 
+// NOTE: `GET /api/members` is NOT implemented on the backend (the members router
+// only exposes /generateInviteCode, /requests, /:id/role and DELETE /:id). This
+// would 404. Only the gated, backend-less Roles screen references it — keep that
+// gate until an active-member roster endpoint ships.
 export async function fetchMembers(): Promise<OrgMember[]> {
   const res = await apiFetch('/api/members', { credentials: 'include' });
   const json = await handleRes<{ members: OrgMember[] }>(res);
@@ -743,6 +747,10 @@ export type CreateMemberResult = {
 /**
  * Directly create an active member (mints the account + emails temporary
  * credentials). Company OWNER/ADMIN only; role must be below the caller's own.
+ *
+ * NOTE: `POST /api/members` is NOT implemented on the backend and this has no
+ * caller today — it would 404. Do not wire it into UI until the create-member
+ * route ships; onboarding currently happens via invite code + join request.
  */
 export async function createMember(input: CreateMemberInput): Promise<CreateMemberResult> {
   // Drop empty-string optionals so the backend treats them as absent.

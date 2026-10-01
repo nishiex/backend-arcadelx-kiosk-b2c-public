@@ -22,6 +22,12 @@ import { useMe } from "@/hooks/useMe"
 import { cn } from "@workspace/ui/lib/utils"
 import { Skeleton, ErrorState, EmptyState } from "@/components/dashboard/ui"
 
+// The roles/permissions backend is not implemented: /api/roles* and the
+// /api/members roster/create routes do not exist on this API, so every query
+// on this screen would 404. Keep the page gated until those routes ship, rather
+// than firing doomed requests. Flip to true once the backend lands.
+const ROLES_BACKEND_AVAILABLE = false
+
 const cellKey = (m: PermissionModule, a: PermissionAction) => `${m}:${a}`
 
 const MODULE_LABELS: Record<PermissionModule, string> = {
@@ -72,12 +78,12 @@ export default function RolesScreen() {
   const [newName, setNewName] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
 
-  const rolesQ = useQuery({ queryKey: ["roles"], queryFn: fetchRoles, enabled: canView })
-  const membersQ = useQuery({ queryKey: ["members"], queryFn: fetchMembers, enabled: canView })
+  const rolesQ = useQuery({ queryKey: ["roles"], queryFn: fetchRoles, enabled: canView && ROLES_BACKEND_AVAILABLE })
+  const membersQ = useQuery({ queryKey: ["members"], queryFn: fetchMembers, enabled: canView && ROLES_BACKEND_AVAILABLE })
   const roleQ = useQuery({
     queryKey: ["role", selectedId],
     queryFn: () => fetchRole(selectedId as string),
-    enabled: canView && !!selectedId,
+    enabled: canView && ROLES_BACKEND_AVAILABLE && !!selectedId,
   })
 
   const roles = rolesQ.data ?? []
@@ -204,6 +210,25 @@ export default function RolesScreen() {
       <div className="mx-auto max-w-6xl space-y-4">
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+
+  // No roles/permissions backend yet — show a clear notice instead of 404s.
+  if (!ROLES_BACKEND_AVAILABLE) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Roles &amp; Permissions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Define named roles, grant them a module &times; action matrix, and assign them to members.
+          </p>
+        </div>
+        <EmptyState
+          className="py-16"
+          icon={<Shield size={30} />}
+          message="Roles & permissions aren't available yet. This feature is coming soon."
+        />
       </div>
     )
   }
