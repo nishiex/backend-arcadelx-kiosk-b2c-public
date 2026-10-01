@@ -1,0 +1,954 @@
+{
+  "scope": "Isolated local fully migrated test database; synthetic accounts and inventory; real HTTP and browser; simulated payment/delivery; no external mail",
+  "organizationName": "Test Distributor Pvt Ltf",
+  "companyId": "1ade74eb-6a20-4596-9283-d317108a109a",
+  "distributorId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+  "quantity": 130,
+  "orders": [
+    {
+      "id": "b3e043b7-0793-4a4f-a9b3-70fa6fa6f7a8",
+      "orderNumber": "ORD-2026-00001",
+      "quantity": 20
+    },
+    {
+      "id": "3921f38d-2332-4cef-991f-364c7ba6d4bb",
+      "orderNumber": "ORD-2026-00002",
+      "quantity": 50
+    },
+    {
+      "id": "402f389b-bd67-43d8-9912-a1219629ccb8",
+      "orderNumber": "ORD-2026-00003",
+      "quantity": 50
+    },
+    {
+      "id": "1c8d3ba3-2e57-45f0-8992-d38faa62f793",
+      "orderNumber": "ORD-2026-00004",
+      "quantity": 10
+    }
+  ],
+  "stages": [
+    {
+      "label": "transfer-before",
+      "companyOwned": 130,
+      "distributorOwned": 0,
+      "companyAvailable": 130,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 0
+    },
+    {
+      "label": "transfer-batch-1-requested",
+      "companyOwned": 130,
+      "distributorOwned": 0,
+      "companyAvailable": 130,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 0
+    },
+    {
+      "label": "transfer-batch-1-reserved",
+      "companyOwned": 130,
+      "distributorOwned": 0,
+      "companyAvailable": 110,
+      "reserved": 20,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 0
+    },
+    {
+      "label": "transfer-batch-1-dispatched",
+      "companyOwned": 130,
+      "distributorOwned": 0,
+      "companyAvailable": 110,
+      "reserved": 0,
+      "inTransit": 20,
+      "companyListRows": 130,
+      "distributorListRows": 0
+    },
+    {
+      "label": "transfer-batch-1-delivered",
+      "companyOwned": 110,
+      "distributorOwned": 20,
+      "companyAvailable": 110,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 20
+    },
+    {
+      "label": "transfer-batch-2-reserved",
+      "companyOwned": 110,
+      "distributorOwned": 20,
+      "companyAvailable": 60,
+      "reserved": 50,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 20
+    },
+    {
+      "label": "transfer-batch-2-dispatched",
+      "companyOwned": 110,
+      "distributorOwned": 20,
+      "companyAvailable": 60,
+      "reserved": 0,
+      "inTransit": 50,
+      "companyListRows": 130,
+      "distributorListRows": 20
+    },
+    {
+      "label": "transfer-batch-2-delivered",
+      "companyOwned": 60,
+      "distributorOwned": 70,
+      "companyAvailable": 60,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 70
+    },
+    {
+      "label": "transfer-batch-3-reserved",
+      "companyOwned": 60,
+      "distributorOwned": 70,
+      "companyAvailable": 10,
+      "reserved": 50,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 70
+    },
+    {
+      "label": "transfer-batch-3-dispatched",
+      "companyOwned": 60,
+      "distributorOwned": 70,
+      "companyAvailable": 10,
+      "reserved": 0,
+      "inTransit": 50,
+      "companyListRows": 130,
+      "distributorListRows": 70
+    },
+    {
+      "label": "transfer-batch-3-delivered",
+      "companyOwned": 10,
+      "distributorOwned": 120,
+      "companyAvailable": 10,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 120
+    },
+    {
+      "label": "transfer-batch-4-reserved",
+      "companyOwned": 10,
+      "distributorOwned": 120,
+      "companyAvailable": 0,
+      "reserved": 10,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 120
+    },
+    {
+      "label": "transfer-batch-4-dispatched",
+      "companyOwned": 10,
+      "distributorOwned": 120,
+      "companyAvailable": 0,
+      "reserved": 0,
+      "inTransit": 10,
+      "companyListRows": 130,
+      "distributorListRows": 120
+    },
+    {
+      "label": "transfer-batch-4-delivered",
+      "companyOwned": 0,
+      "distributorOwned": 130,
+      "companyAvailable": 0,
+      "reserved": 0,
+      "inTransit": 0,
+      "companyListRows": 130,
+      "distributorListRows": 130
+    }
+  ],
+  "kiosks": [
+    {
+      "id": "a89f0957-e090-48e7-8627-1249d3ef7385",
+      "machineCode": "ADLX-2026-A001",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b5238dc6-9335-412b-8c3f-97a1df24fe95",
+      "machineCode": "ADLX-2026-A002",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "c2026ba1-4a8f-45e2-822d-a585084b965a",
+      "machineCode": "ADLX-2026-A003",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "ee7b374a-207c-4510-b3af-1465402a76fd",
+      "machineCode": "ADLX-2026-A004",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "a4ea6e64-9f0a-4250-bb75-37cba7c950fd",
+      "machineCode": "ADLX-2026-A005",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "26e72b13-14a7-400e-a316-6f1022b28c58",
+      "machineCode": "ADLX-2026-A006",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7e80b6d5-4caa-425e-9d40-6aaee2544196",
+      "machineCode": "ADLX-2026-A007",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "068a2406-3b04-4e9c-9a65-7a80c0758390",
+      "machineCode": "ADLX-2026-A008",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "3caf1677-2300-4b7d-a2e0-a7744b4267b6",
+      "machineCode": "ADLX-2026-A009",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "caf2b5e8-9e81-42f0-aca1-3ef6238e1b2e",
+      "machineCode": "ADLX-2026-A010",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7b2aad82-d62e-41b4-8ddd-91f2f9e94cb6",
+      "machineCode": "ADLX-2026-A011",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "e72cda19-8331-4837-a028-e45cdb50bc19",
+      "machineCode": "ADLX-2026-A012",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f19d5fb8-3d3a-4ee3-9903-5d65efd6210d",
+      "machineCode": "ADLX-2026-A013",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "631872b4-8ebc-4bdf-afab-62a8ac486a0e",
+      "machineCode": "ADLX-2026-A014",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5f29c0a4-a80e-43e2-a318-62fa20c07267",
+      "machineCode": "ADLX-2026-A015",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b280854a-f59b-43a7-a8b1-2a2f6c2f4378",
+      "machineCode": "ADLX-2026-A016",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "9fa4e9fb-456a-4ac2-84eb-18b1ac653fd3",
+      "machineCode": "ADLX-2026-A017",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "cbffe904-0d76-44b7-9d39-b41a7d8cf9b2",
+      "machineCode": "ADLX-2026-A018",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "4ac5d011-730c-4289-bf8e-7cf31f85b165",
+      "machineCode": "ADLX-2026-A019",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "76726f21-177b-476c-b1f6-47763c833e27",
+      "machineCode": "ADLX-2026-A020",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "071c0d44-bc2f-4068-b40a-52f9cac68990",
+      "machineCode": "ADLX-2026-A021",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "be2e5f8e-a873-4332-a2a6-c6809d404243",
+      "machineCode": "ADLX-2026-A022",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "c3e14b4a-ef08-46a0-8339-f7df7362147d",
+      "machineCode": "ADLX-2026-A023",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "148dc9c5-cdf9-408d-8fb1-c27cd5cf440b",
+      "machineCode": "ADLX-2026-A024",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "28192d3a-646f-4661-9932-8c52f7dd5d34",
+      "machineCode": "ADLX-2026-A025",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "148184ce-91d0-42a8-9b35-b2e2299d3940",
+      "machineCode": "ADLX-2026-A026",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "fb08ca0b-e5e6-4a55-a3aa-729661de08db",
+      "machineCode": "ADLX-2026-A027",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5e0fdee8-b59b-4a20-ae86-9581aa0643bd",
+      "machineCode": "ADLX-2026-A028",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "659d2f97-d9bc-4078-b7cc-0513074e857d",
+      "machineCode": "ADLX-2026-A029",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "72038fb3-5b5e-4d9d-b91a-c76722f52346",
+      "machineCode": "ADLX-2026-A030",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f2233a94-6cb6-4f15-9984-a79ae9d6e726",
+      "machineCode": "ADLX-2026-A031",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "99bd0f71-f90d-4d17-bd7d-23090ee7fc8a",
+      "machineCode": "ADLX-2026-A032",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f35105b4-9616-4861-aea1-2413ef5beaf9",
+      "machineCode": "ADLX-2026-A033",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "53396679-6fcb-4a2f-91c3-898cee5cd58b",
+      "machineCode": "ADLX-2026-A034",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "df709cdc-0f39-4592-b9be-129b585374e2",
+      "machineCode": "ADLX-2026-A035",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "41cb32f2-45e7-4ecd-b197-628d84e8fa38",
+      "machineCode": "ADLX-2026-A036",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "2c1d30f8-4824-48ff-ada1-4e0fbecb5710",
+      "machineCode": "ADLX-2026-A037",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5ad65368-913a-4b7a-be45-3893ee1493d2",
+      "machineCode": "ADLX-2026-A038",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "9d724b95-ef54-4ddd-9a92-759b36ae4cbd",
+      "machineCode": "ADLX-2026-A039",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "c5ffec20-6a94-48e2-9093-68323f77eec5",
+      "machineCode": "ADLX-2026-A040",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "9ed2011c-6be6-4206-a1c4-2163dfa951a7",
+      "machineCode": "ADLX-2026-A041",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "a82150ed-2bcc-4dcf-afc0-1494b9610ec3",
+      "machineCode": "ADLX-2026-A042",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "4caaeac4-9693-41d9-b07f-c34c062f10e8",
+      "machineCode": "ADLX-2026-A043",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5dbd374a-7afa-440c-accb-a7d81d6987af",
+      "machineCode": "ADLX-2026-A044",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f097431b-a707-4b75-8f95-484479ec6669",
+      "machineCode": "ADLX-2026-A045",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "bec4e21b-7b2d-478b-9d86-1d2d44c8a844",
+      "machineCode": "ADLX-2026-A046",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "bb7865ff-bb22-413a-8200-c38f4f939863",
+      "machineCode": "ADLX-2026-A047",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "4dc0d5fa-379a-4fd4-ae2a-681b0a1a4e99",
+      "machineCode": "ADLX-2026-A048",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "ff2263cd-e7c2-405d-b4c2-2a5bb1ece0c3",
+      "machineCode": "ADLX-2026-A049",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "cd44a2f1-fe3f-42bb-be8f-a62f14db26f1",
+      "machineCode": "ADLX-2026-A050",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "bea26072-9257-4c30-8de3-1ccf8adb33c8",
+      "machineCode": "ADLX-2026-A051",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b013a363-455d-445d-9ae6-061eb9fab567",
+      "machineCode": "ADLX-2026-A052",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "3ce14176-7d30-4619-b4bd-144b95670345",
+      "machineCode": "ADLX-2026-A053",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b58daf24-f562-433a-b23d-bdc0bf8d2508",
+      "machineCode": "ADLX-2026-A054",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "3b489348-e1f8-4f22-976d-cf939020e318",
+      "machineCode": "ADLX-2026-A055",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "62474708-c7cb-4211-a2e2-8558cd53f6b8",
+      "machineCode": "ADLX-2026-A056",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "ec356936-3ad8-4b25-b6e8-d5566d04c4ed",
+      "machineCode": "ADLX-2026-A057",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "2570d1a5-ec1b-45df-a0f0-9509956f317e",
+      "machineCode": "ADLX-2026-A058",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "12b89f1d-c6a6-438a-bf28-8cece3d6e0db",
+      "machineCode": "ADLX-2026-A059",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "81413e53-8439-4793-9f08-dd2f3ef611f9",
+      "machineCode": "ADLX-2026-A060",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "d9ed7874-550a-4f95-9933-7d822a0f88e0",
+      "machineCode": "ADLX-2026-A061",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "92e38ed9-107a-44ce-8d0e-9ee687213ca6",
+      "machineCode": "ADLX-2026-A062",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "26aac730-fbe1-48e2-a2c2-a71626494888",
+      "machineCode": "ADLX-2026-A063",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "6efd840e-4642-4ffe-b961-705a0db80817",
+      "machineCode": "ADLX-2026-A064",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7a8ad37d-7dd5-49c2-ac92-9f26c543d3a7",
+      "machineCode": "ADLX-2026-A065",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b046b19e-3035-4011-b834-b4a814435a12",
+      "machineCode": "ADLX-2026-A066",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "8ca399c2-b79b-498b-adb7-ee2dd5288bb2",
+      "machineCode": "ADLX-2026-A067",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "a5edc8b6-285b-4bae-9b2b-34fcb854a7a8",
+      "machineCode": "ADLX-2026-A068",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "dde71c02-343f-49c5-a183-9f7b54ee7e08",
+      "machineCode": "ADLX-2026-A069",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b4887f4e-33af-4262-a9c3-ae217fb913cb",
+      "machineCode": "ADLX-2026-A070",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "a4c268e9-518e-4cfb-bc58-354237d9a6df",
+      "machineCode": "ADLX-2026-A071",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "333d70f7-fb9b-4da5-867c-feb62bad476c",
+      "machineCode": "ADLX-2026-A072",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "97224dd3-72f2-4d52-97cb-70edeef23c64",
+      "machineCode": "ADLX-2026-A073",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "c5cf1f3a-36c7-424e-b6f8-83fb56f51d64",
+      "machineCode": "ADLX-2026-A074",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "6db6f72e-d95c-4e3a-88ee-8be3e7914fee",
+      "machineCode": "ADLX-2026-A075",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "6a619217-3f9c-4719-a14e-f1a5abf6d0a9",
+      "machineCode": "ADLX-2026-A076",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5d8da90b-f16b-49c7-addd-186fe220822e",
+      "machineCode": "ADLX-2026-A077",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5015f400-37f1-4712-9fe6-401f7b1e6501",
+      "machineCode": "ADLX-2026-A078",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "0606f1ec-b4cf-4ce6-a7a4-6c9c05ed760a",
+      "machineCode": "ADLX-2026-A079",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "d87ae8c4-a755-4add-bcd7-a3446f5822eb",
+      "machineCode": "ADLX-2026-A080",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "09ab7d76-fbd2-462a-bcb2-95a449e73add",
+      "machineCode": "ADLX-2026-A081",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "2408fe0a-5895-4403-ac65-30cf65e475db",
+      "machineCode": "ADLX-2026-A082",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "124ab306-07a4-46da-ac24-2eed2b025eac",
+      "machineCode": "ADLX-2026-A083",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "a1d575f0-6e4b-447c-b332-6a99b03908a4",
+      "machineCode": "ADLX-2026-A084",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "768b2a8b-0512-4587-8d58-58891c054dc8",
+      "machineCode": "ADLX-2026-A085",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b3d9b17d-bbb9-4fd7-b72f-4846debf9d04",
+      "machineCode": "ADLX-2026-A086",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7dace4b0-f7d4-4e50-8a8c-a3fc85defb6e",
+      "machineCode": "ADLX-2026-A087",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "dfa10acb-8596-4514-82d8-280bde081b8e",
+      "machineCode": "ADLX-2026-A088",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "8f47de63-a3eb-490d-a8be-96a9a008818d",
+      "machineCode": "ADLX-2026-A089",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "66c752f9-342a-4ba5-a188-44569652eb20",
+      "machineCode": "ADLX-2026-A090",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "e480914b-c6d4-49bb-9ac4-506648edf64d",
+      "machineCode": "ADLX-2026-A091",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b905e7aa-d7e9-44b2-94af-61286505578b",
+      "machineCode": "ADLX-2026-A092",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "09fd5b06-1742-48c4-89cb-9aa1b625b386",
+      "machineCode": "ADLX-2026-A093",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "abfa4a6c-a2a5-49b8-9f91-34d708994005",
+      "machineCode": "ADLX-2026-A094",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "605ab281-7a44-413e-8a5f-511eb503b9fd",
+      "machineCode": "ADLX-2026-A095",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "bd56ec08-19c6-40ea-be68-c32e1e515feb",
+      "machineCode": "ADLX-2026-A096",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5f164736-273c-491e-a757-7794587e3b85",
+      "machineCode": "ADLX-2026-A097",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "fbeda892-a025-40c8-ab12-5266e8010d00",
+      "machineCode": "ADLX-2026-A098",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b03eece5-0a9e-4f4d-b757-939cc6798166",
+      "machineCode": "ADLX-2026-A099",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "6fccba42-5291-4317-84a5-9125274cb3b9",
+      "machineCode": "ADLX-2026-A100",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "e0ed6172-3620-477a-87b3-c9cbdd9df40e",
+      "machineCode": "ADLX-2026-A101",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "987930cc-ed88-441b-802a-e88c4dec1ffa",
+      "machineCode": "ADLX-2026-A102",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "8fb48e4b-3df6-452f-9468-4460f2acdcaa",
+      "machineCode": "ADLX-2026-A103",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b243777e-55af-4604-8941-62fdd26bf063",
+      "machineCode": "ADLX-2026-A104",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "634d0040-a58d-4578-85c6-b48ae8a37bcd",
+      "machineCode": "ADLX-2026-A105",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "6d51da4f-de06-4871-8610-d964ff88e428",
+      "machineCode": "ADLX-2026-A106",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5fc66c67-5fac-438e-9d2a-0fcebca042b4",
+      "machineCode": "ADLX-2026-A107",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "52812e9c-0718-4997-be64-b5d518fe784d",
+      "machineCode": "ADLX-2026-A108",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "be0b9096-b4c4-4292-b59c-b6f08c8867c0",
+      "machineCode": "ADLX-2026-A109",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f6206a56-26af-4862-abae-f8aedc0ea053",
+      "machineCode": "ADLX-2026-A110",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b6b37382-2e7a-4229-9896-b25daa8a1fba",
+      "machineCode": "ADLX-2026-A111",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "18ba3fa8-b007-4af2-b00e-7dfeb75b2f3e",
+      "machineCode": "ADLX-2026-A112",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "02182a54-2ee7-4bce-a318-64beaf02532b",
+      "machineCode": "ADLX-2026-A113",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "14fbf6ff-707b-4b52-8983-8f08e52740a0",
+      "machineCode": "ADLX-2026-A114",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "e1141e8a-e571-4084-841d-ceddafe636c7",
+      "machineCode": "ADLX-2026-A115",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "cd38af5d-9d5a-41de-a763-c46b9eb24287",
+      "machineCode": "ADLX-2026-A116",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7b58f216-f581-42aa-b539-1d91a584d08a",
+      "machineCode": "ADLX-2026-A117",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "80228a30-2046-43fe-bd60-282f010f1959",
+      "machineCode": "ADLX-2026-A118",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "18076803-803b-4368-ae87-0d1d7e937684",
+      "machineCode": "ADLX-2026-A119",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "edd2beda-b3a4-4424-ac94-65b2074d3884",
+      "machineCode": "ADLX-2026-A120",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "b7f76137-584f-4e43-9480-663a8eb873c2",
+      "machineCode": "ADLX-2026-A121",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "7dae56d7-2efc-4208-a0a6-c46d64cf9673",
+      "machineCode": "ADLX-2026-A122",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "4a86b31d-cd26-448a-852a-b788f352b6cb",
+      "machineCode": "ADLX-2026-A123",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "f5321591-15c8-433d-9e1a-ecbf2d8ab6dc",
+      "machineCode": "ADLX-2026-A124",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "bd1c702d-5bd6-4004-a242-97158591ed4f",
+      "machineCode": "ADLX-2026-A125",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "eb079057-e6af-4f7e-83ff-ba9a9498f7c0",
+      "machineCode": "ADLX-2026-A126",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "14284c1f-4ea1-4afa-9558-c9d03a9bc4b9",
+      "machineCode": "ADLX-2026-A127",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "450d248a-3dd7-4159-9c11-8797efe3e1ae",
+      "machineCode": "ADLX-2026-A128",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "e0b84ca0-b15c-4730-b318-82ac60161e6a",
+      "machineCode": "ADLX-2026-A129",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "de0247aa-a313-4578-ba8b-1806192a22c6",
+      "machineCode": "ADLX-2026-A130",
+      "currentOrgId": "9b3e19e2-e458-4fa8-ac57-85ea57866141",
+      "status": "AVAILABLE"
+    }
+  ],
+  "runningDatabaseChanged": false
+}

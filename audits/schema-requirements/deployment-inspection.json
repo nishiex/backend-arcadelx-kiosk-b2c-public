@@ -1,0 +1,112 @@
+{
+  "checkedAt": "2026-10-01T09:58:52.374Z",
+  "readOnly": true,
+  "readiness": {
+    "networkRejection": true,
+    "agreementRejection": true,
+    "orderDecisions": false
+  },
+  "requiredSchema": [],
+  "localMigrations": [
+    {
+      "name": "20260909095919_add_user_organization_membership_refresh_tokens",
+      "checksum": "b9187e90ee5b2b56681b5307da5903ab22a9cfafa0f456309b4bca3e6ab0b6e1",
+      "lfChecksum": "1aa4ff774a2460c1b1527efe5fdf215e5ca7faecbfab72c401947db6001a6c8c",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260914132819_implement_agreement_and_network_connection_schemas",
+      "checksum": "f653b582fbc958a11af990c44e8988ec6ba2a72eee457edfa6a0fca146b24cf6",
+      "lfChecksum": "a4f8aae27c031368df7a5c3554e1c7cac68bee29a9a1171989d2d25198ab5160",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260916124637_implement_kiosk_and_kioskassignment",
+      "checksum": "1be67538d581ed6de76e8167033d1c556847607b69ac2d6e0b650b5a27ec8057",
+      "lfChecksum": "6ab6760a9089626e4a409cda83a4660f3c116c884dabca554e5cf7404ea8a781",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260917091838_add_password_reset",
+      "checksum": "c451d8ffe11fdf80b22c49378ef20aa5a88ecf5e39efb1dfd076629ef19cc50c",
+      "lfChecksum": "a231bc2776b9104f39685619db0cb45a34bde52cf479235969264964e3f7b03d",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260917132138_add_kiosk_location_and_assignment_model",
+      "checksum": "ecf11265255c5dd611409933c66ed43818f99ebebba38e35072d75c9be891d69",
+      "lfChecksum": "e245b95cda40d93fc94d75f6fd3d46ec897b51c3addb312e6a5831feb894cd5b",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+      "checksum": "a46876cb25a0693bf482506ad7871420d9d31408689643615b9122d1c61ae018",
+      "lfChecksum": "670c88f032899d5d2d7f4eb1af64061a4fdfe778f21aa75ddad0ae5e5543563e",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260921095532_implement_order_and_order_kiosk_schemas",
+      "checksum": "c17dbff8b36a4c9020210c8bde202999b226a8810abb81c9dc0632a4c909c661",
+      "lfChecksum": "b888bdc69ab36b0a0d61ac35362350950c869b7d7e2693cfce6d440d2e93eb6e",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260922135228_implement_payment_status_in_orders",
+      "checksum": "085eb562fda8637edc3456c0b4300cd5fe361ddf031d867525d4467e7f5cca1e",
+      "lfChecksum": "59221b192d25a62c236db9cb5fcbf51d136adbd327cdf9bb27562f70737830cb",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260922151453_add_invoice_filename",
+      "checksum": "5a119442e9c3e73201db7708adef9c4fe02c3b724573b0d8c4a8c942370a67ac",
+      "lfChecksum": "4c37792fdc1c5f595bff47c146971a3a9f6f6199336b752e3e8104b592452095",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260929100000_protect_distributor_lifecycle",
+      "checksum": "2747d383b90f158d89aa167f361f1b9d42a4d44eb3a953c86295e4acb9f36cc8",
+      "lfChecksum": "2747d383b90f158d89aa167f361f1b9d42a4d44eb3a953c86295e4acb9f36cc8",
+      "applied": false,
+      "checksumMatches": false
+    },
+    {
+      "name": "20260929123000_distributor_access_status",
+      "checksum": "f0b34edd3ab79caf325c860a4bb5e9768913fad7b02dac508e474ab803faf2d1",
+      "lfChecksum": "f0b34edd3ab79caf325c860a4bb5e9768913fad7b02dac508e474ab803faf2d1",
+      "applied": true,
+      "checksumMatches": true
+    },
+    {
+      "name": "20260930070000_request_rejections",
+      "checksum": "8ac7b3e1b927646a5c435af7112a45e24e397eb8cda54a4158bb74fb1f9fc0f2",
+      "lfChecksum": "8ac7b3e1b927646a5c435af7112a45e24e397eb8cda54a4158bb74fb1f9fc0f2",
+      "applied": true,
+      "checksumMatches": true
+    }
+  ],
+  "extraMigrations": [
+    {
+      "migration_name": "20260928063729_implement_transactions_schema",
+      "checksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3",
+      "finished_at": "2026-09-28T06:37:35.352Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928073023_remove_payu_retries",
+      "checksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49",
+      "finished_at": "2026-09-28T07:30:27.524Z",
+      "rolled_back_at": null
+    }
+  ],
+  "failedMigrations": [],
+  "recordedMigrationCount": 13
+}

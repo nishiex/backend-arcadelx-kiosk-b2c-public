@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-01T08:25:42.443Z",
+  "readOnly": true,
+  "counts": {
+    "duplicateNetworkPairs": 0,
+    "selfNetworks": 0,
+    "selfAgreements": 0,
+    "duplicateOpenAgreementPairs": 0,
+    "competingDistributorAgreements": 0,
+    "duplicateOpenAssignments": 0,
+    "ambiguousReservations": 0,
+    "mismatchedReservedStock": 0,
+    "orphanReservedStock": 0,
+    "incorrectActiveOrderQuantity": 0,
+    "invalidAgreementRelationships": 0,
+    "mismatchedAssignmentOwners": 0
+  },
+  "extraConfiguredMigrations": [
+    "20260928063729_implement_transactions_schema",
+    "20260928073023_remove_payu_retries"
+  ],
+  "failedMigrationNames": [],
+  "fixMigrationApplied": false
+}

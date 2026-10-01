@@ -1,0 +1,57 @@
+{
+  "verifiedAt": "2026-09-29T09:53:34.816Z",
+  "userId": "39738d87-3ea2-4ccf-a099-2df49b7d10a9",
+  "email": "distributor.test@example.com",
+  "organizationId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+  "organizationName": "Test Distributor Pvt Ltf",
+  "role": "ADMIN",
+  "status": "ACTIVE",
+  "browserLogin": "passed",
+  "identity": "passed",
+  "inventory": "passed",
+  "kioskCount": 0,
+  "existingOwnerPreserved": true,
+  "externalEmailSent": false,
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/network/requests",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/kiosks/summary",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/kiosks",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/kiosks",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/network/requests",
+      "status": 200
+    }
+  ]
+}

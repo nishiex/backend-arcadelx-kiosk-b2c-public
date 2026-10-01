@@ -1,0 +1,39 @@
+{
+  "verifiedAt": "2026-09-29T10:02:23.729Z",
+  "scope": "Running frontend and real API; no mocked responses",
+  "checks": [
+    "Company inventory count is 127",
+    "ADLX-2026-A010 absent from Company inventory",
+    "ADLX-2026-A120 absent from Company inventory",
+    "ADLX-2026-A130 absent from Company inventory",
+    "Company dashboard total is 127",
+    "Transferred kiosks absent from Company Recent kiosks",
+    "Distributor login succeeds",
+    "Distributor dashboard total is 3",
+    "API resolves all three kiosks to Distributor",
+    "Distributor table labels all three assignments",
+    "All three model options are available",
+    "Model filter: ADLX-Pro-X1",
+    "Model filter: Arcade-LX B2C",
+    "Model filter: Arcade-LX Healthcare"
+  ],
+  "companyOwned": 127,
+  "distributorOwned": 3,
+  "kiosks": [
+    {
+      "id": "44ff6453-df22-4e28-b429-187dbd7632cb",
+      "machineCode": "ADLX-2026-A010",
+      "model": "ADLX-Pro-X1"
+    },
+    {
+      "id": "5ccf8895-9069-4a84-b7c6-616b08024bc2",
+      "machineCode": "ADLX-2026-A120",
+      "model": "Arcade-LX B2C"
+    },
+    {
+      "id": "5241f75b-f3c6-443a-a8fa-230fbbd828e5",
+      "machineCode": "ADLX-2026-A130",
+      "model": "Arcade-LX Healthcare"
+    }
+  ]
+}

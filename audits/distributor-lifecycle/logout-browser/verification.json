@@ -1,0 +1,18 @@
+{
+  "verifiedAt": "2026-09-29T10:09:44.541Z",
+  "checks": [
+    "Distributor login HTTP 200",
+    "Existing refresh cookie has /api/auth/refresh path",
+    "Failed logout stays on dashboard and enables retry",
+    "Failed logout retains valid session",
+    "Logout HTTP 200 with current refresh cookie",
+    "Both authentication cookies removed",
+    "Identity blocked after logout",
+    "Kiosk API blocked after logout",
+    "Old refresh cookie cannot recreate session",
+    "Repeated logout is safe",
+    "Reopening protected page returns to login"
+  ],
+  "transport": "Real API/browser; first logout response intentionally replaced by 503 for retry check",
+  "applicationDataChanged": false
+}

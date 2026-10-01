@@ -1,0 +1,18 @@
+{
+  "database": "arcadelx_seed_20260930074603378",
+  "existingDatabasesMutated": false,
+  "checks": [
+    {
+      "name": "missing-configuration-writes-nothing",
+      "pass": true
+    },
+    {
+      "name": "membership-failure-rolls-back-owner-and-company",
+      "pass": true
+    }
+  ],
+  "error": {
+    "name": "AssertionError",
+    "message": "Seed failed (P2022). Check database connectivity, schema and database constraints.\n\n\n1 !== 0\n"
+  }
+}

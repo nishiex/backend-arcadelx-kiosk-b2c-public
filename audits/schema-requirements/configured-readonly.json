@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-01T09:50:54.619Z",
+  "readOnly": true,
+  "columns": [],
+  "indexes": [],
+  "constraints": [],
+  "proposedOrderSequenceBackfill": [],
+  "orderCounts": {
+    "total": 1,
+    "legacynumberformat": 1,
+    "activereservations": 0,
+    "legacyinvoiceurls": 0
+  }
+}

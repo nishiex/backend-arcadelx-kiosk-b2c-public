@@ -1,0 +1,47 @@
+{
+  "database": "arcadelx_schema_review_20261001095237169",
+  "syntheticDataOnly": true,
+  "supabaseChanged": false,
+  "cases": [
+    {
+      "name": "valid-reservations-and-yearly-counters",
+      "passed": true,
+      "expectedFailureCode": null
+    },
+    {
+      "name": "incomplete-active-order",
+      "passed": true,
+      "expectedFailureCode": "P0001"
+    },
+    {
+      "name": "ambiguous-active-reservation",
+      "passed": true,
+      "expectedFailureCode": "P0001"
+    },
+    {
+      "name": "wrong-owner",
+      "passed": true,
+      "expectedFailureCode": "P0001"
+    },
+    {
+      "name": "wrong-stock-status",
+      "passed": true,
+      "expectedFailureCode": "P0001"
+    },
+    {
+      "name": "orphan-reservation",
+      "passed": true,
+      "expectedFailureCode": "23514"
+    },
+    {
+      "name": "counter-overflow-refuses-migration",
+      "passed": true,
+      "expectedFailureCode": "22003"
+    },
+    {
+      "name": "legacy-only-numbering",
+      "passed": true,
+      "expectedFailureCode": null
+    }
+  ]
+}

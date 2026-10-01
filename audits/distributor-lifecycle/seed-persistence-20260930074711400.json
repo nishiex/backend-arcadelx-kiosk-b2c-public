@@ -1,0 +1,34 @@
+{
+  "database": "arcadelx_seed_20260930074711400",
+  "existingDatabasesMutated": false,
+  "checks": [
+    {
+      "name": "missing-configuration-writes-nothing",
+      "pass": true
+    },
+    {
+      "name": "missing-insert-schema-refused-before-writing",
+      "pass": true
+    },
+    {
+      "name": "membership-failure-rolls-back-owner-and-company",
+      "pass": true
+    },
+    {
+      "name": "concurrent-seeds-create-one-complete-company",
+      "pass": true
+    },
+    {
+      "name": "separate-connection-sees-persisted-rows-and-hashed-password",
+      "pass": true
+    },
+    {
+      "name": "existing-company-check-works-without-unapplied-columns",
+      "pass": true
+    }
+  ],
+  "error": {
+    "name": "Error",
+    "message": "Cannot find module 'C:\\Users\\Abcom\\Desktop\\backend-arcadelx-kiosk-b2c\\apps\\api\\node_modules\\prisma\\build\\types.js'"
+  }
+}

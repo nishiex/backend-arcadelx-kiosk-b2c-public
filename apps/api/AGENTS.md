@@ -22,6 +22,26 @@ pre-fix implementation; current behavior, evidence and deployment status are in
 
 ## Environment and deployment status
 
+### Local-only development (2026-10-01)
+
+At the user's request, root `.env` now points both `DATABASE_URL` and `DIRECT_URL`
+to database `arcadelx_local` on Docker `arcadelx-pg`, localhost port 5433. This is a
+fresh database; all twelve checked-in migrations applied successfully and Prisma
+reported no difference against `schema.prisma`. The existing local `arcadelx`
+database and Supabase were not modified. The original environment is preserved
+in `.env.supabase-backup-20261001`, excluded via `.git/info/exclude`; keep it private.
+
+The owner/company seed uses the user's selected local test login from ignored
+`.env`, with placeholder company details. Mailjet uses dummy local keys, so real
+email delivery is unavailable. API runs on 4000 and the existing frontend on 3000.
+Health, database connectivity, login through the frontend proxy, and all three
+workflow readiness flags passed. The verification login was logged out.
+
+Start Docker Desktop, then `docker start arcadelx-pg`. Run `npm run dev` from
+`apps/api` and `apps/web/next-monorepo` in separate terminals as needed. Keep both
+database URLs local when using `prisma migrate dev`. Supabase reconciliation
+below remains historical pending work, not a prerequisite for this local setup.
+
 ### Company seed (2026-09-30)
 
 `prisma/seed.ts` persists the initial Company, owner and ACTIVE OWNER membership in
@@ -89,8 +109,8 @@ storage. The directory defaults to `process.cwd()/invoices` outside production.
 These changes do not reconcile or migrate the configured database. See
 [production audit and deployment recipe](../../audits/PRODUCTION_READINESS.md).
 
-The root environment currently targets **Supabase**, superseding the connection
-description in the root setup document. This checkout has twelve migrations.
+Before the local-only switch above, the root environment targeted **Supabase**.
+The following describes that remote deployment. This checkout has twelve migrations.
 `20260929100000_protect_distributor_lifecycle` remains unapplied;
 `20260929123000_distributor_access_status` was applied independently on 2026-09-29
 and recorded with Prisma after the user requested enabling the disabled controls.

@@ -1,0 +1,62 @@
+{
+  "committedAt": "2026-09-29T10:01:02.270Z",
+  "operation": "TEST_INVENTORY_ASSIGNMENT",
+  "database": "Configured running-app database",
+  "plan": {
+    "companyId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+    "distributorId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+    "distributorName": "Test Distributor Pvt Ltf",
+    "actingUserId": "143ae37d-1ee9-4a06-a301-9df4b5608075",
+    "agreementId": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+    "networkId": "f0eb0899-c848-4ba7-81a7-b4737d931afe",
+    "kiosks": [
+      {
+        "id": "44ff6453-df22-4e28-b429-187dbd7632cb",
+        "machineCode": "ADLX-2026-A010",
+        "model": "ADLX-Pro-X1"
+      },
+      {
+        "id": "5ccf8895-9069-4a84-b7c6-616b08024bc2",
+        "machineCode": "ADLX-2026-A120",
+        "model": "Arcade-LX B2C"
+      },
+      {
+        "id": "5241f75b-f3c6-443a-a8fa-230fbbd828e5",
+        "machineCode": "ADLX-2026-A130",
+        "model": "Arcade-LX Healthcare"
+      }
+    ]
+  },
+  "kiosks": [
+    {
+      "id": "44ff6453-df22-4e28-b429-187dbd7632cb",
+      "machineCode": "ADLX-2026-A010",
+      "model": "ADLX-Pro-X1",
+      "currentOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5ccf8895-9069-4a84-b7c6-616b08024bc2",
+      "machineCode": "ADLX-2026-A120",
+      "model": "Arcade-LX B2C",
+      "currentOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "5241f75b-f3c6-443a-a8fa-230fbbd828e5",
+      "machineCode": "ADLX-2026-A130",
+      "model": "Arcade-LX Healthcare",
+      "currentOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "status": "AVAILABLE"
+    }
+  ],
+  "assignmentIds": [
+    "c51897a6-7f76-4a2f-80b5-1217782f63c0",
+    "112e1330-0de1-4dc5-ab01-e2704a7e63cd",
+    "ab0c1abe-ed49-4e24-8090-9fa711fc54b0"
+  ],
+  "historyRowsBefore": 0,
+  "historyRowsAfter": 3,
+  "ordersUnchanged": true,
+  "otherStockUnchanged": true
+}

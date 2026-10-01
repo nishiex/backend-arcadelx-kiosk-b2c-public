@@ -1,0 +1,76 @@
+{
+  "checkedAt": "2026-09-29T09:24:39.067Z",
+  "scope": "Configured running-app database; read-only; no records changed",
+  "organizations": [
+    {
+      "id": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "name": "NileeGames test",
+      "type": "COMPANY"
+    },
+    {
+      "id": "d7451177-1496-42a8-88d7-08333edc8f14",
+      "name": "Acme Technologies",
+      "type": "DISTRIBUTOR"
+    },
+    {
+      "id": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "name": "Test Distributor Pvt Ltf",
+      "type": "DISTRIBUTOR"
+    }
+  ],
+  "kiosks": [
+    {
+      "currentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "name": "NileeGames test",
+      "type": "COMPANY",
+      "status": "AVAILABLE",
+      "count": 130
+    }
+  ],
+  "networks": [
+    {
+      "id": "6ee5390b-50ac-4ab6-83b8-e22ed4416517",
+      "initiatorOrgId": "d7451177-1496-42a8-88d7-08333edc8f14",
+      "receiverOrgId": "a22ec3db-7072-48fa-9dae-66f2072904bb",
+      "status": "PENDING"
+    },
+    {
+      "id": "f0eb0899-c848-4ba7-81a7-b4737d931afe",
+      "initiatorOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "receiverOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "status": "ACTIVE"
+    }
+  ],
+  "agreements": [
+    {
+      "id": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+      "parentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "childOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "networkConnectionId": "f0eb0899-c848-4ba7-81a7-b4737d931afe",
+      "status": "ACTIVE",
+      "parentSharePct": "60.00",
+      "childSharePct": "40.00",
+      "depositAmountPerMachine": 100000,
+      "nonRefundableAmountPerMachine": 50000,
+      "effectiveFrom": "2026-09-21T06:24:44.934Z",
+      "effectiveTo": null
+    }
+  ],
+  "orders": [
+    {
+      "id": "afd69339-3d50-4fb5-b176-cd0322b1ae79",
+      "orderNumber": "ORD-2026-721401-59",
+      "type": "REQUEST",
+      "status": "APPROVED",
+      "paymentStatus": "PENDING",
+      "parentOrgId": "bbba8db6-0e6b-4482-8194-c5d3f7f9bf52",
+      "childOrgId": "67abc491-0fec-4385-a8b9-ed95c4b94f08",
+      "agreementId": "de5f1c6f-6481-4f61-b351-1c0779b63752",
+      "quantity": 20,
+      "grandTotal": 3180000,
+      "linkedKiosks": 0
+    }
+  ],
+  "assignmentCounts": [],
+  "lifecycleSchema": []
+}

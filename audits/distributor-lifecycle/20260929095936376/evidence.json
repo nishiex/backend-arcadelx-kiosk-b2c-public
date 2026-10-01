@@ -1,0 +1,3370 @@
+[
+  {
+    "id": "environment",
+    "database": "arcadelx_audit_20260929095936376",
+    "configuredRuntime": {
+      "host": "aws-0-ap-southeast-2.pooler.supabase.com",
+      "port": "6543",
+      "database": "/postgres"
+    },
+    "sourceDatabase": "arcadelx",
+    "before": {
+      "Agreement": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "AuditLog": {
+        "count": 128,
+        "digest": "07b39dfb1b455198ee53a9ca5c6d0356"
+      },
+      "Kiosk": {
+        "count": 17,
+        "digest": "7068eaa0302fd29b893e19b25b63fa34"
+      },
+      "KioskAssignment": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "KioskRevenue": {
+        "count": 18,
+        "digest": "edefa612faf188b53dd1f76aa09789fd"
+      },
+      "MachineSequence": {
+        "count": 1,
+        "digest": "940b0eb6e20c4a73f32c9de351d72732"
+      },
+      "Membership": {
+        "count": 6,
+        "digest": "fb447ec626ed909538ae759d6d883e99"
+      },
+      "NetworkConnection": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Organization": {
+        "count": 6,
+        "digest": "49e1a6f85b5223041683574d7cb94578"
+      },
+      "PasswordReset": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Payment": {
+        "count": 3,
+        "digest": "ce02c3e47d4be53a6caad5d604bb37b6"
+      },
+      "PermissionRole": {
+        "count": 7,
+        "digest": "4944e0f95e391e3d52f47e2c16bd1e6a"
+      },
+      "RefreshToken": {
+        "count": 92,
+        "digest": "13c421da06476049f1a6480e4de74481"
+      },
+      "RolePermission": {
+        "count": 540,
+        "digest": "35398943decf102d31622207378d8b43"
+      },
+      "Settlement": {
+        "count": 3,
+        "digest": "8ab2c0003b954c8f7030880246b20ad9"
+      },
+      "SupportTicket": {
+        "count": 1,
+        "digest": "739b069f1541bc28ef0ee1639d7650cb"
+      },
+      "User": {
+        "count": 6,
+        "digest": "5e1ea2326aa0c2a7cdc87d8085a19677"
+      },
+      "_prisma_migrations": {
+        "count": 14,
+        "digest": "e5e89179249c133bcd1fa70ad206d1ac"
+      }
+    },
+    "constraints": [
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_childOrgId_fkey",
+        "definition": "FOREIGN KEY (\"childOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_networkConnectionId_fkey",
+        "definition": "FOREIGN KEY (\"networkConnectionId\") REFERENCES \"NetworkConnection\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_parentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"parentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "depositAmountPerMachine_positive",
+        "definition": "CHECK ((\"depositAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "nonRefundableAmountPerMachine_positive",
+        "definition": "CHECK ((\"nonRefundableAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"AuditLog\"",
+        "conname": "AuditLog_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_currentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"currentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_assignedById_fkey",
+        "definition": "FOREIGN KEY (\"assignedById\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"KioskRevenue\"",
+        "conname": "KioskRevenue_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskRevenue\"",
+        "conname": "KioskRevenue_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"KioskRevenue\"",
+        "conname": "KioskRevenue_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"MachineSequence\"",
+        "conname": "MachineSequence_pkey",
+        "definition": "PRIMARY KEY (year)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_permissionRoleId_fkey",
+        "definition": "FOREIGN KEY (\"permissionRoleId\") REFERENCES \"PermissionRole\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_initiatorOrgId_fkey",
+        "definition": "FOREIGN KEY (\"initiatorOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_receiverOrgId_fkey",
+        "definition": "FOREIGN KEY (\"receiverOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_ownerId_fkey",
+        "definition": "FOREIGN KEY (\"ownerId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "\"Payment\"",
+        "conname": "Payment_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Payment\"",
+        "conname": "Payment_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Payment\"",
+        "conname": "Payment_settlementId_fkey",
+        "definition": "FOREIGN KEY (\"settlementId\") REFERENCES \"Settlement\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"PermissionRole\"",
+        "conname": "PermissionRole_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"PermissionRole\"",
+        "conname": "PermissionRole_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "conname": "_prisma_migrations_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"RolePermission\"",
+        "conname": "RolePermission_permissionRoleId_fkey",
+        "definition": "FOREIGN KEY (\"permissionRoleId\") REFERENCES \"PermissionRole\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "\"RolePermission\"",
+        "conname": "RolePermission_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Settlement\"",
+        "conname": "Settlement_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Settlement\"",
+        "conname": "Settlement_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"SupportTicket\"",
+        "conname": "SupportTicket_createdById_fkey",
+        "definition": "FOREIGN KEY (\"createdById\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"SupportTicket\"",
+        "conname": "SupportTicket_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"SupportTicket\"",
+        "conname": "SupportTicket_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"User\"",
+        "conname": "User_pkey",
+        "definition": "PRIMARY KEY (id)"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "Agreement",
+        "indexname": "Agreement_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Agreement_pkey\" ON public.\"Agreement\" USING btree (id)"
+      },
+      {
+        "tablename": "AuditLog",
+        "indexname": "AuditLog_actorUserId_idx",
+        "indexdef": "CREATE INDEX \"AuditLog_actorUserId_idx\" ON public.\"AuditLog\" USING btree (\"actorUserId\")"
+      },
+      {
+        "tablename": "AuditLog",
+        "indexname": "AuditLog_createdAt_idx",
+        "indexdef": "CREATE INDEX \"AuditLog_createdAt_idx\" ON public.\"AuditLog\" USING btree (\"createdAt\")"
+      },
+      {
+        "tablename": "AuditLog",
+        "indexname": "AuditLog_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"AuditLog_pkey\" ON public.\"AuditLog\" USING btree (id)"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_externalDeviceId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_externalDeviceId_key\" ON public.\"Kiosk\" USING btree (\"externalDeviceId\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_machineCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_machineCode_key\" ON public.\"Kiosk\" USING btree (\"machineCode\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_pkey\" ON public.\"Kiosk\" USING btree (id)"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_serialNumber_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_serialNumber_key\" ON public.\"Kiosk\" USING btree (\"serialNumber\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_kioskId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_kioskId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"kioskId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_organizationId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_organizationId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"organizationId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskAssignment_pkey\" ON public.\"KioskAssignment\" USING btree (id)"
+      },
+      {
+        "tablename": "KioskRevenue",
+        "indexname": "KioskRevenue_kioskId_year_month_key",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskRevenue_kioskId_year_month_key\" ON public.\"KioskRevenue\" USING btree (\"kioskId\", year, month)"
+      },
+      {
+        "tablename": "KioskRevenue",
+        "indexname": "KioskRevenue_organizationId_year_month_idx",
+        "indexdef": "CREATE INDEX \"KioskRevenue_organizationId_year_month_idx\" ON public.\"KioskRevenue\" USING btree (\"organizationId\", year, month)"
+      },
+      {
+        "tablename": "KioskRevenue",
+        "indexname": "KioskRevenue_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskRevenue_pkey\" ON public.\"KioskRevenue\" USING btree (id)"
+      },
+      {
+        "tablename": "MachineSequence",
+        "indexname": "MachineSequence_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"MachineSequence_pkey\" ON public.\"MachineSequence\" USING btree (year)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_organizationId_idx",
+        "indexdef": "CREATE INDEX \"Membership_organizationId_idx\" ON public.\"Membership\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_permissionRoleId_idx",
+        "indexdef": "CREATE INDEX \"Membership_permissionRoleId_idx\" ON public.\"Membership\" USING btree (\"permissionRoleId\")"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_pkey\" ON public.\"Membership\" USING btree (id)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_userId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_userId_key\" ON public.\"Membership\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "NetworkConnection",
+        "indexname": "NetworkConnection_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"NetworkConnection_pkey\" ON public.\"NetworkConnection\" USING btree (id)"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_inviteCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_inviteCode_key\" ON public.\"Organization\" USING btree (\"inviteCode\")"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_pkey\" ON public.\"Organization\" USING btree (id)"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "only_one_company",
+        "indexdef": "CREATE UNIQUE INDEX only_one_company ON public.\"Organization\" USING btree (type) WHERE (type = 'COMPANY'::\"OrgType\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_pkey\" ON public.\"PasswordReset\" USING btree (id)"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_resetToken_key",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_resetToken_key\" ON public.\"PasswordReset\" USING btree (\"resetToken\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_userId_idx",
+        "indexdef": "CREATE INDEX \"PasswordReset_userId_idx\" ON public.\"PasswordReset\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "Payment",
+        "indexname": "Payment_organizationId_idx",
+        "indexdef": "CREATE INDEX \"Payment_organizationId_idx\" ON public.\"Payment\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "Payment",
+        "indexname": "Payment_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Payment_pkey\" ON public.\"Payment\" USING btree (id)"
+      },
+      {
+        "tablename": "Payment",
+        "indexname": "Payment_reference_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Payment_reference_key\" ON public.\"Payment\" USING btree (reference)"
+      },
+      {
+        "tablename": "Payment",
+        "indexname": "Payment_settlementId_idx",
+        "indexdef": "CREATE INDEX \"Payment_settlementId_idx\" ON public.\"Payment\" USING btree (\"settlementId\")"
+      },
+      {
+        "tablename": "PermissionRole",
+        "indexname": "PermissionRole_organizationId_idx",
+        "indexdef": "CREATE INDEX \"PermissionRole_organizationId_idx\" ON public.\"PermissionRole\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "PermissionRole",
+        "indexname": "PermissionRole_organizationId_name_key",
+        "indexdef": "CREATE UNIQUE INDEX \"PermissionRole_organizationId_name_key\" ON public.\"PermissionRole\" USING btree (\"organizationId\", name)"
+      },
+      {
+        "tablename": "PermissionRole",
+        "indexname": "PermissionRole_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"PermissionRole_pkey\" ON public.\"PermissionRole\" USING btree (id)"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_pkey\" ON public.\"RefreshToken\" USING btree (id)"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_token_key",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_token_key\" ON public.\"RefreshToken\" USING btree (token)"
+      },
+      {
+        "tablename": "RolePermission",
+        "indexname": "RolePermission_permissionRoleId_idx",
+        "indexdef": "CREATE INDEX \"RolePermission_permissionRoleId_idx\" ON public.\"RolePermission\" USING btree (\"permissionRoleId\")"
+      },
+      {
+        "tablename": "RolePermission",
+        "indexname": "RolePermission_permissionRoleId_module_action_key",
+        "indexdef": "CREATE UNIQUE INDEX \"RolePermission_permissionRoleId_module_action_key\" ON public.\"RolePermission\" USING btree (\"permissionRoleId\", module, action)"
+      },
+      {
+        "tablename": "RolePermission",
+        "indexname": "RolePermission_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"RolePermission_pkey\" ON public.\"RolePermission\" USING btree (id)"
+      },
+      {
+        "tablename": "Settlement",
+        "indexname": "Settlement_organizationId_idx",
+        "indexdef": "CREATE INDEX \"Settlement_organizationId_idx\" ON public.\"Settlement\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "Settlement",
+        "indexname": "Settlement_organizationId_year_month_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Settlement_organizationId_year_month_key\" ON public.\"Settlement\" USING btree (\"organizationId\", year, month)"
+      },
+      {
+        "tablename": "Settlement",
+        "indexname": "Settlement_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Settlement_pkey\" ON public.\"Settlement\" USING btree (id)"
+      },
+      {
+        "tablename": "Settlement",
+        "indexname": "Settlement_reference_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Settlement_reference_key\" ON public.\"Settlement\" USING btree (reference)"
+      },
+      {
+        "tablename": "SupportTicket",
+        "indexname": "SupportTicket_organizationId_status_idx",
+        "indexdef": "CREATE INDEX \"SupportTicket_organizationId_status_idx\" ON public.\"SupportTicket\" USING btree (\"organizationId\", status)"
+      },
+      {
+        "tablename": "SupportTicket",
+        "indexname": "SupportTicket_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"SupportTicket_pkey\" ON public.\"SupportTicket\" USING btree (id)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_email_key",
+        "indexdef": "CREATE UNIQUE INDEX \"User_email_key\" ON public.\"User\" USING btree (email)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"User_pkey\" ON public.\"User\" USING btree (id)"
+      },
+      {
+        "tablename": "_prisma_migrations",
+        "indexname": "_prisma_migrations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX _prisma_migrations_pkey ON public._prisma_migrations USING btree (id)"
+      }
+    ],
+    "migrations": [
+      {
+        "migration_name": "20260909095919_add_user_organization_membership_refresh_tokens",
+        "checksum": "b9187e90ee5b2b56681b5307da5903ab22a9cfafa0f456309b4bca3e6ab0b6e1",
+        "finished_at": "2026-09-22T06:51:56.807Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260914132819_implement_agreement_and_network_connection_schemas",
+        "checksum": "f653b582fbc958a11af990c44e8988ec6ba2a72eee457edfa6a0fca146b24cf6",
+        "finished_at": "2026-09-22T06:51:56.877Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260916124637_implement_kiosk_and_kioskassignment",
+        "checksum": "1be67538d581ed6de76e8167033d1c556847607b69ac2d6e0b650b5a27ec8057",
+        "finished_at": "2026-09-22T06:51:56.960Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260917091838_add_password_reset",
+        "checksum": "c451d8ffe11fdf80b22c49378ef20aa5a88ecf5e39efb1dfd076629ef19cc50c",
+        "finished_at": "2026-09-22T06:51:57.003Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260917132138_add_kiosk_location_and_assignment_model",
+        "checksum": "ecf11265255c5dd611409933c66ed43818f99ebebba38e35072d75c9be891d69",
+        "finished_at": "2026-09-22T06:51:57.025Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+        "checksum": "a46876cb25a0693bf482506ad7871420d9d31408689643615b9122d1c61ae018",
+        "finished_at": "2026-09-22T06:51:57.043Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260922000000_add_kiosk_hardware_details",
+        "checksum": "3eced99e6ee0c3c550b4dbe484c581eb074ce77c395716feae0a6957cb900e50",
+        "finished_at": "2026-09-22T10:15:28.347Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260922010000_add_org_business_details",
+        "checksum": "3397be24bcca3510eed7522b1d2e26b694369bfb0099ec2859c661d64c4a438c",
+        "finished_at": "2026-09-22T10:29:09.908Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260922020000_add_support_tickets",
+        "checksum": "0d4d8ec8dfd34a218029f75f09acae660dc75674dac01103309cba98a857c843",
+        "finished_at": "2026-09-22T13:05:02.508Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260923000000_add_revenue_settlement_payment",
+        "checksum": "508a367441abf05e6410a7a51f783a22ca93e7d6a274364275c83dd32682e312",
+        "finished_at": "2026-09-23T09:02:15.026Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260923010000_add_audit_log",
+        "checksum": "48c93260c5332e64fae7fb3117c8fb5d6533f7a59325065fd2306a1b4423620b",
+        "finished_at": "2026-09-23T09:35:55.214Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260923102110_add_permission_roles",
+        "checksum": "8a353f7af6d44f0c3e7c5cffe857d4eed59e9062e3cb1db98aef5cdecc088c3c",
+        "finished_at": "2026-09-23T10:21:10.489Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260923120000_add_user_profile_fields",
+        "checksum": "fef0c4d23b5d06d6aa62af0b5f53d3d5a0faf6192b54245824d3843fa32081b8",
+        "finished_at": "2026-09-23T12:24:27.438Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260924071647_add_audit_detail",
+        "checksum": "1032eaef00b82809eb7eee4f34da932713801f92fb141bf89a973229dd0dd5f7",
+        "finished_at": "2026-09-24T07:16:47.614Z",
+        "rolled_back_at": null
+      }
+    ],
+    "emailTransport": "in-memory capture; no external send",
+    "server": "unmodified src/app.ts on ephemeral loopback port"
+  },
+  {
+    "id": "configured-database-schema-readonly",
+    "constraints": [
+      {
+        "table_name": "_prisma_migrations",
+        "conname": "_prisma_migrations_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_childOrgId_fkey",
+        "definition": "FOREIGN KEY (\"childOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_networkConnectionId_fkey",
+        "definition": "FOREIGN KEY (\"networkConnectionId\") REFERENCES \"NetworkConnection\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_parentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"parentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "depositAmountPerMachine_positive",
+        "definition": "CHECK ((\"depositAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "nonRefundableAmountPerMachine_positive",
+        "definition": "CHECK ((\"nonRefundableAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_currentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"currentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_assignedById_fkey",
+        "definition": "FOREIGN KEY (\"assignedById\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_orderId_fkey",
+        "definition": "FOREIGN KEY (\"orderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"MachineSequence\"",
+        "conname": "MachineSequence_pkey",
+        "definition": "PRIMARY KEY (year)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_initiatorOrgId_fkey",
+        "definition": "FOREIGN KEY (\"initiatorOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_receiverOrgId_fkey",
+        "definition": "FOREIGN KEY (\"receiverOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_agreementId_fkey",
+        "definition": "FOREIGN KEY (\"agreementId\") REFERENCES \"Agreement\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_childOrgId_fkey",
+        "definition": "FOREIGN KEY (\"childOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_parentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"parentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_orderId_fkey",
+        "definition": "FOREIGN KEY (\"orderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_pkey",
+        "definition": "PRIMARY KEY (\"orderId\", \"kioskId\")"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_ownerId_fkey",
+        "definition": "FOREIGN KEY (\"ownerId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"RevenueSyncRunLog\"",
+        "conname": "RevenueSyncRunLog_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Transaction\"",
+        "conname": "Transaction_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Transaction\"",
+        "conname": "Transaction_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"User\"",
+        "conname": "User_pkey",
+        "definition": "PRIMARY KEY (id)"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "Agreement",
+        "indexname": "Agreement_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Agreement_pkey\" ON public.\"Agreement\" USING btree (id)"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_externalDeviceId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_externalDeviceId_key\" ON public.\"Kiosk\" USING btree (\"externalDeviceId\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_machineCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_machineCode_key\" ON public.\"Kiosk\" USING btree (\"machineCode\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_pkey\" ON public.\"Kiosk\" USING btree (id)"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_kioskId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_kioskId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"kioskId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_organizationId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_organizationId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"organizationId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskAssignment_pkey\" ON public.\"KioskAssignment\" USING btree (id)"
+      },
+      {
+        "tablename": "MachineSequence",
+        "indexname": "MachineSequence_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"MachineSequence_pkey\" ON public.\"MachineSequence\" USING btree (year)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_organizationId_idx",
+        "indexdef": "CREATE INDEX \"Membership_organizationId_idx\" ON public.\"Membership\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_pkey\" ON public.\"Membership\" USING btree (id)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_userId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_userId_key\" ON public.\"Membership\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "NetworkConnection",
+        "indexname": "NetworkConnection_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"NetworkConnection_pkey\" ON public.\"NetworkConnection\" USING btree (id)"
+      },
+      {
+        "tablename": "Order",
+        "indexname": "Order_orderNumber_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Order_orderNumber_key\" ON public.\"Order\" USING btree (\"orderNumber\")"
+      },
+      {
+        "tablename": "Order",
+        "indexname": "Order_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Order_pkey\" ON public.\"Order\" USING btree (id)"
+      },
+      {
+        "tablename": "OrderKiosk",
+        "indexname": "OrderKiosk_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"OrderKiosk_pkey\" ON public.\"OrderKiosk\" USING btree (\"orderId\", \"kioskId\")"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_inviteCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_inviteCode_key\" ON public.\"Organization\" USING btree (\"inviteCode\")"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_pkey\" ON public.\"Organization\" USING btree (id)"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "only_one_company",
+        "indexdef": "CREATE UNIQUE INDEX only_one_company ON public.\"Organization\" USING btree (type) WHERE (type = 'COMPANY'::\"OrgType\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_pkey\" ON public.\"PasswordReset\" USING btree (id)"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_resetToken_key",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_resetToken_key\" ON public.\"PasswordReset\" USING btree (\"resetToken\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_userId_idx",
+        "indexdef": "CREATE INDEX \"PasswordReset_userId_idx\" ON public.\"PasswordReset\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_pkey\" ON public.\"RefreshToken\" USING btree (id)"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_token_key",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_token_key\" ON public.\"RefreshToken\" USING btree (token)"
+      },
+      {
+        "tablename": "RevenueSyncRunLog",
+        "indexname": "RevenueSyncRunLog_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"RevenueSyncRunLog_pkey\" ON public.\"RevenueSyncRunLog\" USING btree (id)"
+      },
+      {
+        "tablename": "Transaction",
+        "indexname": "Transaction_externalTransactionId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Transaction_externalTransactionId_key\" ON public.\"Transaction\" USING btree (\"externalTransactionId\")"
+      },
+      {
+        "tablename": "Transaction",
+        "indexname": "Transaction_kioskId_occurredAt_idx",
+        "indexdef": "CREATE INDEX \"Transaction_kioskId_occurredAt_idx\" ON public.\"Transaction\" USING btree (\"kioskId\", \"occurredAt\")"
+      },
+      {
+        "tablename": "Transaction",
+        "indexname": "Transaction_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Transaction_pkey\" ON public.\"Transaction\" USING btree (id)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_email_key",
+        "indexdef": "CREATE UNIQUE INDEX \"User_email_key\" ON public.\"User\" USING btree (email)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"User_pkey\" ON public.\"User\" USING btree (id)"
+      },
+      {
+        "tablename": "_prisma_migrations",
+        "indexname": "_prisma_migrations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX _prisma_migrations_pkey ON public._prisma_migrations USING btree (id)"
+      }
+    ],
+    "migrations": [
+      {
+        "migration_name": "20260909095919_add_user_organization_membership_refresh_tokens",
+        "checksum": "1aa4ff774a2460c1b1527efe5fdf215e5ca7faecbfab72c401947db6001a6c8c",
+        "finished_at": "2026-09-14T13:25:41.183Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260914132819_implement_agreement_and_network_connection_schemas",
+        "checksum": "a4f8aae27c031368df7a5c3554e1c7cac68bee29a9a1171989d2d25198ab5160",
+        "finished_at": "2026-09-14T13:28:25.305Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260916124637_implement_kiosk_and_kioskassignment",
+        "checksum": "6ab6760a9089626e4a409cda83a4660f3c116c884dabca554e5cf7404ea8a781",
+        "finished_at": "2026-09-17T09:18:05.611Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260917091838_add_password_reset",
+        "checksum": "a231bc2776b9104f39685619db0cb45a34bde52cf479235969264964e3f7b03d",
+        "finished_at": "2026-09-17T09:18:43.434Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260917132138_add_kiosk_location_and_assignment_model",
+        "checksum": "e245b95cda40d93fc94d75f6fd3d46ec897b51c3addb312e6a5831feb894cd5b",
+        "finished_at": "2026-09-17T13:21:42.941Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+        "checksum": "670c88f032899d5d2d7f4eb1af64061a4fdfe778f21aa75ddad0ae5e5543563e",
+        "finished_at": "2026-09-18T13:24:03.576Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260921095532_implement_order_and_order_kiosk_schemas",
+        "checksum": "b888bdc69ab36b0a0d61ac35362350950c869b7d7e2693cfce6d440d2e93eb6e",
+        "finished_at": "2026-09-21T09:55:39.740Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260922135228_implement_payment_status_in_orders",
+        "checksum": "59221b192d25a62c236db9cb5fcbf51d136adbd327cdf9bb27562f70737830cb",
+        "finished_at": "2026-09-22T13:52:32.421Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260922151453_add_invoice_filename",
+        "checksum": "4c37792fdc1c5f595bff47c146971a3a9f6f6199336b752e3e8104b592452095",
+        "finished_at": "2026-09-22T15:14:57.794Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260928063729_implement_transactions_schema",
+        "checksum": "6b2453ea6f7f938eecb8c8be18687744995a4aa0a6ddc82f6f75047bb9e2f6a3",
+        "finished_at": "2026-09-28T06:37:35.352Z",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260928073023_remove_payu_retries",
+        "checksum": "2629cb11a8df9c247a0e8e0a334a3cdb976adf8d848d1188e2cf03e0d7840d49",
+        "finished_at": "2026-09-28T07:30:27.524Z",
+        "rolled_back_at": null
+      }
+    ],
+    "columns": [
+      {
+        "table_name": "Agreement",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "networkConnectionId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "parentOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "childOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "parentSharePct",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "numeric_precision": 5,
+        "numeric_scale": 2
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "childSharePct",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "numeric_precision": 5,
+        "numeric_scale": 2
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "effectiveFrom",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "effectiveTo",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "AgreementStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "pdfUrl",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "depositAmountPerMachine",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "Agreement",
+        "column_name": "nonRefundableAmountPerMachine",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "machineCode",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "model",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "KioskStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "externalDeviceId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "currentOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Kiosk",
+        "column_name": "location",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "kioskId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "organizationId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "orderId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "assignedById",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "assignedFrom",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "KioskAssignment",
+        "column_name": "assignedTo",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "MachineSequence",
+        "column_name": "year",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "MachineSequence",
+        "column_name": "value",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "userId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "organizationId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "role",
+        "data_type": "USER-DEFINED",
+        "udt_name": "Role",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "MembershipStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Membership",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "initiatorOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "receiverOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "NetworkStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "NetworkConnection",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "orderNumber",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "type",
+        "data_type": "USER-DEFINED",
+        "udt_name": "OrderType",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "OrderStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "parentOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "childOrgId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "agreementId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "quantity",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "Order",
+        "column_name": "depositPerMachine",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "nonRefundablePerMachine",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "totalDeposit",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "totalNonRefundable",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "taxAmount",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "grandTotal",
+        "data_type": "double precision",
+        "udt_name": "float8",
+        "numeric_precision": 53,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "invoiceUrl",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "paymentStatus",
+        "data_type": "USER-DEFINED",
+        "udt_name": "PaymentStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Order",
+        "column_name": "invoiceFilename",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "OrderKiosk",
+        "column_name": "orderId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "OrderKiosk",
+        "column_name": "kioskId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "ownerId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "name",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "type",
+        "data_type": "USER-DEFINED",
+        "udt_name": "OrgType",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "state",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "city",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "pincode",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "address",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "inviteCode",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "inviteCodeExpiresAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Organization",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "userId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "otpHash",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "resetToken",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "expiresAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "verifiedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "usedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "attempts",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "PasswordReset",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "token",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "userId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "expiresAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "revoked",
+        "data_type": "boolean",
+        "udt_name": "bool",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RefreshToken",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "runAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "totalRecordsFetched",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "newRecordsInserted",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "unattributedCount",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "status",
+        "data_type": "USER-DEFINED",
+        "udt_name": "SyncStatus",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "errorMessage",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "RevenueSyncRunLog",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "kioskId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "gameId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "amount",
+        "data_type": "numeric",
+        "udt_name": "numeric",
+        "numeric_precision": 10,
+        "numeric_scale": 2
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "currency",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "externalTransactionId",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "occurredAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "Transaction",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "id",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "email",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "passwordHash",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "name",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "createdAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "User",
+        "column_name": "updatedAt",
+        "data_type": "timestamp without time zone",
+        "udt_name": "timestamp",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "id",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "checksum",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "finished_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "migration_name",
+        "data_type": "character varying",
+        "udt_name": "varchar",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "logs",
+        "data_type": "text",
+        "udt_name": "text",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "rolled_back_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "started_at",
+        "data_type": "timestamp with time zone",
+        "udt_name": "timestamptz",
+        "numeric_precision": null,
+        "numeric_scale": null
+      },
+      {
+        "table_name": "_prisma_migrations",
+        "column_name": "applied_steps_count",
+        "data_type": "integer",
+        "udt_name": "int4",
+        "numeric_precision": 32,
+        "numeric_scale": 0
+      }
+    ]
+  },
+  {
+    "id": "isolated-schema-applied",
+    "migrations": [
+      {
+        "name": "20260909095919_add_user_organization_membership_refresh_tokens",
+        "sha256": "b9187e90ee5b2b56681b5307da5903ab22a9cfafa0f456309b4bca3e6ab0b6e1"
+      },
+      {
+        "name": "20260914132819_implement_agreement_and_network_connection_schemas",
+        "sha256": "f653b582fbc958a11af990c44e8988ec6ba2a72eee457edfa6a0fca146b24cf6"
+      },
+      {
+        "name": "20260916124637_implement_kiosk_and_kioskassignment",
+        "sha256": "1be67538d581ed6de76e8167033d1c556847607b69ac2d6e0b650b5a27ec8057"
+      },
+      {
+        "name": "20260917091838_add_password_reset",
+        "sha256": "c451d8ffe11fdf80b22c49378ef20aa5a88ecf5e39efb1dfd076629ef19cc50c"
+      },
+      {
+        "name": "20260917132138_add_kiosk_location_and_assignment_model",
+        "sha256": "ecf11265255c5dd611409933c66ed43818f99ebebba38e35072d75c9be891d69"
+      },
+      {
+        "name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+        "sha256": "a46876cb25a0693bf482506ad7871420d9d31408689643615b9122d1c61ae018"
+      },
+      {
+        "name": "20260921095532_implement_order_and_order_kiosk_schemas",
+        "sha256": "c17dbff8b36a4c9020210c8bde202999b226a8810abb81c9dc0632a4c909c661"
+      },
+      {
+        "name": "20260922135228_implement_payment_status_in_orders",
+        "sha256": "085eb562fda8637edc3456c0b4300cd5fe361ddf031d867525d4467e7f5cca1e"
+      },
+      {
+        "name": "20260922151453_add_invoice_filename",
+        "sha256": "5a119442e9c3e73201db7708adef9c4fe02c3b724573b0d8c4a8c942370a67ac"
+      },
+      {
+        "name": "20260929100000_protect_distributor_lifecycle",
+        "sha256": "2747d383b90f158d89aa167f361f1b9d42a4d44eb3a953c86295e4acb9f36cc8"
+      }
+    ],
+    "constraints": [
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_childOrgId_fkey",
+        "definition": "FOREIGN KEY (\"childOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_networkConnectionId_fkey",
+        "definition": "FOREIGN KEY (\"networkConnectionId\") REFERENCES \"NetworkConnection\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_parentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"parentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "Agreement_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "agreement_distinct_parties",
+        "definition": "CHECK ((\"parentOrgId\" <> \"childOrgId\"))"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "depositAmountPerMachine_positive",
+        "definition": "CHECK ((\"depositAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "nonRefundableAmountPerMachine_positive",
+        "definition": "CHECK ((\"nonRefundableAmountPerMachine\" >= 0))"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_key_key",
+        "definition": "UNIQUE (key)"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_ownerOrganizationId_fkey",
+        "definition": "FOREIGN KEY (\"ownerOrganizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_currentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"currentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_reservedOrderId_fkey",
+        "definition": "FOREIGN KEY (\"reservedOrderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "kiosk_reservation_state",
+        "definition": "CHECK (((status = ANY (ARRAY['RESERVED'::\"KioskStatus\", 'ASSIGNED'::\"KioskStatus\"])) = (\"reservedOrderId\" IS NOT NULL)))"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_assignedById_fkey",
+        "definition": "FOREIGN KEY (\"assignedById\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_orderId_fkey",
+        "definition": "FOREIGN KEY (\"orderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE SET NULL"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"KioskAssignment\"",
+        "conname": "KioskAssignment_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"MachineSequence\"",
+        "conname": "MachineSequence_pkey",
+        "definition": "PRIMARY KEY (year)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_organizationId_fkey",
+        "definition": "FOREIGN KEY (\"organizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Membership\"",
+        "conname": "Membership_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_initiatorOrgId_fkey",
+        "definition": "FOREIGN KEY (\"initiatorOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "NetworkConnection_receiverOrgId_fkey",
+        "definition": "FOREIGN KEY (\"receiverOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "network_distinct_parties",
+        "definition": "CHECK ((\"initiatorOrgId\" <> \"receiverOrgId\"))"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_agreementId_fkey",
+        "definition": "FOREIGN KEY (\"agreementId\") REFERENCES \"Agreement\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_childOrgId_fkey",
+        "definition": "FOREIGN KEY (\"childOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_parentOrgId_fkey",
+        "definition": "FOREIGN KEY (\"parentOrgId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Order\"",
+        "conname": "Order_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_kioskId_fkey",
+        "definition": "FOREIGN KEY (\"kioskId\") REFERENCES \"Kiosk\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_orderId_fkey",
+        "definition": "FOREIGN KEY (\"orderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"OrderKiosk\"",
+        "conname": "OrderKiosk_pkey",
+        "definition": "PRIMARY KEY (\"orderId\", \"kioskId\")"
+      },
+      {
+        "table_name": "\"OrderSequence\"",
+        "conname": "OrderSequence_pkey",
+        "definition": "PRIMARY KEY (year)"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_ownerId_fkey",
+        "definition": "FOREIGN KEY (\"ownerId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Organization\"",
+        "conname": "Organization_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"PasswordReset\"",
+        "conname": "PasswordReset_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE CASCADE"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"RefreshToken\"",
+        "conname": "RefreshToken_userId_fkey",
+        "definition": "FOREIGN KEY (\"userId\") REFERENCES \"User\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"User\"",
+        "conname": "User_pkey",
+        "definition": "PRIMARY KEY (id)"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "Agreement",
+        "indexname": "Agreement_open_pair_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Agreement_open_pair_key\" ON public.\"Agreement\" USING btree (\"parentOrgId\", \"childOrgId\") WHERE (status = ANY (ARRAY['PENDING_APPROVAL'::\"AgreementStatus\", 'ACTIVE'::\"AgreementStatus\"]))"
+      },
+      {
+        "tablename": "Agreement",
+        "indexname": "Agreement_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Agreement_pkey\" ON public.\"Agreement\" USING btree (id)"
+      },
+      {
+        "tablename": "EmailDelivery",
+        "indexname": "EmailDelivery_key_key",
+        "indexdef": "CREATE UNIQUE INDEX \"EmailDelivery_key_key\" ON public.\"EmailDelivery\" USING btree (key)"
+      },
+      {
+        "tablename": "EmailDelivery",
+        "indexname": "EmailDelivery_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"EmailDelivery_pkey\" ON public.\"EmailDelivery\" USING btree (id)"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_externalDeviceId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_externalDeviceId_key\" ON public.\"Kiosk\" USING btree (\"externalDeviceId\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_machineCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_machineCode_key\" ON public.\"Kiosk\" USING btree (\"machineCode\")"
+      },
+      {
+        "tablename": "Kiosk",
+        "indexname": "Kiosk_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Kiosk_pkey\" ON public.\"Kiosk\" USING btree (id)"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_kioskId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_kioskId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"kioskId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_one_open_key",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskAssignment_one_open_key\" ON public.\"KioskAssignment\" USING btree (\"kioskId\") WHERE (\"assignedTo\" IS NULL)"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_organizationId_assignedTo_idx",
+        "indexdef": "CREATE INDEX \"KioskAssignment_organizationId_assignedTo_idx\" ON public.\"KioskAssignment\" USING btree (\"organizationId\", \"assignedTo\")"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskAssignment_pkey\" ON public.\"KioskAssignment\" USING btree (id)"
+      },
+      {
+        "tablename": "MachineSequence",
+        "indexname": "MachineSequence_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"MachineSequence_pkey\" ON public.\"MachineSequence\" USING btree (year)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_organizationId_idx",
+        "indexdef": "CREATE INDEX \"Membership_organizationId_idx\" ON public.\"Membership\" USING btree (\"organizationId\")"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_pkey\" ON public.\"Membership\" USING btree (id)"
+      },
+      {
+        "tablename": "Membership",
+        "indexname": "Membership_userId_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Membership_userId_key\" ON public.\"Membership\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "NetworkConnection",
+        "indexname": "NetworkConnection_pair_key",
+        "indexdef": "CREATE UNIQUE INDEX \"NetworkConnection_pair_key\" ON public.\"NetworkConnection\" USING btree (LEAST(\"initiatorOrgId\", \"receiverOrgId\"), GREATEST(\"initiatorOrgId\", \"receiverOrgId\"))"
+      },
+      {
+        "tablename": "NetworkConnection",
+        "indexname": "NetworkConnection_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"NetworkConnection_pkey\" ON public.\"NetworkConnection\" USING btree (id)"
+      },
+      {
+        "tablename": "Order",
+        "indexname": "Order_orderNumber_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Order_orderNumber_key\" ON public.\"Order\" USING btree (\"orderNumber\")"
+      },
+      {
+        "tablename": "Order",
+        "indexname": "Order_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Order_pkey\" ON public.\"Order\" USING btree (id)"
+      },
+      {
+        "tablename": "OrderKiosk",
+        "indexname": "OrderKiosk_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"OrderKiosk_pkey\" ON public.\"OrderKiosk\" USING btree (\"orderId\", \"kioskId\")"
+      },
+      {
+        "tablename": "OrderSequence",
+        "indexname": "OrderSequence_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"OrderSequence_pkey\" ON public.\"OrderSequence\" USING btree (year)"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_inviteCode_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_inviteCode_key\" ON public.\"Organization\" USING btree (\"inviteCode\")"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "Organization_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"Organization_pkey\" ON public.\"Organization\" USING btree (id)"
+      },
+      {
+        "tablename": "Organization",
+        "indexname": "only_one_company",
+        "indexdef": "CREATE UNIQUE INDEX only_one_company ON public.\"Organization\" USING btree (type) WHERE (type = 'COMPANY'::\"OrgType\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_pkey\" ON public.\"PasswordReset\" USING btree (id)"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_resetToken_key",
+        "indexdef": "CREATE UNIQUE INDEX \"PasswordReset_resetToken_key\" ON public.\"PasswordReset\" USING btree (\"resetToken\")"
+      },
+      {
+        "tablename": "PasswordReset",
+        "indexname": "PasswordReset_userId_idx",
+        "indexdef": "CREATE INDEX \"PasswordReset_userId_idx\" ON public.\"PasswordReset\" USING btree (\"userId\")"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_pkey\" ON public.\"RefreshToken\" USING btree (id)"
+      },
+      {
+        "tablename": "RefreshToken",
+        "indexname": "RefreshToken_token_key",
+        "indexdef": "CREATE UNIQUE INDEX \"RefreshToken_token_key\" ON public.\"RefreshToken\" USING btree (token)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_email_key",
+        "indexdef": "CREATE UNIQUE INDEX \"User_email_key\" ON public.\"User\" USING btree (email)"
+      },
+      {
+        "tablename": "User",
+        "indexname": "User_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"User_pkey\" ON public.\"User\" USING btree (id)"
+      }
+    ]
+  },
+  {
+    "id": "schema-comparison",
+    "missingOrDifferentConstraintsOnConfiguredDatabase": [
+      {
+        "table_name": "\"Agreement\"",
+        "conname": "agreement_distinct_parties",
+        "definition": "CHECK ((\"parentOrgId\" <> \"childOrgId\"))"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_key_key",
+        "definition": "UNIQUE (key)"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_ownerOrganizationId_fkey",
+        "definition": "FOREIGN KEY (\"ownerOrganizationId\") REFERENCES \"Organization\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"EmailDelivery\"",
+        "conname": "EmailDelivery_pkey",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "Kiosk_reservedOrderId_fkey",
+        "definition": "FOREIGN KEY (\"reservedOrderId\") REFERENCES \"Order\"(id) ON UPDATE CASCADE ON DELETE RESTRICT"
+      },
+      {
+        "table_name": "\"Kiosk\"",
+        "conname": "kiosk_reservation_state",
+        "definition": "CHECK (((status = ANY (ARRAY['RESERVED'::\"KioskStatus\", 'ASSIGNED'::\"KioskStatus\"])) = (\"reservedOrderId\" IS NOT NULL)))"
+      },
+      {
+        "table_name": "\"NetworkConnection\"",
+        "conname": "network_distinct_parties",
+        "definition": "CHECK ((\"initiatorOrgId\" <> \"receiverOrgId\"))"
+      },
+      {
+        "table_name": "\"OrderSequence\"",
+        "conname": "OrderSequence_pkey",
+        "definition": "PRIMARY KEY (year)"
+      }
+    ],
+    "missingOrDifferentIndexesOnConfiguredDatabase": [
+      {
+        "tablename": "Agreement",
+        "indexname": "Agreement_open_pair_key",
+        "indexdef": "CREATE UNIQUE INDEX \"Agreement_open_pair_key\" ON public.\"Agreement\" USING btree (\"parentOrgId\", \"childOrgId\") WHERE (status = ANY (ARRAY['PENDING_APPROVAL'::\"AgreementStatus\", 'ACTIVE'::\"AgreementStatus\"]))"
+      },
+      {
+        "tablename": "EmailDelivery",
+        "indexname": "EmailDelivery_key_key",
+        "indexdef": "CREATE UNIQUE INDEX \"EmailDelivery_key_key\" ON public.\"EmailDelivery\" USING btree (key)"
+      },
+      {
+        "tablename": "EmailDelivery",
+        "indexname": "EmailDelivery_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"EmailDelivery_pkey\" ON public.\"EmailDelivery\" USING btree (id)"
+      },
+      {
+        "tablename": "KioskAssignment",
+        "indexname": "KioskAssignment_one_open_key",
+        "indexdef": "CREATE UNIQUE INDEX \"KioskAssignment_one_open_key\" ON public.\"KioskAssignment\" USING btree (\"kioskId\") WHERE (\"assignedTo\" IS NULL)"
+      },
+      {
+        "tablename": "NetworkConnection",
+        "indexname": "NetworkConnection_pair_key",
+        "indexdef": "CREATE UNIQUE INDEX \"NetworkConnection_pair_key\" ON public.\"NetworkConnection\" USING btree (LEAST(\"initiatorOrgId\", \"receiverOrgId\"), GREATEST(\"initiatorOrgId\", \"receiverOrgId\"))"
+      },
+      {
+        "tablename": "OrderSequence",
+        "indexname": "OrderSequence_pkey",
+        "indexdef": "CREATE UNIQUE INDEX \"OrderSequence_pkey\" ON public.\"OrderSequence\" USING btree (year)"
+      }
+    ],
+    "extraConfiguredMigrations": [
+      "20260928063729_implement_transactions_schema",
+      "20260928073023_remove_payu_retries"
+    ]
+  },
+  {
+    "id": "source-hashes-before",
+    "hashes": {
+      "apps\\api\\src\\app.ts": "54e1183ef402b886dc8b4d2fc6a56d149c3ff9d2ce98c812b6642f30d3a18ed4",
+      "apps\\api\\src\\assets\\arcadelx-logo.png": "c347da3e9f4f10e1305fbc7ceecd557b5375edb65a6001749ff2ba379fed9e67",
+      "apps\\api\\src\\config\\env.ts": "39258e9b67e6d756a1179dc9598f3e3cab109128c218d13e7bf58cb087f3c814",
+      "apps\\api\\src\\controllers\\Agreement\\agreement.controller.ts": "b8a10aafd76c81d37ad31a48cafec609dd56745099d7f05e18530596791c917d",
+      "apps\\api\\src\\controllers\\auth.controller.ts": "b241d3cd54e2bdbd6d9c1202d151ab8b3e6fbbb54852e1775512755c97ec9dbf",
+      "apps\\api\\src\\controllers\\Internal\\internal.controller.ts": "50e21762bb489e9fddeb07dbe84d555aa0abb58e86d4416077bd2821ff2ca5ae",
+      "apps\\api\\src\\controllers\\Kiosk\\kiosk.controller.ts": "7a0a94677704d6525ff1ffa4e782e48b6b5eb8c894f83af5b1a515879386e18d",
+      "apps\\api\\src\\controllers\\membership.controller.ts": "77a14392c2dd722e73094a803836d7d6b75e106fa4a81fa9ab04acbf0cf270b8",
+      "apps\\api\\src\\controllers\\Network\\network.controller.ts": "0b2063b212ccee9904a581a4042f282eb4f992931e4b7a72f54fc49eac9c92d0",
+      "apps\\api\\src\\controllers\\Orders\\orders.controller.ts": "81eda2034022ea281ceec7c7ad9e54d328319db5241b8b0585254b2b1c764615",
+      "apps\\api\\src\\middlewares\\auth.ts": "fc86e5f65c77be164918ff275fb3435724b6694e1d7bc6f055df4453f8b01db0",
+      "apps\\api\\src\\middlewares\\internal.auth.ts": "2b894a1d1adaa570cac90262aaa9ff533aa94a80e3eaf11648f6b9d385ec5bf3",
+      "apps\\api\\src\\routes\\Agreements\\agreement.routes.ts": "4c283c34a84546a1b5c05758ea43d61deabefa392b449e77381cb03bcccac3d3",
+      "apps\\api\\src\\routes\\auth.routes.ts": "cf98b2622df7af5b43b2976224a07391c5632fd4dc9a1ee64cc97bc2b89f6330",
+      "apps\\api\\src\\routes\\Internal\\internal.routes.ts": "d123accbba1e05d450c57ad487bf9f5b79d0b46b2bea038e8ed1decd71e74d32",
+      "apps\\api\\src\\routes\\Kiosk\\kiosk.routes.ts": "114d493e8d42fe7f1640e3f092ed1a0e75a4eeaf54160bc13b0c310a1732d7e3",
+      "apps\\api\\src\\routes\\member.routes.ts": "7aaa652599451beb72cf9d0bf621d1cb63010118af5893c8c640339f6df019bb",
+      "apps\\api\\src\\routes\\Network\\network.routes.ts": "a2177942d2e902b19134e5176474a68d8ced257d86af3765f2afeb8269e217fc",
+      "apps\\api\\src\\routes\\Orders\\order.route.ts": "67c8f4d4385b670597e1960e647c5eed4b1e1bff741a3eb2491dd249c562098a",
+      "apps\\api\\src\\server.ts": "71bbc88cae5baa980a281b71072f5c9da52150c47633f217d6ee1b9ceb04abba",
+      "apps\\api\\src\\services\\agreement-rules.ts": "fbdc77067d67577ab3b6a9c8a2c254c428c950a9ff812879b2235f3e0ed21558",
+      "apps\\api\\src\\services\\email\\auth.email.ts": "71b3bc23f7ffeb03d88f1262c72956d835fafeb2b099002917d2fff98f72c369",
+      "apps\\api\\src\\services\\email\\delivery.service.ts": "2b970c8aa8c20f055ccef713c243bbd6ddb3d61bf1c40d1dd064a3b5d472dbff",
+      "apps\\api\\src\\services\\email\\email.service.ts": "18a9c4c958d85307b8f92ba068c0199cc576093ab78693c2c2834f4e1208309b",
+      "apps\\api\\src\\services\\email\\passwordreset.email.ts": "e90625d8d3c8fa938774ace11785106bed2fa9609ce8aa1c6945e5a637885f83",
+      "apps\\api\\src\\services\\pdf\\invoice.pdf.ts": "ad6b3931890461a09663267289103755861e31cb41c039e843b54e8e34968a45",
+      "apps\\api\\src\\utils\\ApiError.ts": "98e4628d3c02606e2d68e169242154aeccbb2dddc866e2352f91a1bd178c05e5",
+      "apps\\api\\src\\utils\\ApiResponse.ts": "884db6ef7e72d6a2c0d419682af753698faedb11af4f96c8eee15043060c4e8a",
+      "apps\\api\\src\\utils\\asyncHandler.ts": "20d701a3f020f0b1c09cf0af874cf4d2f4ce01115e803f720c603acec041ce4d",
+      "apps\\api\\src\\utils\\db.ts": "0acaafe13c0ee99ec096806a9e6d945bf3fd833ad847bedca788e8415c4b6884",
+      "apps\\api\\src\\utils\\errorHandler.ts": "5de4c257be2b1b6c4138641cec834073297df24597601da5361d300f7d8891db",
+      "apps\\api\\src\\utils\\passwordReset.ts": "3681c56912e7be6231e6548eb0cd21d0dc8fc8ef74019f9f469d05ce54ca264a",
+      "apps\\api\\src\\utils\\token.ts": "3b70e37cb37522c1879abe95959d4d201b60a8848c8ed1c386a7ad7ed3da2ee5",
+      "apps\\api\\prisma\\migrations\\20260909095919_add_user_organization_membership_refresh_tokens\\migration.sql": "b9187e90ee5b2b56681b5307da5903ab22a9cfafa0f456309b4bca3e6ab0b6e1",
+      "apps\\api\\prisma\\migrations\\20260914132819_implement_agreement_and_network_connection_schemas\\migration.sql": "f653b582fbc958a11af990c44e8988ec6ba2a72eee457edfa6a0fca146b24cf6",
+      "apps\\api\\prisma\\migrations\\20260916124637_implement_kiosk_and_kioskassignment\\migration.sql": "1be67538d581ed6de76e8167033d1c556847607b69ac2d6e0b650b5a27ec8057",
+      "apps\\api\\prisma\\migrations\\20260917091838_add_password_reset\\migration.sql": "c451d8ffe11fdf80b22c49378ef20aa5a88ecf5e39efb1dfd076629ef19cc50c",
+      "apps\\api\\prisma\\migrations\\20260917132138_add_kiosk_location_and_assignment_model\\migration.sql": "ecf11265255c5dd611409933c66ed43818f99ebebba38e35072d75c9be891d69",
+      "apps\\api\\prisma\\migrations\\20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount\\migration.sql": "a46876cb25a0693bf482506ad7871420d9d31408689643615b9122d1c61ae018",
+      "apps\\api\\prisma\\migrations\\20260921095532_implement_order_and_order_kiosk_schemas\\migration.sql": "c17dbff8b36a4c9020210c8bde202999b226a8810abb81c9dc0632a4c909c661",
+      "apps\\api\\prisma\\migrations\\20260922135228_implement_payment_status_in_orders\\migration.sql": "085eb562fda8637edc3456c0b4300cd5fe361ddf031d867525d4467e7f5cca1e",
+      "apps\\api\\prisma\\migrations\\20260922151453_add_invoice_filename\\migration.sql": "5a119442e9c3e73201db7708adef9c4fe02c3b724573b0d8c4a8c942370a67ac",
+      "apps\\api\\prisma\\migrations\\20260929100000_protect_distributor_lifecycle\\migration.sql": "2747d383b90f158d89aa167f361f1b9d42a4d44eb3a953c86295e4acb9f36cc8",
+      "apps\\api\\prisma\\migrations\\migration_lock.toml": "99836963713b4f5b269ad49af0ed3d7b0b2e336115c2f92dc9ac683d139d0900",
+      "apps\\api\\prisma\\schema.prisma": "ad1c485a91cfeacfac8c87d28be25b7c4cc463774d6d258f87619d2ed8045b9a",
+      "apps\\api\\prisma\\seed.ts": "f1f0af458621e624c8d6f95b941d48703b193fff7b713b98f0d8df382077271f",
+      "packages\\shared-types\\validationSchemas\\agreement.validation.ts": "42e5372d698dee119e1767b6344bde14d82508eb4caf8a570eb5764652f260d1",
+      "packages\\shared-types\\validationSchemas\\auth.validation.ts": "78e9aa871d88cd7129389dbd175be89b4512253a6d89a5e82a63a840bbb96a99",
+      "packages\\shared-types\\validationSchemas\\Kiosk\\kiosk.validation.ts": "34b61fa19d19b1f20827db2abb3069eef6559725815459decce44129c3973d72",
+      "packages\\shared-types\\validationSchemas\\member.validation.ts": "4f446ca6c82a510f6c08c351d9ed6619f32ab1eeac5ea4fd23a3127e9e0a879b",
+      "packages\\shared-types\\validationSchemas\\network.validation.ts": "27fa3faa1a5bb82d39e61c2e3c6df9307dd89cf29e103c3015220ed54b80215d",
+      "packages\\shared-types\\validationSchemas\\Orders\\order.validation.ts": "d720138fa20e89afaa733d60baccce790cf5d35051bdfd1b7b0dfbd984d17ec7"
+    }
+  },
+  {
+    "id": "fixture-model-company",
+    "kind": "direct DB fixture",
+    "organizationId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+    "userId": "05a26061-e51e-470c-91a0-eded3c6e843a",
+    "type": "COMPANY",
+    "role": "OWNER",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "login-model-company",
+    "kind": "HTTP",
+    "actor": "unauthenticated",
+    "method": "POST",
+    "route": "/api/auth/login",
+    "request": {
+      "email": "model-company@example.invalid",
+      "password": "[redacted]"
+    },
+    "status": 200,
+    "expected": 200,
+    "pass": true,
+    "response": {
+      "statusCode": 200,
+      "data": {
+        "user": {
+          "id": "05a26061-e51e-470c-91a0-eded3c6e843a",
+          "email": "model-company@example.invalid"
+        }
+      },
+      "message": "Login successful",
+      "success": true
+    }
+  },
+  {
+    "id": "fixture-model-distributor",
+    "kind": "direct DB fixture",
+    "organizationId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+    "userId": "fb73430d-dd46-4b6d-8ed1-75ce2c7d6da0",
+    "type": "DISTRIBUTOR",
+    "role": "OWNER",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "login-model-distributor",
+    "kind": "HTTP",
+    "actor": "unauthenticated",
+    "method": "POST",
+    "route": "/api/auth/login",
+    "request": {
+      "email": "model-distributor@example.invalid",
+      "password": "[redacted]"
+    },
+    "status": 200,
+    "expected": 200,
+    "pass": true,
+    "response": {
+      "statusCode": 200,
+      "data": {
+        "user": {
+          "id": "fb73430d-dd46-4b6d-8ed1-75ce2c7d6da0",
+          "email": "model-distributor@example.invalid"
+        }
+      },
+      "message": "Login successful",
+      "success": true
+    }
+  },
+  {
+    "id": "model-network-initiate",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/network/initiate",
+    "request": {
+      "targetOwnerEmail": "model-distributor@example.invalid"
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "connection": {
+          "id": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+          "initiatorOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "receiverOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+          "status": "PENDING",
+          "createdAt": "2026-09-29T09:59:45.056Z",
+          "updatedAt": "2026-09-29T09:59:45.056Z"
+        }
+      },
+      "message": "Connection request sent successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-network-pending",
+    "kind": "assertion",
+    "pass": true,
+    "connection": {
+      "id": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+      "initiatorOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+      "receiverOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+      "status": "PENDING",
+      "createdAt": "2026-09-29T09:59:45.056Z",
+      "updatedAt": "2026-09-29T09:59:45.056Z"
+    }
+  },
+  {
+    "id": "model-network-accept",
+    "kind": "HTTP",
+    "actor": "model-distributor",
+    "method": "POST",
+    "route": "/api/network/84ad2152-e9b1-421a-acf8-9dfa21a9dec2/accept",
+    "status": 200,
+    "expected": 200,
+    "pass": true,
+    "response": {
+      "statusCode": 200,
+      "data": {
+        "connection": {
+          "id": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+          "initiatorOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "receiverOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+          "status": "ACTIVE",
+          "createdAt": "2026-09-29T09:59:45.056Z",
+          "updatedAt": "2026-09-29T09:59:45.086Z"
+        }
+      },
+      "message": "Connection accepted successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-agreement-create",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/agreements/create",
+    "request": {
+      "networkConnectionId": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+      "childOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+      "parentSharePct": 60,
+      "childSharePct": 40,
+      "depositAmountPerMachine": 1000,
+      "nonRefundableAmountPerMachine": 200
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "agreement": {
+          "id": "47e61ba9-18d7-42fa-b0e2-fd1f7622595c",
+          "networkConnectionId": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+          "parentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "childOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+          "parentSharePct": "60",
+          "childSharePct": "40",
+          "effectiveFrom": "2026-09-29T09:59:45.155Z",
+          "effectiveTo": null,
+          "status": "PENDING_APPROVAL",
+          "pdfUrl": null,
+          "depositAmountPerMachine": 1000,
+          "nonRefundableAmountPerMachine": 200,
+          "createdAt": "2026-09-29T09:59:45.158Z",
+          "updatedAt": "2026-09-29T09:59:45.158Z"
+        }
+      },
+      "message": "Agreement drafted and sent for approval",
+      "success": true
+    }
+  },
+  {
+    "id": "model-agreement-approve",
+    "kind": "HTTP",
+    "actor": "model-distributor",
+    "method": "PATCH",
+    "route": "/api/agreements/47e61ba9-18d7-42fa-b0e2-fd1f7622595c/approve",
+    "status": 200,
+    "expected": 200,
+    "pass": true,
+    "response": {
+      "statusCode": 200,
+      "data": {
+        "agreement": {
+          "id": "47e61ba9-18d7-42fa-b0e2-fd1f7622595c",
+          "networkConnectionId": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+          "parentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "childOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+          "parentSharePct": "60",
+          "childSharePct": "40",
+          "effectiveFrom": "2026-09-29T09:59:45.211Z",
+          "effectiveTo": null,
+          "status": "ACTIVE",
+          "pdfUrl": null,
+          "depositAmountPerMachine": 1000,
+          "nonRefundableAmountPerMachine": 200,
+          "createdAt": "2026-09-29T09:59:45.158Z",
+          "updatedAt": "2026-09-29T09:59:45.216Z"
+        }
+      },
+      "message": "Agreement approved and now active",
+      "success": true
+    }
+  },
+  {
+    "id": "model-stock-ADLX-Pro-X1",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/kiosks/batch",
+    "request": {
+      "model": "ADLX-Pro-X1",
+      "count": 1
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "count": 1,
+        "startCode": "ADLX-2026-A001",
+        "endCode": "ADLX-2026-A001"
+      },
+      "message": "Kiosks batch created successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-stock-Arcade-LX B2C",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/kiosks/batch",
+    "request": {
+      "model": "Arcade-LX B2C",
+      "count": 1
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "count": 1,
+        "startCode": "ADLX-2026-A002",
+        "endCode": "ADLX-2026-A002"
+      },
+      "message": "Kiosks batch created successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-stock-Arcade-LX Healthcare",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/kiosks/batch",
+    "request": {
+      "model": "Arcade-LX Healthcare",
+      "count": 1
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "count": 1,
+        "startCode": "ADLX-2026-A003",
+        "endCode": "ADLX-2026-A003"
+      },
+      "message": "Kiosks batch created successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-stock-Company spare",
+    "kind": "HTTP",
+    "actor": "model-company",
+    "method": "POST",
+    "route": "/api/kiosks/batch",
+    "request": {
+      "model": "Company spare",
+      "count": 1
+    },
+    "status": 201,
+    "expected": 201,
+    "pass": true,
+    "response": {
+      "statusCode": 201,
+      "data": {
+        "count": 1,
+        "startCode": "ADLX-2026-A004",
+        "endCode": "ADLX-2026-A004"
+      },
+      "message": "Kiosks batch created successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-unavailable-stock-rolls-back",
+    "kind": "assertion",
+    "pass": true
+  },
+  {
+    "id": "model-assignment-before",
+    "plan": {
+      "companyId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+      "distributorId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+      "distributorName": "model-distributor",
+      "actingUserId": "05a26061-e51e-470c-91a0-eded3c6e843a",
+      "agreementId": "47e61ba9-18d7-42fa-b0e2-fd1f7622595c",
+      "networkId": "84ad2152-e9b1-421a-acf8-9dfa21a9dec2",
+      "kiosks": [
+        {
+          "id": "bdbdca1b-7972-4361-86c2-d868ce92804b",
+          "machineCode": "ADLX-2026-A001",
+          "model": "ADLX-Pro-X1",
+          "status": "AVAILABLE",
+          "location": null,
+          "externalDeviceId": null,
+          "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "reservedOrderId": null,
+          "createdAt": "2026-09-29T09:59:45.244Z",
+          "updatedAt": "2026-09-29T09:59:45.244Z"
+        },
+        {
+          "id": "078ea639-aacd-4fb8-90b3-0223ef6b0f6e",
+          "machineCode": "ADLX-2026-A002",
+          "model": "Arcade-LX B2C",
+          "status": "AVAILABLE",
+          "location": null,
+          "externalDeviceId": null,
+          "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "reservedOrderId": null,
+          "createdAt": "2026-09-29T09:59:45.268Z",
+          "updatedAt": "2026-09-29T09:59:45.268Z"
+        },
+        {
+          "id": "1039a2ad-7bbe-46f6-9084-f9182ab57c76",
+          "machineCode": "ADLX-2026-A003",
+          "model": "Arcade-LX Healthcare",
+          "status": "AVAILABLE",
+          "location": null,
+          "externalDeviceId": null,
+          "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+          "reservedOrderId": null,
+          "createdAt": "2026-09-29T09:59:45.289Z",
+          "updatedAt": "2026-09-29T09:59:45.289Z"
+        }
+      ]
+    },
+    "before": [
+      {
+        "id": "078ea639-aacd-4fb8-90b3-0223ef6b0f6e",
+        "model": "Arcade-LX B2C",
+        "status": "AVAILABLE",
+        "location": null,
+        "createdAt": "2026-09-29T09:59:45.268",
+        "updatedAt": "2026-09-29T09:59:45.268",
+        "machineCode": "ADLX-2026-A002",
+        "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "externalDeviceId": null,
+        "test_hidden_reservation": null
+      },
+      {
+        "id": "1039a2ad-7bbe-46f6-9084-f9182ab57c76",
+        "model": "Arcade-LX Healthcare",
+        "status": "AVAILABLE",
+        "location": null,
+        "createdAt": "2026-09-29T09:59:45.289",
+        "updatedAt": "2026-09-29T09:59:45.289",
+        "machineCode": "ADLX-2026-A003",
+        "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "externalDeviceId": null,
+        "test_hidden_reservation": null
+      },
+      {
+        "id": "bdbdca1b-7972-4361-86c2-d868ce92804b",
+        "model": "ADLX-Pro-X1",
+        "status": "AVAILABLE",
+        "location": null,
+        "createdAt": "2026-09-29T09:59:45.244",
+        "updatedAt": "2026-09-29T09:59:45.386",
+        "machineCode": "ADLX-2026-A001",
+        "currentOrgId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "externalDeviceId": null,
+        "test_hidden_reservation": null
+      }
+    ],
+    "historyBefore": [
+      {
+        "id": "2052b974-9093-456e-9403-df5d0fa734fc",
+        "kioskId": "078ea639-aacd-4fb8-90b3-0223ef6b0f6e",
+        "organizationId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "orderId": null,
+        "assignedById": "05a26061-e51e-470c-91a0-eded3c6e843a",
+        "assignedFrom": "2026-09-29T04:29:45.331Z",
+        "assignedTo": null
+      },
+      {
+        "id": "20dc3c71-b9d4-4cb5-85e7-1da0d86c3037",
+        "kioskId": "bdbdca1b-7972-4361-86c2-d868ce92804b",
+        "organizationId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "orderId": null,
+        "assignedById": "05a26061-e51e-470c-91a0-eded3c6e843a",
+        "assignedFrom": "2026-09-29T04:29:45.331Z",
+        "assignedTo": null
+      },
+      {
+        "id": "2e42d478-9d04-487a-b8ad-3c1251dbe5b8",
+        "kioskId": "1039a2ad-7bbe-46f6-9084-f9182ab57c76",
+        "organizationId": "91f40f8b-0f4b-40bd-bf38-f25708b6c86b",
+        "orderId": null,
+        "assignedById": "05a26061-e51e-470c-91a0-eded3c6e843a",
+        "assignedFrom": "2026-09-29T04:29:45.331Z",
+        "assignedTo": null
+      }
+    ],
+    "ordersBefore": [],
+    "othersBefore": "a5df3c53d1746262199c50ba8181730a",
+    "scope": "Direct test assignment; no order/payment transition"
+  },
+  {
+    "id": "model-assignment-result",
+    "kiosks": [
+      {
+        "id": "078ea639-aacd-4fb8-90b3-0223ef6b0f6e",
+        "machineCode": "ADLX-2026-A002",
+        "model": "Arcade-LX B2C",
+        "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+        "status": "AVAILABLE"
+      },
+      {
+        "id": "1039a2ad-7bbe-46f6-9084-f9182ab57c76",
+        "machineCode": "ADLX-2026-A003",
+        "model": "Arcade-LX Healthcare",
+        "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+        "status": "AVAILABLE"
+      },
+      {
+        "id": "bdbdca1b-7972-4361-86c2-d868ce92804b",
+        "machineCode": "ADLX-2026-A001",
+        "model": "ADLX-Pro-X1",
+        "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+        "status": "AVAILABLE"
+      }
+    ],
+    "assignmentIds": [
+      "b1261310-0e80-4977-b8d8-26736672cfe9",
+      "72dddf5d-e196-4ace-b75b-48ef8e4765a0",
+      "16e9bb66-faa7-4cfc-b3a3-5e42e8a88c0e"
+    ],
+    "historyRowsBefore": 3,
+    "historyRowsAfter": 6,
+    "ordersUnchanged": true,
+    "otherStockUnchanged": true
+  },
+  {
+    "id": "model-exact-ownership-and-no-duplicates",
+    "kind": "assertion",
+    "pass": true
+  },
+  {
+    "id": "model-distributor-inventory",
+    "kind": "HTTP",
+    "actor": "model-distributor",
+    "method": "GET",
+    "route": "/api/kiosks",
+    "status": 200,
+    "expected": 200,
+    "pass": true,
+    "response": {
+      "statusCode": 200,
+      "data": {
+        "kiosks": [
+          {
+            "id": "1039a2ad-7bbe-46f6-9084-f9182ab57c76",
+            "machineCode": "ADLX-2026-A003",
+            "model": "Arcade-LX Healthcare",
+            "status": "AVAILABLE",
+            "location": null,
+            "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+            "currentOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            },
+            "assignedOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            }
+          },
+          {
+            "id": "078ea639-aacd-4fb8-90b3-0223ef6b0f6e",
+            "machineCode": "ADLX-2026-A002",
+            "model": "Arcade-LX B2C",
+            "status": "AVAILABLE",
+            "location": null,
+            "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+            "currentOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            },
+            "assignedOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            }
+          },
+          {
+            "id": "bdbdca1b-7972-4361-86c2-d868ce92804b",
+            "machineCode": "ADLX-2026-A001",
+            "model": "ADLX-Pro-X1",
+            "status": "AVAILABLE",
+            "location": null,
+            "currentOrgId": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+            "currentOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            },
+            "assignedOrg": {
+              "id": "521b81f5-1270-45bb-8fc0-e1d7089fbc85",
+              "name": "model-distributor",
+              "type": "DISTRIBUTOR"
+            }
+          }
+        ]
+      },
+      "message": "Inventory fetched successfully",
+      "success": true
+    }
+  },
+  {
+    "id": "model-api-organization-labels",
+    "kind": "assertion",
+    "pass": true
+  },
+  {
+    "id": "application-sources-unchanged",
+    "kind": "assertion",
+    "pass": true,
+    "hashesAfter": {
+      "apps\\api\\src\\app.ts": "54e1183ef402b886dc8b4d2fc6a56d149c3ff9d2ce98c812b6642f30d3a18ed4",
+      "apps\\api\\src\\assets\\arcadelx-logo.png": "c347da3e9f4f10e1305fbc7ceecd557b5375edb65a6001749ff2ba379fed9e67",
+      "apps\\api\\src\\config\\env.ts": "39258e9b67e6d756a1179dc9598f3e3cab109128c218d13e7bf58cb087f3c814",
+      "apps\\api\\src\\controllers\\Agreement\\agreement.controller.ts": "b8a10aafd76c81d37ad31a48cafec609dd56745099d7f05e18530596791c917d",
+      "apps\\api\\src\\controllers\\auth.controller.ts": "b241d3cd54e2bdbd6d9c1202d151ab8b3e6fbbb54852e1775512755c97ec9dbf",
+      "apps\\api\\src\\controllers\\Internal\\internal.controller.ts": "50e21762bb489e9fddeb07dbe84d555aa0abb58e86d4416077bd2821ff2ca5ae",
+      "apps\\api\\src\\controllers\\Kiosk\\kiosk.controller.ts": "7a0a94677704d6525ff1ffa4e782e48b6b5eb8c894f83af5b1a515879386e18d",
+      "apps\\api\\src\\controllers\\membership.controller.ts": "77a14392c2dd722e73094a803836d7d6b75e106fa4a81fa9ab04acbf0cf270b8",
+      "apps\\api\\src\\controllers\\Network\\network.controller.ts": "0b2063b212ccee9904a581a4042f282eb4f992931e4b7a72f54fc49eac9c92d0",
+      "apps\\api\\src\\controllers\\Orders\\orders.controller.ts": "81eda2034022ea281ceec7c7ad9e54d328319db5241b8b0585254b2b1c764615",
+      "apps\\api\\src\\middlewares\\auth.ts": "fc86e5f65c77be164918ff275fb3435724b6694e1d7bc6f055df4453f8b01db0",
+      "apps\\api\\src\\middlewares\\internal.auth.ts": "2b894a1d1adaa570cac90262aaa9ff533aa94a80e3eaf11648f6b9d385ec5bf3",
+      "apps\\api\\src\\routes\\Agreements\\agreement.routes.ts": "4c283c34a84546a1b5c05758ea43d61deabefa392b449e77381cb03bcccac3d3",
+      "apps\\api\\src\\routes\\auth.routes.ts": "cf98b2622df7af5b43b2976224a07391c5632fd4dc9a1ee64cc97bc2b89f6330",
+      "apps\\api\\src\\routes\\Internal\\internal.routes.ts": "d123accbba1e05d450c57ad487bf9f5b79d0b46b2bea038e8ed1decd71e74d32",
+      "apps\\api\\src\\routes\\Kiosk\\kiosk.routes.ts": "114d493e8d42fe7f1640e3f092ed1a0e75a4eeaf54160bc13b0c310a1732d7e3",
+      "apps\\api\\src\\routes\\member.routes.ts": "7aaa652599451beb72cf9d0bf621d1cb63010118af5893c8c640339f6df019bb",
+      "apps\\api\\src\\routes\\Network\\network.routes.ts": "a2177942d2e902b19134e5176474a68d8ced257d86af3765f2afeb8269e217fc",
+      "apps\\api\\src\\routes\\Orders\\order.route.ts": "67c8f4d4385b670597e1960e647c5eed4b1e1bff741a3eb2491dd249c562098a",
+      "apps\\api\\src\\server.ts": "71bbc88cae5baa980a281b71072f5c9da52150c47633f217d6ee1b9ceb04abba",
+      "apps\\api\\src\\services\\agreement-rules.ts": "fbdc77067d67577ab3b6a9c8a2c254c428c950a9ff812879b2235f3e0ed21558",
+      "apps\\api\\src\\services\\email\\auth.email.ts": "71b3bc23f7ffeb03d88f1262c72956d835fafeb2b099002917d2fff98f72c369",
+      "apps\\api\\src\\services\\email\\delivery.service.ts": "2b970c8aa8c20f055ccef713c243bbd6ddb3d61bf1c40d1dd064a3b5d472dbff",
+      "apps\\api\\src\\services\\email\\email.service.ts": "18a9c4c958d85307b8f92ba068c0199cc576093ab78693c2c2834f4e1208309b",
+      "apps\\api\\src\\services\\email\\passwordreset.email.ts": "e90625d8d3c8fa938774ace11785106bed2fa9609ce8aa1c6945e5a637885f83",
+      "apps\\api\\src\\services\\pdf\\invoice.pdf.ts": "ad6b3931890461a09663267289103755861e31cb41c039e843b54e8e34968a45",
+      "apps\\api\\src\\utils\\ApiError.ts": "98e4628d3c02606e2d68e169242154aeccbb2dddc866e2352f91a1bd178c05e5",
+      "apps\\api\\src\\utils\\ApiResponse.ts": "884db6ef7e72d6a2c0d419682af753698faedb11af4f96c8eee15043060c4e8a",
+      "apps\\api\\src\\utils\\asyncHandler.ts": "20d701a3f020f0b1c09cf0af874cf4d2f4ce01115e803f720c603acec041ce4d",
+      "apps\\api\\src\\utils\\db.ts": "0acaafe13c0ee99ec096806a9e6d945bf3fd833ad847bedca788e8415c4b6884",
+      "apps\\api\\src\\utils\\errorHandler.ts": "5de4c257be2b1b6c4138641cec834073297df24597601da5361d300f7d8891db",
+      "apps\\api\\src\\utils\\passwordReset.ts": "3681c56912e7be6231e6548eb0cd21d0dc8fc8ef74019f9f469d05ce54ca264a",
+      "apps\\api\\src\\utils\\token.ts": "3b70e37cb37522c1879abe95959d4d201b60a8848c8ed1c386a7ad7ed3da2ee5",
+      "apps\\api\\prisma\\migrations\\20260909095919_add_user_organization_membership_refresh_tokens\\migration.sql": "b9187e90ee5b2b56681b5307da5903ab22a9cfafa0f456309b4bca3e6ab0b6e1",
+      "apps\\api\\prisma\\migrations\\20260914132819_implement_agreement_and_network_connection_schemas\\migration.sql": "f653b582fbc958a11af990c44e8988ec6ba2a72eee457edfa6a0fca146b24cf6",
+      "apps\\api\\prisma\\migrations\\20260916124637_implement_kiosk_and_kioskassignment\\migration.sql": "1be67538d581ed6de76e8167033d1c556847607b69ac2d6e0b650b5a27ec8057",
+      "apps\\api\\prisma\\migrations\\20260917091838_add_password_reset\\migration.sql": "c451d8ffe11fdf80b22c49378ef20aa5a88ecf5e39efb1dfd076629ef19cc50c",
+      "apps\\api\\prisma\\migrations\\20260917132138_add_kiosk_location_and_assignment_model\\migration.sql": "ecf11265255c5dd611409933c66ed43818f99ebebba38e35072d75c9be891d69",
+      "apps\\api\\prisma\\migrations\\20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount\\migration.sql": "a46876cb25a0693bf482506ad7871420d9d31408689643615b9122d1c61ae018",
+      "apps\\api\\prisma\\migrations\\20260921095532_implement_order_and_order_kiosk_schemas\\migration.sql": "c17dbff8b36a4c9020210c8bde202999b226a8810abb81c9dc0632a4c909c661",
+      "apps\\api\\prisma\\migrations\\20260922135228_implement_payment_status_in_orders\\migration.sql": "085eb562fda8637edc3456c0b4300cd5fe361ddf031d867525d4467e7f5cca1e",
+      "apps\\api\\prisma\\migrations\\20260922151453_add_invoice_filename\\migration.sql": "5a119442e9c3e73201db7708adef9c4fe02c3b724573b0d8c4a8c942370a67ac",
+      "apps\\api\\prisma\\migrations\\20260929100000_protect_distributor_lifecycle\\migration.sql": "2747d383b90f158d89aa167f361f1b9d42a4d44eb3a953c86295e4acb9f36cc8",
+      "apps\\api\\prisma\\migrations\\migration_lock.toml": "99836963713b4f5b269ad49af0ed3d7b0b2e336115c2f92dc9ac683d139d0900",
+      "apps\\api\\prisma\\schema.prisma": "ad1c485a91cfeacfac8c87d28be25b7c4cc463774d6d258f87619d2ed8045b9a",
+      "apps\\api\\prisma\\seed.ts": "f1f0af458621e624c8d6f95b941d48703b193fff7b713b98f0d8df382077271f",
+      "packages\\shared-types\\validationSchemas\\agreement.validation.ts": "42e5372d698dee119e1767b6344bde14d82508eb4caf8a570eb5764652f260d1",
+      "packages\\shared-types\\validationSchemas\\auth.validation.ts": "78e9aa871d88cd7129389dbd175be89b4512253a6d89a5e82a63a840bbb96a99",
+      "packages\\shared-types\\validationSchemas\\Kiosk\\kiosk.validation.ts": "34b61fa19d19b1f20827db2abb3069eef6559725815459decce44129c3973d72",
+      "packages\\shared-types\\validationSchemas\\member.validation.ts": "4f446ca6c82a510f6c08c351d9ed6619f32ab1eeac5ea4fd23a3127e9e0a879b",
+      "packages\\shared-types\\validationSchemas\\network.validation.ts": "27fa3faa1a5bb82d39e61c2e3c6df9307dd89cf29e103c3015220ed54b80215d",
+      "packages\\shared-types\\validationSchemas\\Orders\\order.validation.ts": "d720138fa20e89afaa733d60baccce790cf5d35051bdfd1b7b0dfbd984d17ec7"
+    }
+  },
+  {
+    "id": "existing-database-unchanged",
+    "kind": "assertion",
+    "pass": true,
+    "before": {
+      "Agreement": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "AuditLog": {
+        "count": 128,
+        "digest": "07b39dfb1b455198ee53a9ca5c6d0356"
+      },
+      "Kiosk": {
+        "count": 17,
+        "digest": "7068eaa0302fd29b893e19b25b63fa34"
+      },
+      "KioskAssignment": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "KioskRevenue": {
+        "count": 18,
+        "digest": "edefa612faf188b53dd1f76aa09789fd"
+      },
+      "MachineSequence": {
+        "count": 1,
+        "digest": "940b0eb6e20c4a73f32c9de351d72732"
+      },
+      "Membership": {
+        "count": 6,
+        "digest": "fb447ec626ed909538ae759d6d883e99"
+      },
+      "NetworkConnection": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Organization": {
+        "count": 6,
+        "digest": "49e1a6f85b5223041683574d7cb94578"
+      },
+      "PasswordReset": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Payment": {
+        "count": 3,
+        "digest": "ce02c3e47d4be53a6caad5d604bb37b6"
+      },
+      "PermissionRole": {
+        "count": 7,
+        "digest": "4944e0f95e391e3d52f47e2c16bd1e6a"
+      },
+      "RefreshToken": {
+        "count": 92,
+        "digest": "13c421da06476049f1a6480e4de74481"
+      },
+      "RolePermission": {
+        "count": 540,
+        "digest": "35398943decf102d31622207378d8b43"
+      },
+      "Settlement": {
+        "count": 3,
+        "digest": "8ab2c0003b954c8f7030880246b20ad9"
+      },
+      "SupportTicket": {
+        "count": 1,
+        "digest": "739b069f1541bc28ef0ee1639d7650cb"
+      },
+      "User": {
+        "count": 6,
+        "digest": "5e1ea2326aa0c2a7cdc87d8085a19677"
+      },
+      "_prisma_migrations": {
+        "count": 14,
+        "digest": "e5e89179249c133bcd1fa70ad206d1ac"
+      }
+    },
+    "after": {
+      "Agreement": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "AuditLog": {
+        "count": 128,
+        "digest": "07b39dfb1b455198ee53a9ca5c6d0356"
+      },
+      "Kiosk": {
+        "count": 17,
+        "digest": "7068eaa0302fd29b893e19b25b63fa34"
+      },
+      "KioskAssignment": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "KioskRevenue": {
+        "count": 18,
+        "digest": "edefa612faf188b53dd1f76aa09789fd"
+      },
+      "MachineSequence": {
+        "count": 1,
+        "digest": "940b0eb6e20c4a73f32c9de351d72732"
+      },
+      "Membership": {
+        "count": 6,
+        "digest": "fb447ec626ed909538ae759d6d883e99"
+      },
+      "NetworkConnection": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Organization": {
+        "count": 6,
+        "digest": "49e1a6f85b5223041683574d7cb94578"
+      },
+      "PasswordReset": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "Payment": {
+        "count": 3,
+        "digest": "ce02c3e47d4be53a6caad5d604bb37b6"
+      },
+      "PermissionRole": {
+        "count": 7,
+        "digest": "4944e0f95e391e3d52f47e2c16bd1e6a"
+      },
+      "RefreshToken": {
+        "count": 92,
+        "digest": "13c421da06476049f1a6480e4de74481"
+      },
+      "RolePermission": {
+        "count": 540,
+        "digest": "35398943decf102d31622207378d8b43"
+      },
+      "Settlement": {
+        "count": 3,
+        "digest": "8ab2c0003b954c8f7030880246b20ad9"
+      },
+      "SupportTicket": {
+        "count": 1,
+        "digest": "739b069f1541bc28ef0ee1639d7650cb"
+      },
+      "User": {
+        "count": 6,
+        "digest": "5e1ea2326aa0c2a7cdc87d8085a19677"
+      },
+      "_prisma_migrations": {
+        "count": 14,
+        "digest": "e5e89179249c133bcd1fa70ad206d1ac"
+      }
+    }
+  },
+  {
+    "id": "run-summary",
+    "database": "arcadelx_audit_20260929095936376",
+    "requests": 11,
+    "checks": 6,
+    "mismatches": [],
+    "mailsCaptured": 0,
+    "noExternalEmailSent": true,
+    "output": "C:\\Users\\Abcom\\Desktop\\backend-arcadelx-kiosk-b2c\\audits\\distributor-lifecycle\\20260929095936376"
+  }
+]
