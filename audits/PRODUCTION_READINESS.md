@@ -99,7 +99,7 @@ Before public launch, configure TLS, authentication endpoint rate limiting at th
 - No host, TLS certificate or public URL has been selected. Therefore real HTTPS browser cookie behavior, Linux deployment and actual mail delivery remain unverified on the final infrastructure.
 - Email failure recovery is explicit via retry endpoints; no automatic background retry worker was added. Keep the encryption secret stable.
 - The old Fleet composition code only enumerates `AVAILABLE` in its status list even though the backend supports more states. This existing UI limitation was identified, not changed during production setup; the user's reverted Fleet composition design remains intact.
-- The Orders frontend is still a placeholder; production setup does not add the missing full commercial lifecycle UI. Backend lifecycle coverage does not imply the complete workflow is available through screens.
+- The Orders frontend now lists real requests and allocations and shows order details, including linked kiosks after delivery. Creation, payment and dispatch/delivery controls are not part of that viewing screen; the complete commercial lifecycle still is not available through screens. See [Orders view verification](distributor-lifecycle/ORDERS_VIEW.md).
 - Existing authentication limitations documented in the backend guide (including refresh expiry/rotation behavior and access JWT lifetime) were not redesigned in this preparation. This is not a full security penetration test.
 
 Re-run production smoke checks against an isolated checkout with generated Prisma client and installed dependencies:

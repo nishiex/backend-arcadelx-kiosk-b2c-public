@@ -30,6 +30,7 @@ let role = 'ADMIN'
 const org = { id: 'our-org', name: 'Our Company', type: 'COMPANY' }
 const other = { id: 'other-org', name: 'Other Company', type: 'COMPANY' }
 const readiness = { networkRejection: true, agreementRejection: true, orderDecisions: false }
+let readinessError = false
 const members = Array.from({ length: 51 }, (_, i) => ({ id: `member-${i}`, status: 'PENDING', user: { name: `Applicant ${i}`, email: `member-${i}@example.invalid` } }))
 const network = { id: 'network-1', status: 'PENDING', initiator: other, reciever: org, createdAt: new Date().toISOString() }
 const agreement = { id: 'agreement-1', status: 'PENDING_APPROVAL', parentOrg: other, childOrg: org, parentSharePct: '60', childSharePct: '40', depositAmountPerMachine: 1000, nonRefundableAmountPerMachine: 200, createdAt: new Date().toISOString() }
@@ -45,7 +46,10 @@ globalThis.fetch = async (input, init) => {
   calls.push({ path: url.pathname + url.search, method, body })
   let data: unknown
   if (url.pathname === '/api/auth/me') data = { user: me() }
-  else if (url.pathname === '/api/workflows') data = readiness
+  else if (url.pathname === '/api/workflows') {
+    if (readinessError) return new Response(JSON.stringify({ success: false, message: 'Readiness unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
+    data = readiness
+  }
   else if (url.pathname === '/api/members/requests') {
     const page = Number(url.searchParams.get('page') ?? 1), limit = Number(url.searchParams.get('limit') ?? 50)
     const pending = members.filter(item => item.status === 'PENDING')
@@ -121,6 +125,22 @@ try {
   check('no-order-actions-for-other-supplier', !document.querySelector('[aria-label="Approve ORD-TEST-2"]'))
   await React.act(async () => { readiness.orderDecisions = true; await qc.invalidateQueries({ queryKey: ['workflow-readiness'] }) })
   await until(() => !(document.querySelector('[aria-label="Approve ORD-TEST-1"]') as HTMLButtonElement).disabled, 'Order readiness enables actions')
+  for (const action of ['Approve', 'Reject']) {
+    await click(document.querySelector(`[aria-label="${action} ORD-TEST-1"]`))
+    await until(() => !!document.querySelector('[role="dialog"]'), `${action} confirmation opens before readiness failure`)
+    const decisionCallsBefore = calls.filter(call => call.path.startsWith('/api/orders/') && call.method === 'POST').length
+    await React.act(async () => { readinessError = true; await qc.invalidateQueries({ queryKey: ['workflow-readiness'] }) })
+    await until(() => document.body.textContent!.includes("Couldn't check order action availability."), 'Readiness refetch error renders')
+    check(`${action}-readiness-error-retains-enabled-cache`, qc.getQueryData<{ orderDecisions: boolean }>(['workflow-readiness'])?.orderDecisions === true)
+    check(`${action}-readiness-error-disables-both-order-triggers`, ['Approve', 'Reject'].every(label => (document.querySelector(`[aria-label="${label} ORD-TEST-1"]`) as HTMLButtonElement).disabled))
+    const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === action)!
+    check(`${action}-readiness-error-disables-open-confirmation`, confirm.disabled)
+    await click(confirm)
+    check(`${action}-readiness-error-sends-no-decision`, calls.filter(call => call.path.startsWith('/api/orders/') && call.method === 'POST').length === decisionCallsBefore)
+    await React.act(async () => { readinessError = false; await qc.invalidateQueries({ queryKey: ['workflow-readiness'] }) })
+    await until(() => !confirm.disabled, `${action} confirmation recovers after successful readiness refetch`)
+    await click(byText('Cancel'))
+  }
   await click(document.querySelector('[aria-label="Approve ORD-TEST-1"]'))
   await until(() => !!document.querySelector('[role="dialog"]'), 'Order confirmation opens')
   check('order-approval-explains-reservation', document.querySelector('[role="dialog"]')!.textContent!.includes('reserved'))

@@ -9,7 +9,6 @@ import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Skeleton, ErrorState, EmptyState } from "@/components/dashboard/ui"
 import DistributorStatusDialog from "./DistributorStatusDialog"
-import CompanyInviteCodeDialog from "./CompanyInviteCodeDialog"
 
 export default function DistributorsScreen() {
   const { canManageDistributors, can, isCompany, me } = useMe()
@@ -35,7 +34,6 @@ export default function DistributorsScreen() {
         </div>
         {canAdd && (
           <div className="flex flex-wrap gap-2">
-            <CompanyInviteCodeDialog />
             <Link
               href="/distributors/new"
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"

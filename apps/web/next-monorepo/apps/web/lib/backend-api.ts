@@ -197,6 +197,40 @@ export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): 
   return (await handleRes<{ order: KioskOrderDetails }>(res)).order;
 }
 
+export type CreateOrderInput = { type: 'REQUEST'; targetOrgId: string; quantity: number };
+export type CreatedOrder = Omit<KioskOrder, 'parentOrg' | 'childOrg'>;
+
+export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder> {
+  if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 50) {
+    throw new Error('Enter a whole number from 1 to 50.');
+  }
+  const res = await apiFetch('/api/orders/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return (await handleRes<{ order: CreatedOrder }>(res)).order;
+}
+
+// Read every page: current agreements may follow older relationship history.
+export async function fetchOrderRequestCompanies(organizationId: string, signal?: AbortSignal): Promise<OrgRef[]> {
+  const readAll = async (kind: 'network' | 'agreements') => {
+    const rows: ReviewRequest[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const result = await fetchReviewRequests(kind, page, signal);
+      rows.push(...result.requests);
+      totalPages = result.meta.totalPages;
+      page++;
+    } while (page <= totalPages);
+    return rows.filter(row => row.status === 'ACTIVE' && row.to.id === organizationId && row.from.type === 'COMPANY');
+  };
+  const [agreements, networks] = await Promise.all([readAll('agreements'), readAll('network')]);
+  const connected = new Set(networks.map(row => row.from.id));
+  return [...new Map(agreements.filter(row => connected.has(row.from.id)).map(row => [row.from.id, row.from])).values()];
+}
+
 export async function fetchPendingMembers(page = 1, limit = 10): Promise<PendingMembersResponse> {
   const res = await apiFetch(`/api/members/requests?page=${page}&limit=${limit}`, { credentials: 'include' });
   return handleRes<PendingMembersResponse>(res);
@@ -216,8 +250,8 @@ export type ReviewRequest = {
   parentSharePct?: string | number; childSharePct?: string | number;
   depositAmountPerMachine?: number; nonRefundableAmountPerMachine?: number;
 };
-export async function fetchReviewRequests(kind: 'network' | 'agreements', page = 1): Promise<{ requests: ReviewRequest[]; meta: PaginationMeta }> {
-  const res = await apiFetch(`/api/${kind}?page=${page}&limit=20`);
+export async function fetchReviewRequests(kind: 'network' | 'agreements', page = 1, signal?: AbortSignal): Promise<{ requests: ReviewRequest[]; meta: PaginationMeta }> {
+  const res = await apiFetch(`/api/${kind}?page=${page}&limit=20`, { signal, cache: 'no-store' });
   if (kind === 'network') {
     const data = await handleRes<{ requests: Array<Omit<ReviewRequest, 'from' | 'to'> & { initiator: OrgRef; reciever: OrgRef }>; meta: PaginationMeta }>(res);
     return { meta: data.meta, requests: data.requests.map(row => ({ ...row, from: row.initiator, to: row.reciever })) };

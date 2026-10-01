@@ -127,6 +127,12 @@ export function EmptyState({
 /** Semantic dot + label + filled-pill styling per kiosk status. */
 export const STATUS_META: Record<KioskStatus, { label: string; dot: string; text: string; pill: string; hex: string }> = {
   AVAILABLE: { label: "Available", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", pill: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", hex: "#10b981" },
+  RESERVED: { label: "Reserved", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", pill: "bg-amber-500/10 text-amber-600 dark:text-amber-400", hex: "#f59e0b" },
+  ASSIGNED: { label: "Assigned", dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", pill: "bg-blue-500/10 text-blue-600 dark:text-blue-400", hex: "#3b82f6" },
+  INSTALLED: { label: "Installed", dot: "bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400", pill: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400", hex: "#6366f1" },
+  MAINTENANCE: { label: "Maintenance", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400", pill: "bg-rose-500/10 text-rose-600 dark:text-rose-400", hex: "#f43f5e" },
+  RETURNED: { label: "Returned", dot: "bg-purple-500", text: "text-purple-600 dark:text-purple-400", pill: "bg-purple-500/10 text-purple-600 dark:text-purple-400", hex: "#a855f7" },
+  RETIRED: { label: "Retired", dot: "bg-slate-500", text: "text-slate-600 dark:text-slate-400", pill: "bg-slate-500/10 text-slate-600 dark:text-slate-400", hex: "#64748b" },
 }
 
 export function StatusBadge({ status }: { status: KioskStatus }) {

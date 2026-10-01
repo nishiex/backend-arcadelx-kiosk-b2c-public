@@ -7,16 +7,20 @@ import { fetchOrders, fetchWorkflowReadiness, ORDER_STATUSES, type OrderStatus }
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import OrderDetailsDialog from "./OrderDetailsDialog"
+import CreateOrderDialog from "./CreateOrderDialog"
 import DecisionDialog from "@/components/requests/DecisionDialog"
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, orderDate, orderPerspective } from "./order-display"
 
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
 export default function OrdersScreen() {
-  const { me, role, isLoading: loadingMe, isError: identityError } = useMe()
+  const { me, role, orgType, isLoading: loadingMe, isError: identityError } = useMe()
   const organizationId = me?.membership?.organizationId
   const canDecide = me?.membership?.status === "ACTIVE" && (role === "OWNER" || role === "ADMIN")
+  const canRequest = !identityError && canDecide && orgType === "DISTRIBUTOR"
+  const [createdMessage, setCreatedMessage] = React.useState("")
   const readiness = useQuery({ queryKey: ["workflow-readiness"], queryFn: fetchWorkflowReadiness, enabled: !!organizationId && canDecide, refetchInterval: 30_000 })
+  const orderActionsDisabled = readiness.isError || !readiness.data?.orderDecisions
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState<OrderStatus | "">("")
   const [direction, setDirection] = React.useState("")
@@ -38,9 +42,17 @@ export default function OrdersScreen() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-2xl font-semibold tracking-tight">Orders &amp; Requests</h1><p className="mt-1 text-sm text-muted-foreground">Track incoming requests and outgoing machine allocations, including completed deliveries.</p></div>
-        <button type="button" onClick={() => orders.refetch()} disabled={!organizationId || orders.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"><RefreshCw size={16} className={orders.isFetching ? "animate-spin" : ""} /> Refresh</button>
+        <div className="flex flex-wrap gap-2">
+          {canRequest && organizationId && <CreateOrderDialog key={organizationId} organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => {
+            setSearch(""); setStatus(""); setDirection("")
+            setCreatedMessage(`Request ${order.orderNumber} submitted for company approval.`)
+          }} />}
+          <button type="button" onClick={() => orders.refetch()} disabled={!organizationId || orders.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"><RefreshCw size={16} className={orders.isFetching ? "animate-spin" : ""} /> Refresh</button>
+        </div>
       </div>
-      {canDecide && readiness.data && !readiness.data.orderDecisions && <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Order decisions are temporarily unavailable. Please contact your administrator.</p>}
+      {createdMessage && <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm">{createdMessage}</p>}
+      {canRequest && readiness.isLoading && <p role="status" className="text-sm text-muted-foreground">Checking kiosk request availability...</p>}
+      {canDecide && readiness.data && !readiness.data.orderDecisions && <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Order requests and decisions are temporarily unavailable. Please contact your administrator.</p>}
       {canDecide && readiness.isError && <ErrorState message="Couldn't check order action availability." onRetry={() => readiness.refetch()} />}
       <div className="overflow-hidden rounded-xl border border-border bg-card" aria-busy={orders.isFetching}>
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row">
@@ -73,7 +85,7 @@ export default function OrdersScreen() {
                     <td className="px-4 py-4 tabular-nums">{order.quantity}</td>
                     <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[order.status]}`}>{ORDER_STATUS_LABELS[order.status]}</span></td>
                     <td className="whitespace-nowrap px-4 py-4 text-muted-foreground">{orderDate(order.createdAt)}</td>
-                    <td className="px-4 py-4 text-right"><div className="flex flex-wrap items-center justify-end gap-2"><OrderDetailsDialog order={order} organizationId={organizationId} />{canDecide && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && <><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="reject" disabled={!readiness.data?.orderDecisions} /><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={!readiness.data?.orderDecisions} /></>}</div></td>
+                    <td className="px-4 py-4 text-right"><div className="flex flex-wrap items-center justify-end gap-2"><OrderDetailsDialog order={order} organizationId={organizationId} />{canDecide && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && <><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="reject" disabled={orderActionsDisabled} /><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} /></>}</div></td>
                   </tr>
                 )
               })}</tbody>

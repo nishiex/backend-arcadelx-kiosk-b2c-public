@@ -1,6 +1,94 @@
 # File cleanup audit
 
-Checked 2026-09-29. This review deleted no additional files. The previously approved 75 generated test PDFs and 11 old logs have already been removed.
+## JSON cleanup: 2026-09-29, 18:58 IST
+
+Reviewed 57 project JSON files, excluding installed dependencies and generated
+build/client internals. Removed **6 untracked JSON files (165,985 bytes)** after
+archiving and verifying every file's SHA-256:
+
+| Removed path (relative to `audits/`) | Reason |
+| --- | --- |
+| `FILE_CLEANUP_MANIFEST.json` | Relocated beside the recovery archives; historical recovery metadata. |
+| `distributor-lifecycle/SUMMARY.json` | Generated summary; original evidence and report generator retained. |
+| `distributor-lifecycle/20260929072537010/regression-summary.json` | Generated summary; evidence, report and generator retained. |
+| `distributor-lifecycle/20260929090011640/evidence.json` | Superseded isolated assignment run; later complete run `20260929091925707` retained. |
+| `distributor-lifecycle/20260929090011640/assignment-result.json` | Summary of the same superseded run; Markdown report retained. |
+| `distributor-lifecycle/20260929091925707/assignment-result.json` | Duplicates `assignment-test-result` in the retained evidence file. |
+
+Source/reference checks found only generator writes for the removed summaries,
+not application or helper reads. All 21 package/build/editor JSON files remain,
+as do 30 audit JSON files needed by scripts, linked reports, deployment records,
+or latest verification. In particular, transfer preview/preflight inputs and
+the completed transfer record that prevents accidental reruns remain.
+
+Recovery archive: `C:\Users\Abcom\Desktop\arcadelx-cleanup-backups\json-cleanup-20260929-185810.zip`.
+Its adjacent `.json` manifest records exact paths, reasons and hashes. The earlier
+cleanup manifest is also available as
+`C:\Users\Abcom\Desktop\arcadelx-cleanup-backups\FILE_CLEANUP_MANIFEST-20260929-175737.json`.
+Verified all 364 remaining tracked/untracked working files and the Git index
+were unchanged before updating this note. No application code or database changed.
+This JSON review supersedes the historical recommendation below to retain the
+generated `SUMMARY.json` in the workspace.
+
+## Follow-up cleanup: 2026-09-29, 18:54 IST
+
+Removed another **36 untracked files (2,581,478 bytes)** and **13 empty
+directories** after the invite-code and invoice changes:
+
+- Archived four superseded intermediate invite-code runs:
+  `20260929124414428`, `20260929124520027`, `20260929125441451`,
+  `20260929125522313` (17 files, including generated test PDFs).
+- Removed 19 generated test PDFs from the retained successful regression runs.
+- Removed the resulting empty directories and the empty root `tmp/pdfs` tree.
+
+Recovery archive: `C:\Users\Abcom\Desktop\arcadelx-cleanup-backups\cleanup-20260929-185425.zip`.
+The adjacent `cleanup-20260929-185425.json` records every removed path and SHA-256.
+All archive entries were verified before deletion. Hash verification confirmed
+that all 370 remaining tracked/untracked working files and the Git index were
+unchanged before this audit note was added.
+
+Preserved the successful full invite regression (`20260929124550708`), latest
+invite/generation compatibility results (`20260929125602088`), latest invoice
+regression (`20260929130844532`), their schema snapshots, and
+`output/pdf/invoice-design-preview.pdf`. Application source, current changes,
+configuration, migrations, test harnesses and historical linked evidence remain.
+No application code or database was changed.
+
+## Earlier cleanup
+
+Cleanup completed 2026-09-29 after the user requested removing unwanted files.
+
+Removed **38 files (2,117,936 bytes)** and **33 empty directories** from the project:
+
+| Removed category | Files |
+| --- | ---: |
+| Superseded intermediate audit results/schema snapshots | 18 |
+| Newly generated isolated-test invoice PDFs | 15 |
+| Screenshots/verification for the reverted Assigned-only Fleet display | 3 |
+| Superseded migration diagnostics | 2 |
+
+Every removed file was untracked, inside `audits/distributor-lifecycle`, and
+archived first. Each archived file's SHA-256 was verified against its source
+before removal. Exact paths and hashes are in [the relocated cleanup manifest](../../arcadelx-cleanup-backups/FILE_CLEANUP_MANIFEST-20260929-175737.json).
+Recovery archive: `C:\Users\Abcom\Desktop\arcadelx-cleanup-backups\cleanup-20260929-175737.zip`.
+
+**Preserved:** all application source, shared packages, environment/configuration,
+lockfiles, migrations, current changes, test scripts, original complete audit,
+linked historical evidence, real assignment/deployment records, latest Orders
+verification (`20260929114444300`), full regression (`20260929121006343`) and
+retention/reactivation results (`20260929121828960`). The earlier status verification
+(`20260929120912488`) is also retained. No database was changed.
+
+Frontend files listed as unreferenced below remain review candidates, not proven
+disposable source. Running dependency/build caches were retained. Root Turbo cache
+output is now gitignored. The API/database health and frontend were checked after
+cleanup; source tests were not rerun because no application code changed.
+
+## Prior read-only review (historical)
+
+The review below preceded this cleanup. Its removal candidates and no-deletion
+statements describe that earlier review. The previously approved 75 generated test
+PDFs and 11 old logs had already been removed at that time.
 
 ## What was checked
 

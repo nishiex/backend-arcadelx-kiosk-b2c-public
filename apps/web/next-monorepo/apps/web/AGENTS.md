@@ -29,3 +29,18 @@ and `audits/SCHEMA_RECONCILIATION_PLAN.md` for exact status and test evidence.
 mocked HTTP (jsdom installed under the temp `arcadelx-ui-tests` folder). It is not
 a connected-browser visual test. Keep permission gates and safe org-scoped
 query keys when changing these screens.
+
+## Distributor kiosk requests (2026-10-01)
+
+Orders exposes Request Kiosks to active Distributor Owners/Admins. The dialog
+resolves eligible Companies across every page of active agreements and network
+connections, checks the current Distributor is the child/receiver, and submits
+`POST /api/orders/create` with `type: REQUEST`, `targetOrgId` and integer quantity
+1–50. Workflow readiness must allow `orderDecisions`; unknown/error/unavailable
+readiness blocks creation. The deployed lifecycle migration is still required
+before this control can enable. Success clears filters and refreshes scoped orders.
+
+`scripts/order-request-ui-check.tsx` exercises the real components with mocked HTTP
+and the same temporary jsdom installation as the decision checks. It covers
+relationship pagination, permissions, validation, readiness, failures, duplicate
+submits and successful list refresh without writing to a live API or database.

@@ -25,17 +25,19 @@ export default function KioskDetailDialog({
 }) {
   const queryClient = useQueryClient()
   const [location, setLocation] = React.useState("")
+  const [status, setStatus] = React.useState<Kiosk["status"] | "">("")
 
   React.useEffect(() => {
     if (kiosk) {
       setLocation(typeof kiosk.location === "string" ? kiosk.location : "")
+      setStatus(kiosk.status)
     }
   }, [kiosk])
 
   const mutation = useMutation({
     mutationFn: () =>
       updateKioskStatus(kiosk!.id, {
-        status: kiosk!.status,
+        status: status as Kiosk["status"],
         ...(location.trim() ? { location: location.trim() } : {}),
       }),
     onSuccess: () => {
@@ -81,17 +83,38 @@ export default function KioskDetailDialog({
 
               {canEdit ? (
                 <div className="space-y-4">
-                  <div>
-                    <label htmlFor="loc" className="mb-1.5 block text-sm font-medium">
-                      Location
-                    </label>
-                    <input
-                      id="loc"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g. Phoenix Mall, Mumbai"
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="status" className="mb-1.5 block text-sm font-medium">
+                        Status
+                      </label>
+                      <select
+                        id="status"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as Kiosk["status"])}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                      >
+                        <option value="AVAILABLE">AVAILABLE</option>
+                        <option value="RESERVED" disabled>RESERVED</option>
+                        <option value="ASSIGNED" disabled>ASSIGNED</option>
+                        <option value="INSTALLED">INSTALLED</option>
+                        <option value="MAINTENANCE">MAINTENANCE</option>
+                        <option value="RETURNED">RETURNED</option>
+                        <option value="RETIRED">RETIRED</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="loc" className="mb-1.5 block text-sm font-medium">
+                        Location
+                      </label>
+                      <input
+                        id="loc"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="e.g. Phoenix Mall, Mumbai"
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                      />
+                    </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-1">
                     <RadixDialog.Close className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">

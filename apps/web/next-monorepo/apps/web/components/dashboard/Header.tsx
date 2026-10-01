@@ -11,7 +11,7 @@ import { fetchPendingMembers, fetchNetworkRequests } from "@/lib/backend-api"
 import { gsap, prefersReducedMotion } from "@/lib/gsap"
 
 export default function Header() {
-  const { me, canManageMembers, canReviewRequests } = useMe()
+  const { me, canManageMembers } = useMe()
   const [open, setOpen] = React.useState(false)
   const bellRef = React.useRef<HTMLButtonElement>(null)
 
@@ -21,16 +21,9 @@ export default function Header() {
     enabled: canManageMembers,
     refetchInterval: 10_000,
   })
-  const network = useQuery({
-    queryKey: ["networkRequests", 1, 1],
-    queryFn: () => fetchNetworkRequests(1, 1),
-    enabled: canReviewRequests,
-    refetchInterval: 10_000,
-  })
 
   const memberCount = canManageMembers ? members.data?.meta?.total ?? 0 : 0
-  const networkCount = canReviewRequests ? network.data?.meta?.total ?? 0 : 0
-  const total = memberCount + networkCount
+  const total = memberCount
 
   // Pop the badge when the count first becomes positive.
   React.useEffect(() => {
@@ -59,7 +52,7 @@ export default function Header() {
 
       <div className="ml-auto flex items-center gap-2 sm:gap-4">
         <ThemeToggle />
-        {(canManageMembers || canReviewRequests) && (
+        {(canManageMembers) && (
           <div className="relative">
             <button
               ref={bellRef}
@@ -91,12 +84,6 @@ export default function Header() {
                         <li className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-muted">
                           <Link href="/user" onClick={() => setOpen(false)} className="inline-flex items-center gap-2"><Users size={15} /> Member requests</Link>
                           <span className="font-semibold tabular-nums">{memberCount}</span>
-                        </li>
-                      )}
-                      {canReviewRequests && (
-                        <li className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-muted">
-                          <Link href="/requests" onClick={() => setOpen(false)} className="inline-flex items-center gap-2"><Share2 size={15} /> Network requests</Link>
-                          <span className="font-semibold tabular-nums">{networkCount}</span>
                         </li>
                       )}
                     </ul>

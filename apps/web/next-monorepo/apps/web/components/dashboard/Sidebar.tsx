@@ -34,7 +34,6 @@ const NAV: NavItem[] = [
   { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
-  { name: "Requests", href: "/requests", icon: ClipboardList, show: (p) => p.canReviewRequests },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
