@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-05T09:49:00.720Z",
+  "database": "arcadelx_auth_20261005094858429",
+  "results": [
+    {
+      "label": "existing Company login",
+      "pass": true
+    },
+    {
+      "label": "Company invitation",
+      "pass": true
+    },
+    {
+      "label": "baseline registration fails on reverted schema",
+      "pass": true
+    }
+  ],
+  "noOnlineWrites": true,
+  "noExternalEmail": true
+}

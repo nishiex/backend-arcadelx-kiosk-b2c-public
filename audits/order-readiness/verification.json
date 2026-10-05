@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-05T08:07:20.831Z",
+  "migrationName": "20261005120000_restore_order_workflow",
+  "checksum": "dec7eb6b11b08d6eb338b936f3c0166279a3888bb395051aaf8f1254c7a0142f",
+  "results": [
+    {
+      "mode": "reverted",
+      "database": "arcadelx_order_repair_20261005080719043_reverted",
+      "pass": true,
+      "ready": true,
+      "expectedError": null
+    },
+    {
+      "mode": "already_current",
+      "database": "arcadelx_order_repair_20261005080719043_already_current",
+      "pass": true,
+      "ready": true,
+      "expectedError": null
+    },
+    {
+      "mode": "bad_quantity",
+      "database": "arcadelx_order_repair_20261005080719043_bad_quantity",
+      "pass": true,
+      "ready": false,
+      "expectedError": "P0001"
+    },
+    {
+      "mode": "orphan_stock",
+      "database": "arcadelx_order_repair_20261005080719043_orphan_stock",
+      "pass": true,
+      "ready": false,
+      "expectedError": "23514"
+    }
+  ]
+}

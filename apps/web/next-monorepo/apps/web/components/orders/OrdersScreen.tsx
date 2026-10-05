@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import OrderDetailsDialog from "./OrderDetailsDialog"
 import CreateOrderDialog from "./CreateOrderDialog"
 import DecisionDialog from "@/components/requests/DecisionDialog"
-import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, orderDate, orderPerspective } from "./order-display"
+import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_STYLES, orderDate, orderPerspective } from "./order-display"
 
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
@@ -17,6 +17,7 @@ export default function OrdersScreen() {
   const { me, role, orgType, isLoading: loadingMe, isError: identityError } = useMe()
   const organizationId = me?.membership?.organizationId
   const canDecide = me?.membership?.status === "ACTIVE" && (role === "OWNER" || role === "ADMIN")
+  const canApproveOrders = canDecide && (orgType === "COMPANY" || orgType === "DISTRIBUTOR")
   const canRequest = !identityError && canDecide && orgType === "DISTRIBUTOR"
   const [createdMessage, setCreatedMessage] = React.useState("")
   const readiness = useQuery({ queryKey: ["workflow-readiness"], queryFn: fetchWorkflowReadiness, enabled: !!organizationId && canDecide, refetchInterval: 30_000 })
@@ -72,9 +73,9 @@ export default function OrdersScreen() {
           <EmptyState className="py-14" icon={<ClipboardList size={28} />} message={hasFilters ? "No orders match your filters." : "No orders yet. Orders will appear here when a machine request or allocation is created."} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[1020px] text-left text-sm">
               <caption className="sr-only">Orders and requests involving your organization</caption>
-              <thead className="bg-muted/30 text-xs text-muted-foreground"><tr>{["Order number", "Direction", "Counterparty", "Qty", "Status", "Date", "Actions"].map(label => <th key={label} scope="col" className={`px-4 py-3 font-medium ${label === "Actions" ? "text-right" : ""}`}>{label}</th>)}</tr></thead>
+              <thead className="bg-muted/30 text-xs text-muted-foreground"><tr>{["Order number", "Direction", "Counterparty", "Qty", "Order status", "Payment status", "Date", "Actions"].map(label => <th key={label} scope="col" className={`px-4 py-3 font-medium ${label === "Actions" ? "text-right" : ""}`}>{label}</th>)}</tr></thead>
               <tbody>{filtered.map(order => {
                 const view = orderPerspective(order, organizationId)
                 return (
@@ -84,8 +85,16 @@ export default function OrdersScreen() {
                     <td className="px-4 py-4"><p className="font-medium">{view.counterparty.name}</p><p className="mt-1 text-xs text-muted-foreground">{view.description}</p></td>
                     <td className="px-4 py-4 tabular-nums">{order.quantity}</td>
                     <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[order.status]}`}>{ORDER_STATUS_LABELS[order.status]}</span></td>
+                    <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${PAYMENT_STATUS_STYLES[order.paymentStatus] ?? "bg-muted text-muted-foreground"}`}>{PAYMENT_STATUS_LABELS[order.paymentStatus] ?? "Unknown"}</span></td>
                     <td className="whitespace-nowrap px-4 py-4 text-muted-foreground">{orderDate(order.createdAt)}</td>
-                    <td className="px-4 py-4 text-right"><div className="flex flex-wrap items-center justify-end gap-2"><OrderDetailsDialog order={order} organizationId={organizationId} />{canDecide && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && <><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="reject" disabled={orderActionsDisabled} /><DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} /></>}</div></td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canApproveOrders && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && (
+                          <DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} />
+                        )}
+                        <OrderDetailsDialog order={order} organizationId={organizationId} />
+                      </div>
+                    </td>
                   </tr>
                 )
               })}</tbody>

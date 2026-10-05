@@ -144,6 +144,8 @@ export default function DashboardWelcome() {
   }
 
   const firstName = me?.name?.split(" ")[0] ?? "there"
+  // Display branding only; COMPANY/OWNER remain the authoritative API values.
+  const isMasterAdmin = orgType === "COMPANY" && role === "OWNER" && me?.membership?.status === "ACTIVE"
 
   return (
     <div
@@ -187,10 +189,9 @@ export default function DashboardWelcome() {
                 <Building2 size={15} />
               </span>
               <span className="leading-tight">
-                <span className="block text-sm font-medium">{orgName}</span>
-                <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {orgType}
-                  {role ? ` · ${role}` : ""}
+                <span className="block text-sm font-medium">{isMasterAdmin ? "ArcadeLX" : orgName}</span>
+                <span className="block text-[11px] tracking-wide text-muted-foreground">
+                  {isMasterAdmin ? "Master Admin" : `${orgType ?? ""}${role ? ` · ${role}` : ""}`}
                 </span>
               </span>
             </div>

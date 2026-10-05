@@ -32,6 +32,15 @@ query keys when changing these screens.
 
 ## Distributor kiosk requests (2026-10-01)
 
+Frontend update (2026-10-05): the action is now labeled Request Containers,
+with Number of containers (1–50) and Model type (draft). Model entry is transient
+form state only: it is explicitly not saved or sent to the Company, and resets
+when the form reopens. The existing quantity-only payload, authorization and
+workflow-readiness gates are unchanged. Targeted lint passed; full typecheck
+still reports the pre-existing dashboard/ui.tsx KioskStatus mismatch. Updated
+component assertions have not been rerun because the test helper is blocked by
+the sandbox and the approval service failed in this session.
+
 Orders exposes Request Kiosks to active Distributor Owners/Admins. The dialog
 resolves eligible Companies across every page of active agreements and network
 connections, checks the current Distributor is the child/receiver, and submits

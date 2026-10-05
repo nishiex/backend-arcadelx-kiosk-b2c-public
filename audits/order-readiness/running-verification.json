@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-05T08:08:48.873Z",
+  "checks": [
+    {
+      "base": "http://localhost:4000",
+      "status": 200,
+      "readiness": {
+        "networkRejection": false,
+        "agreementRejection": false,
+        "orderDecisions": true
+      }
+    },
+    {
+      "base": "http://localhost:3000",
+      "status": 200,
+      "readiness": {
+        "networkRejection": false,
+        "agreementRejection": false,
+        "orderDecisions": true
+      }
+    }
+  ],
+  "noBusinessWrites": true
+}

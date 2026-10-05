@@ -1,0 +1,443 @@
+{
+  "checkedAt": "2026-10-05T09:51:29.226Z",
+  "database": "arcadelx_audit_20261005095123305",
+  "migration": "20261005121000_restore_registration_fields",
+  "checksum": "24d045f04158f52e6a17778f932a61a1f3b134b4d64dd1c6cab31e272bfaffa5",
+  "completed": true,
+  "results": [
+    {
+      "label": "existing Company login",
+      "pass": true
+    },
+    {
+      "label": "Company invitation",
+      "pass": true
+    },
+    {
+      "label": "Distributor registration succeeds",
+      "pass": true
+    },
+    {
+      "label": "registration profile fields persisted",
+      "pass": true
+    },
+    {
+      "label": "login existing-company",
+      "pass": true
+    },
+    {
+      "label": "login auth-company",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "auth-distributor",
+      "pass": true
+    },
+    {
+      "label": "auth-distributor-secure-registration",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor",
+      "pass": true
+    },
+    {
+      "label": "auth-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-partner-secure-registration",
+      "pass": true
+    },
+    {
+      "label": "login auth-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-identity-COMPANY",
+      "pass": true
+    },
+    {
+      "label": "auth-identity-DISTRIBUTOR",
+      "pass": true
+    },
+    {
+      "label": "auth-identity-PARTNER",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor-admin",
+      "pass": true
+    },
+    {
+      "label": "auth-admin-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-admin-partner-secure-registration",
+      "pass": true
+    },
+    {
+      "label": "login auth-admin-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-anonymous-denied",
+      "pass": true
+    },
+    {
+      "label": "auth-distributor-cannot-register-distributor",
+      "pass": true
+    },
+    {
+      "label": "auth-partner-cannot-register",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "auth-MANAGER-denied",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor-STAFF",
+      "pass": true
+    },
+    {
+      "label": "auth-STAFF-denied",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor-PENDING",
+      "pass": true
+    },
+    {
+      "label": "auth-PENDING-denied",
+      "pass": true
+    },
+    {
+      "label": "login auth-distributor-REJECTED",
+      "pass": true
+    },
+    {
+      "label": "auth-REJECTED-denied",
+      "pass": true
+    },
+    {
+      "label": "auth-company-only-/api/members/generateInviteCode",
+      "pass": true
+    },
+    {
+      "label": "auth-company-only-/api/members/requests",
+      "pass": true
+    },
+    {
+      "label": "auth-company-only-/api/network/distributors",
+      "pass": true
+    },
+    {
+      "label": "auth-company-only-/api/kiosks/batch",
+      "pass": true
+    },
+    {
+      "label": "auth-company-only-/api/network/distributors/07e9b13a-6b42-4320-948b-23c35323d9b8/status",
+      "pass": true
+    },
+    {
+      "label": "auth-email-recovery",
+      "pass": true
+    },
+    {
+      "label": "auth-cross-org-retry-denied",
+      "pass": true
+    },
+    {
+      "label": "auth-owner-retry",
+      "pass": true
+    },
+    {
+      "label": "auth-owner-repeat-retry",
+      "pass": true
+    },
+    {
+      "label": "login auth-recovered-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-partner-refresh",
+      "pass": true
+    },
+    {
+      "label": "auth-partner-password-change",
+      "pass": true
+    },
+    {
+      "label": "auth-old-password-denied",
+      "pass": true
+    },
+    {
+      "label": "auth-old-session-refresh-denied",
+      "pass": true
+    },
+    {
+      "label": "login auth-changed-partner",
+      "pass": true
+    },
+    {
+      "label": "auth-partner-logout",
+      "pass": true
+    },
+    {
+      "label": "auth-logged-out-refresh-denied",
+      "pass": true
+    },
+    {
+      "label": "auth-complete-chain-and-session-regression",
+      "pass": true
+    },
+    {
+      "label": "login invite-admin",
+      "pass": true
+    },
+    {
+      "label": "login invite-other-org",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "invite-missing",
+      "pass": true
+    },
+    {
+      "label": "invite-missing-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-empty",
+      "pass": true
+    },
+    {
+      "label": "invite-empty-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-whitespace",
+      "pass": true
+    },
+    {
+      "label": "invite-whitespace-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-null",
+      "pass": true
+    },
+    {
+      "label": "invite-null-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-wrong-type",
+      "pass": true
+    },
+    {
+      "label": "invite-wrong-type-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-too-long",
+      "pass": true
+    },
+    {
+      "label": "invite-too-long-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-unknown",
+      "pass": true
+    },
+    {
+      "label": "invite-unknown-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-expired",
+      "pass": true
+    },
+    {
+      "label": "invite-expired-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-non-company-code",
+      "pass": true
+    },
+    {
+      "label": "invite-non-company-code-atomic",
+      "pass": true
+    },
+    {
+      "label": "login invite-other-company",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "invite-wrong-company",
+      "pass": true
+    },
+    {
+      "label": "invite-wrong-company-atomic",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "invite-anonymous",
+      "pass": true
+    },
+    {
+      "label": "invite-anonymous-atomic",
+      "pass": true
+    },
+    {
+      "label": "login invite-manager",
+      "pass": true
+    },
+    {
+      "label": "invite-role-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "invite-role-MANAGER-atomic",
+      "pass": true
+    },
+    {
+      "label": "login invite-staff",
+      "pass": true
+    },
+    {
+      "label": "invite-role-STAFF",
+      "pass": true
+    },
+    {
+      "label": "invite-role-STAFF-atomic",
+      "pass": true
+    },
+    {
+      "label": "login invite-pending",
+      "pass": true
+    },
+    {
+      "label": "invite-pending",
+      "pass": true
+    },
+    {
+      "label": "invite-pending-atomic",
+      "pass": true
+    },
+    {
+      "label": "invite-distributor-cannot-create",
+      "pass": true
+    },
+    {
+      "label": "invite-distributor-cannot-create-atomic",
+      "pass": true
+    },
+    {
+      "label": "register invite-company-partner",
+      "pass": true
+    },
+    {
+      "label": "login invite-company-partner",
+      "pass": true
+    },
+    {
+      "label": "register invite-distributor-partner",
+      "pass": true
+    },
+    {
+      "label": "login invite-distributor-partner",
+      "pass": true
+    },
+    {
+      "label": "invite-existing-join-flow",
+      "pass": true
+    },
+    {
+      "label": "invite-other-registration-flows-preserved",
+      "pass": true
+    },
+    {
+      "label": "invite-valid-company-owner",
+      "pass": true
+    },
+    {
+      "label": "invite-owner-organization-membership-delivery-preserved",
+      "pass": true
+    },
+    {
+      "label": "invite-already-used",
+      "pass": true
+    },
+    {
+      "label": "invite-already-used-atomic",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "invite-rollback",
+      "pass": true
+    },
+    {
+      "label": "invite-rollback-retains-code-and-no-owner",
+      "pass": true
+    },
+    {
+      "label": "invite-valid-company-admin-after-rollback",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "invite-race-two",
+      "pass": true
+    },
+    {
+      "label": "invite-race-one",
+      "pass": true
+    },
+    {
+      "label": "invite-concurrent-use-creates-exactly-one-distributor",
+      "pass": true
+    },
+    {
+      "label": "repeat migration preserves profiles and deactivated access",
+      "pass": true
+    },
+    {
+      "label": "inactive Distributor still cannot login",
+      "pass": true
+    }
+  ],
+  "noOnlineWrites": true,
+  "noExternalEmail": true
+}

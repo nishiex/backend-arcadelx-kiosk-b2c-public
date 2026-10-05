@@ -36,10 +36,6 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-4 py-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
-        {/* Brand — logo only on desktop (the sidebar already carries the wordmark). */}
-        <a href="/" className="hidden items-center md:flex" aria-label="ArcadeLX home">
-          <img src="/logo.png" alt="ArcadeLX" className="h-8 w-8 rounded-lg object-contain" />
-        </a>
         <div className="relative hidden sm:block">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input

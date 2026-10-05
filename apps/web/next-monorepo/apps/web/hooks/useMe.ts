@@ -30,6 +30,7 @@ export type Permissions = {
   canManageNetwork: boolean
   canManageAgreements: boolean
   canManageDistributors: boolean
+  canRegisterPartners: boolean
   canReviewRequests: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
@@ -78,6 +79,7 @@ export function useMe(): Permissions {
     canManageAgreements: canTransact && role === "OWNER",
     /** Only a company admin/super-admin (OWNER/ADMIN) may add distributors. */
     canManageDistributors: isCompany && isOwnerOrAdmin,
+    canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor && isOwnerOrAdmin,
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
     permissions,
     can,

@@ -1,0 +1,27 @@
+{
+  "checkedAt": "2026-10-05T10:25:02.951Z",
+  "noBusinessWrites": true,
+  "noEmailSent": true,
+  "pendingLocalMigrations": [],
+  "remoteOnlyMigrations": [
+    "20261005071443_revert_teammate_changes",
+    "20260928063729_implement_transactions_schema",
+    "20260928073023_remove_payu_retries"
+  ],
+  "repairChecksumMatches": true,
+  "http": [
+    {
+      "url": "http://localhost:4000/health/db",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/partners",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/api/auth/me",
+      "status": 401
+    }
+  ],
+  "mailjetAuthenticationStatus": 200
+}

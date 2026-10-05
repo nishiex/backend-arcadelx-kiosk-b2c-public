@@ -7,15 +7,7 @@ import { toast } from "sonner"
 import { Plus, X, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { createKioskBatch } from "@/lib/backend-api"
-
-const MODELS = [
-  "Arcade-LX B2C",
-  "Arcade-LX B2B",
-  "Arcade-LX Kids",
-  "Arcade-LX Healthcare",
-  "Arcade-LX Mini",
-  "Arcade-LX Pro",
-]
+import { KIOSK_MODELS } from "@/lib/kiosk-models"
 
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -31,14 +23,14 @@ const inputCls =
 
 export default function AddMachineDialog() {
   const [open, setOpen] = React.useState(false)
-  const [model, setModel] = React.useState(MODELS[0]!)
+  const [model, setModel] = React.useState<string>(KIOSK_MODELS[0])
   const [count, setCount] = React.useState(1)
   const queryClient = useQueryClient()
 
   // Reset the form each time the dialog opens.
   React.useEffect(() => {
     if (open) {
-      setModel(MODELS[0]!)
+      setModel(KIOSK_MODELS[0])
       setCount(1)
     }
   }, [open])
@@ -87,7 +79,7 @@ export default function AddMachineDialog() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Machine Model">
               <select className={inputCls} value={model} onChange={(e) => setModel(e.target.value)}>
-                {MODELS.map((m) => (
+                {KIOSK_MODELS.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>

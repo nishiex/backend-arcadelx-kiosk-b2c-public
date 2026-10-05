@@ -1,0 +1,22 @@
+{
+  "migration": "20261005121000_restore_registration_fields",
+  "checksum": "24d045f04158f52e6a17778f932a61a1f3b134b4d64dd1c6cab31e272bfaffa5",
+  "checkedAt": "2026-10-05T09:54:27.654Z",
+  "before": {
+    "count": 4,
+    "digest": "c9a428b7da8ff65d116946a212889bef"
+  },
+  "after": {
+    "count": 4,
+    "digest": "c9a428b7da8ff65d116946a212889bef"
+  },
+  "restored": [
+    "accessVersion",
+    "country",
+    "gstNumber",
+    "isActive",
+    "phone"
+  ],
+  "committed": true,
+  "existingDataPreserved": true
+}

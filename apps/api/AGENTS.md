@@ -22,6 +22,45 @@ pre-fix implementation; current behavior, evidence and deployment status are in
 
 ## Environment and deployment status
 
+### Order readiness restored (2026-10-05)
+
+After the remote-only revert removed the order prerequisites, the user requested
+restoring requests and decisions. Additive migration
+`20261005120000_restore_order_workflow` is now applied online and recorded
+atomically. It restores Kiosk reservation pointers/constraints, OrderSequence,
+EmailDelivery, and the single-open-assignment index. All twelve preflight checks
+were clear; existing business-row fingerprints were preserved and ten existing
+reserved kiosks were backfilled. Four isolated local repair cases, API typecheck,
+and Prisma validation passed. Both API and frontend-proxy `/api/workflows` now
+return `orderDecisions: true`. Network/agreement rejection flags remain false
+after the separate remote revert. See [repair evidence](../../audits/order-readiness/README.md).
+
+### Current auth repair (2026-10-05)
+
+After the remote revert, additive migration
+`20261005121000_restore_registration_fields` restored the five existing
+Organization profile/access fields required by registration. Core organization
+data was preserved. Existing handlers, sessions, hashing and permissions remain.
+Runtime uses the responding port 5432 endpoint of the same online database and
+verified saved Mailjet keys in ignored environment configuration. DB health and
+108 isolated auth checks pass; actual mailbox delivery remains untested.
+Read-only SQL history confirms no local migrations pending and a matching repair
+checksum; three remote-only migrations remain. Native migrate status is blocked
+by sandbox spawn EPERM. See [current evidence](../../audits/auth-registration/README.md).
+
+### Earlier auth verification (superseded by current repair above)
+
+At the user's request, runtime DATABASE_URL and DIRECT_URL now target the saved
+online Supabase database. Current Mailjet keys remain local dummy values. Online
+read-only checks found the Organization profile/access fields and EmailDelivery
+table; migration history still diverges. Do not infer full lifecycle readiness
+from the database health check. The auth chain already uses the existing register,
+login, password, session and credential-delivery handlers; no backend change was
+needed. A Distributor-only Partner registration form now calls these APIs.
+`AUDIT_PHASES=auth_flow` adds isolated auth-chain/session/permission tests.
+See [auth flow map and verification](../../audits/AUTH_FLOW.md) for results and
+remaining configuration/typecheck/migration issues.
+
 ### Local-only development (2026-10-01)
 
 At the user's request, root `.env` now points both `DATABASE_URL` and `DIRECT_URL`

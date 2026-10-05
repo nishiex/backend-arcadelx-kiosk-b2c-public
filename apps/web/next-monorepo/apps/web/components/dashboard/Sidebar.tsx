@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutGrid,
   UserCog,
+  UsersRound,
   MonitorSmartphone,
   Building2,
   ClipboardList,
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
   { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
+  { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canRegisterPartners },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
@@ -72,11 +74,16 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function Brand() {
+function Brand({ compact = false }: { compact?: boolean }) {
+  const { me, isCompany, role, isError } = useMe()
+  const isMasterAdmin = !isError && isCompany && role === "OWNER" && me?.membership?.status === "ACTIVE"
   return (
-    <div className="mb-6 flex items-center gap-2 px-1">
+    <div className={`flex items-center gap-2 ${compact ? "" : "mb-6 px-1"}`}>
       <img src="/logo.png" alt="ArcadeLX" className="h-8 w-8 rounded-lg object-contain" />
-      <span className="text-lg font-bold tracking-tight">ArcadeLX</span>
+      <div className="leading-tight">
+        <span className="block text-lg font-bold tracking-tight">ArcadeLX</span>
+        {isMasterAdmin && <span className="mt-0.5 block text-xs font-medium text-muted-foreground">Master Admin</span>}
+      </div>
     </div>
   )
 }
@@ -95,10 +102,7 @@ export default function Sidebar() {
 
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-sidebar-border bg-sidebar p-3 md:hidden">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="ArcadeLX" className="h-7 w-7 rounded-md object-contain" />
-          <span className="font-bold">ArcadeLX</span>
-        </div>
+        <Brand compact />
         <button
           aria-label="Open menu"
           onClick={() => setOpen(true)}

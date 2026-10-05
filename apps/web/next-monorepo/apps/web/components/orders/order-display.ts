@@ -16,6 +16,20 @@ export const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
   REJECTED: "bg-red-500/10 text-red-700 dark:text-red-300",
 }
 
+export const PAYMENT_STATUS_LABELS: Record<KioskOrder["paymentStatus"], string> = {
+  PENDING: "Pending",
+  PAID: "Paid",
+  FAILED: "Failed",
+  REFUNDED: "Refunded",
+}
+
+export const PAYMENT_STATUS_STYLES: Record<KioskOrder["paymentStatus"], string> = {
+  PENDING: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  PAID: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  FAILED: "bg-red-500/10 text-red-700 dark:text-red-300",
+  REFUNDED: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+}
+
 const orgLabels: Record<OrgType, string> = { COMPANY: "Company", DISTRIBUTOR: "Distributor", PARTNER: "Partner" }
 export const orderDate = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value))
 export const orderMoney = (value: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value)

@@ -314,6 +314,26 @@ export async function createDistributor(
   return handleRes<CreateDistributorResult>(res);
 }
 
+export type CreatePartnerInput = Omit<CreateDistributorInput, 'inviteCode'>;
+export type CreatePartnerResult = Omit<CreateDistributorResult, 'credentialsEmailSent'> & {
+  credentialsEmailSent: boolean;
+};
+
+export async function createPartner(input: CreatePartnerInput): Promise<CreatePartnerResult> {
+  return handleRes<CreatePartnerResult>(await apiFetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ ...input, orgType: 'PARTNER' }),
+  }));
+}
+
+export async function retryOrganizationCredentials(organizationId: string): Promise<{ credentialsEmailSent: boolean }> {
+  return handleRes(await apiFetch(`/api/auth/organizations/${encodeURIComponent(organizationId)}/credentials/retry`, {
+    method: 'POST', credentials: 'include',
+  }));
+}
+
 export type Distributor = {
   id: string;
   name: string;

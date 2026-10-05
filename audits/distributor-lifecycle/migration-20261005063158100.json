@@ -1,0 +1,133 @@
+{
+  "target": "20260929100000_protect_distributor_lifecycle",
+  "results": [
+    {
+      "case": "valid",
+      "database": "arcadelx_upgrade_20261005063158100_0",
+      "passed": true,
+      "errorCode": null,
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "duplicate_network",
+      "database": "arcadelx_upgrade_20261005063158100_1",
+      "passed": true,
+      "errorCode": "23505",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "duplicate_agreement",
+      "database": "arcadelx_upgrade_20261005063158100_2",
+      "passed": true,
+      "errorCode": "23505",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "duplicate_history",
+      "database": "arcadelx_upgrade_20261005063158100_3",
+      "passed": true,
+      "errorCode": "23505",
+      "before": {
+        "history": "3",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "3",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "ambiguous_stock",
+      "database": "arcadelx_upgrade_20261005063158100_4",
+      "passed": true,
+      "errorCode": "P0001",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "stale_owner",
+      "database": "arcadelx_upgrade_20261005063158100_5",
+      "passed": true,
+      "errorCode": "P0001",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "incomplete_order",
+      "database": "arcadelx_upgrade_20261005063158100_6",
+      "passed": true,
+      "errorCode": "P0001",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "2"
+      }
+    },
+    {
+      "case": "orphan_reservation",
+      "database": "arcadelx_upgrade_20261005063158100_7",
+      "passed": true,
+      "errorCode": "23514",
+      "before": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "3"
+      },
+      "after": {
+        "history": "2",
+        "orders": "2",
+        "kiosks": "3"
+      }
+    }
+  ]
+}
