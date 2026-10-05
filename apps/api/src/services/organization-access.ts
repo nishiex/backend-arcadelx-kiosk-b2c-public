@@ -2,7 +2,7 @@ import type { Prisma } from "../generated/prisma/client";
 import { prisma } from "../utils/db";
 import { ApiError } from "../utils/ApiError";
 
-type Client = Prisma.TransactionClient;
+type Client = Pick<Prisma.TransactionClient, '$queryRaw'>;
 export type OrganizationAccess = { id: string; type: string; isActive: boolean; accessVersion: number };
 
 // JSON field extraction preserves existing logins before this additive migration

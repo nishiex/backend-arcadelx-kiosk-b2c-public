@@ -81,6 +81,14 @@ try {
   await submit()
   assert.equal(posts().length, 0)
   await setValue('pincode', '400001')
+  await submit()
+  assert.equal(posts().length, 0, 'Owner contact is required')
+  for (const invalid of ['123', 'abcdefghij', '12345678901']) {
+    await setValue('ownerContact', invalid); await submit()
+    assert.equal(posts().length, 0, 'Owner contact must contain exactly ten digits')
+  }
+  await setValue('ownerContact', '0123456789')
+  await setValue('gstNumber', 'TEST-PARTNER-GST')
   fail = true; await submit()
   await until(() => !!document.querySelector('[role="alert"]'))
   assert.ok(document.querySelector('form'))
@@ -96,7 +104,7 @@ try {
   await React.act(async () => release!())
   await until(() => !!button('Retry credentials email'))
   assert.equal(document.querySelector('form'), null)
-  assert.deepEqual(posts().at(-1)!.body, { orgName: 'Test Partner', ownerName: 'Partner Owner', ownerEmail: 'partner@example.invalid', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: 400001, orgType: 'PARTNER' })
+  assert.deepEqual(posts().at(-1)!.body, { orgName: 'Test Partner', ownerName: 'Partner Owner', ownerEmail: 'partner@example.invalid', ownerContact: '0123456789', gstNumber: 'TEST-PARTNER-GST', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: 400001, orgType: 'PARTNER' })
   assert.equal(posts().at(-1)!.credentials, 'include')
   assert.ok(document.body.textContent?.includes('have not been emailed'))
   await React.act(async () => button('Retry credentials email')!.click())

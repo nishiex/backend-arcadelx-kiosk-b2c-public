@@ -46,7 +46,14 @@ async function main() {
     for (const name of fs.readdirSync(dir).sort()) {
       const file = path.join(dir, name, 'migration.sql'); if (fs.existsSync(file)) await c.query(fs.readFileSync(file, 'utf8'));
     }
+      if (name === '20261005190000_add_owner_contact') {
+        await c.query('INSERT INTO "User" (id,email,name,"passwordHash","updatedAt") VALUES ($1,$2,$3,$4,now())', ['contact-upgrade-user','contact-upgrade@example.invalid','Existing User','unused-test-hash']);
+      }
     const companyId = crypto.randomUUID(), companyUser = crypto.randomUUID();
+      if (name === '20261005190000_add_owner_contact') {
+        const existing = (await c.query('SELECT name,contact,"passwordHash" FROM "User" WHERE id=$1', ['contact-upgrade-user'])).rows[0];
+        check('contact migration preserves existing users without inventing contact', existing.contact === null && existing.name === 'Existing User' && existing.passwordHash === 'unused-test-hash');
+      }
     await c.query('INSERT INTO "User" (id,email,name,"passwordHash","updatedAt") VALUES ($1,$2,$3,$4,now())', [companyUser,'company@example.invalid','Company Owner',await bcrypt.hash(password,10)]);
     await c.query('INSERT INTO "Organization" (id,"ownerId",name,type,state,city,pincode,address,"updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())', [companyId,companyUser,'Company','COMPANY','Maharashtra','Mumbai',400001,'Test company address']);
     await c.query('INSERT INTO "Membership" (id,"userId","organizationId",role,status,"updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [crypto.randomUUID(),companyUser,companyId,'OWNER','ACTIVE']);
@@ -65,7 +72,7 @@ async function main() {
     check('existing Company login', companyLogin.status === 200);
     const invite = await http('/api/members/generateInviteCode', companyLogin.cookies);
     check('Company invitation', invite.status === 201);
-    const data = { orgName:'Distributor',ownerName:'Distributor Owner',ownerEmail:'distributor@example.invalid',orgType:'DISTRIBUTOR',inviteCode:invite.body.data.inviteCode,state:'Maharashtra',city:'Mumbai',pincode:400001,address:'Test distributor address',gstNumber:'TEST-GST',phone:'9999999999',country:'India' };
+    const data = { orgName:'Distributor',ownerName:'Distributor Owner',ownerEmail:'distributor@example.invalid',ownerContact:'9000000000',orgType:'DISTRIBUTOR',inviteCode:invite.body.data.inviteCode,state:'Maharashtra',city:'Mumbai',pincode:400001,address:'Test distributor address',gstNumber:'TEST-GST',phone:'9999999999',country:'India' };
     const created = await http('/api/auth/register', companyLogin.cookies, data);
     if (baseline) {
       check('baseline registration fails on reverted schema', created.status === 500);
@@ -83,9 +90,10 @@ async function main() {
     let sequence = 0;
     const ctx = {
       prisma, sql:c, auditUrl:url, mails, actors, password,
+    let contactSequence = 0;
       next:()=>++sequence, setFailMail:value=>{failMail=value;},
       check, record:(label,details)=>check(label,details.pass !== false),
-      registration:(label,type='DISTRIBUTOR')=>({orgName:label,ownerName:label,ownerEmail:label+'@example.invalid',orgType:type,state:'Maharashtra',city:'Mumbai',pincode:400001,address:'Auth test address'}),
+      registration:(label,type='DISTRIBUTOR')=>({orgName:label,ownerName:label,ownerEmail:label+'@example.invalid',ownerContact:String(9100000000 + ++contactSequence),orgType:type,state:'Maharashtra',city:'Mumbai',pincode:400001,address:'Auth test address'}),
       async http(label,actor,method,route,body,expected) {
         const r = await http(route,actor?.cookie,body,method);
         if (expected !== undefined) check(label, (Array.isArray(expected)?expected:[expected]).includes(r.status));
@@ -114,7 +122,7 @@ async function main() {
       },
     };
     ctx.company = await ctx.login('existing-company','company@example.invalid');
-    for(const phase of ['auth_flow','distributor_invites']) {
+    for(const phase of ['auth_flow','distributor_invites','owner_contact']) {
       const module=await import(pathToFileURL(path.join(root,'audits/distributor-lifecycle/harness/phases',phase+'.ts')).href);
       await module.run(ctx);
     }

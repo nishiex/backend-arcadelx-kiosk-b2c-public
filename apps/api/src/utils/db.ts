@@ -10,4 +10,7 @@ const adapter = new PrismaPg({
 
 export const prisma = new PrismaClient({
   adapter,
+  // Contact is only selected explicitly where needed. Routine auth and nested
+  // user responses also remain compatible before the contact migration deploys.
+  omit: { user: { contact: true } },
 });

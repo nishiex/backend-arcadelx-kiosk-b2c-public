@@ -282,12 +282,13 @@ export type CreateDistributorInput = {
   address: string;
   gstNumber?: string;
   phone?: string;
+  ownerContact: string;
   country?: string;
 };
 
 export type CreateDistributorResult = {
   organization: { id: string; name: string; type: OrgType };
-  owner: { id: string; name: string; email: string };
+  owner: { id: string; name: string; email: string; contact: string };
   /**
    * Whether the backend confirmed the credentials email was sent. The current
    * register endpoint does not return this flag (and fails the whole request if

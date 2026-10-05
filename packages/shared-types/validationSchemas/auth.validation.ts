@@ -54,6 +54,7 @@ const RegisterOrgFields = z.object({
   orgName: nameSchema,
   ownerName: nameSchema,
   ownerEmail: emailSchema,
+  ownerContact: z.string().trim().regex(/^\d{10}$/, "Owner contact must be a 10-digit number"),
   state: stateSchema,
   city: citySchema,
   pincode: pincodeSchema,

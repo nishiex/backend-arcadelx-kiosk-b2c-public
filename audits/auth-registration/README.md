@@ -1,5 +1,10 @@
 # Registration repair verification
 
+Current codebase verification: [owner contact integration](OWNER_CONTACT.md)
+passes 204 combined checks and both registration-form component suites. The new
+owner-contact migration is tested locally but not deployed to Supabase. The
+deployment statements below describe the earlier registration-field repair.
+
 The online revert removed Organization fields required by existing registration and Prisma defaults. `baseline.json` reproduces failure in a new local database. `verification.json` records 108 passing checks after repair. Tests use real handlers with captured Mailjet transport; no online test accounts or external emails are created.
 
 `deployment.json` confirms the additive repair committed online and core Organization data fingerprints were preserved. Its new migration history row was inserted atomically; old migration history was not rewritten.

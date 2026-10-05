@@ -8,17 +8,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { createDistributor, type CompanyInviteCode, type CreateDistributorInput } from "@/lib/backend-api"
+import { createDistributor, generateCompanyInviteCode, type CreateDistributorInput } from "@/lib/backend-api"
 import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
 import { useMe } from "@/hooks/useMe"
-import CompanyInviteCodeDialog, { companyInviteCodeKey } from "./CompanyInviteCodeDialog"
+import { companyInviteCodeKey } from "./CompanyInviteCodeDialog"
 
 type FormValues = {
-  inviteCode: string
   orgName: string
   gstNumber: string
   ownerName: string
   ownerEmail: string
+  ownerContact: string
   phone: string
   address: string
   city: string
@@ -62,7 +62,6 @@ export default function AddDistributorForm() {
     formState: { errors },
   } = useForm<FormValues>({ defaultValues: {
     country: "India",
-    inviteCode: queryClient.getQueryData<CompanyInviteCode>(inviteKey)?.inviteCode ?? "",
   } })
 
   // City list cascades off the chosen state.
@@ -70,12 +69,15 @@ export default function AddDistributorForm() {
   const cityOptions = React.useMemo(() => citiesForState(selectedState), [selectedState])
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => {
+    mutationFn: async (values: FormValues) => {
+      const { inviteCode } = await generateCompanyInviteCode()
+      queryClient.removeQueries({ queryKey: inviteKey })
       const payload: CreateDistributorInput = {
-        inviteCode: values.inviteCode.trim(),
+        inviteCode,
         orgName: values.orgName,
         ownerName: values.ownerName,
         ownerEmail: values.ownerEmail,
+        ownerContact: values.ownerContact,
         address: values.address,
         city: values.city,
         state: values.state,
@@ -125,22 +127,6 @@ export default function AddDistributorForm() {
         {/* Distributor Information */}
         <h2 className="mb-4 text-sm font-semibold">Distributor Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Company Invite Code" error={errors.inviteCode?.message}>
-            <div className="space-y-2">
-              <input
-                aria-label="Company Invite Code"
-                autoCapitalize="none"
-                spellCheck={false}
-                className={inputCls}
-                {...register("inviteCode", {
-                  required: "Invite code is required",
-                  setValueAs: (value: string) => value.trim(),
-                  maxLength: { value: 10, message: "Invalid invite code" },
-                })}
-              />
-              <CompanyInviteCodeDialog disabled={mutation.isPending} onUseCode={code => setValue("inviteCode", code, { shouldValidate: true, shouldDirty: true })} />
-            </div>
-          </Field>
           <Field label="Business Name" error={errors.orgName?.message}>
             <input className={inputCls} {...register("orgName", { required: "Business name is required" })} />
           </Field>
@@ -160,7 +146,15 @@ export default function AddDistributorForm() {
               })}
             />
           </Field>
-          <Field label="Phone Number">
+          <Field label="Owner Contact Number" error={errors.ownerContact?.message}>
+            <input aria-label="Owner Contact Number" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} className={inputCls}
+              {...register("ownerContact", {
+                required: "Owner contact is required",
+                setValueAs: (value: string) => value.trim(),
+                pattern: { value: /^\d{10}$/, message: "Enter a 10-digit contact number" },
+              })} />
+          </Field>
+          <Field label="Organization Phone (optional)">
             <input className={inputCls} {...register("phone")} />
           </Field>
         </div>

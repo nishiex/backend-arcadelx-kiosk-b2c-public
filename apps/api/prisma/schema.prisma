@@ -32,6 +32,8 @@ model User {
   email        String @unique
   passwordHash String
   name         String
+  // Required by organization registration; legacy users and staff may omit it.
+  contact      String? @unique @db.VarChar(10)
 
   membership Membership?
 

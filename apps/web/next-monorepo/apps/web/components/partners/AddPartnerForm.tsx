@@ -64,12 +64,27 @@ function PartnerForm({ modal }: { modal: boolean }) {
               </div>
             ))}
             <div>
+              <label htmlFor="ownerContact" className="mb-1.5 block text-sm font-medium">Owner contact number</label>
+              <input id="ownerContact" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} aria-invalid={!!errors.ownerContact} aria-describedby={errors.ownerContact ? "ownerContact-error" : undefined}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register("ownerContact", {
+                  required: "Owner contact is required", setValueAs: (value: string) => value.trim(),
+                  pattern: { value: /^\d{10}$/, message: "Enter a 10-digit contact number" },
+                })} />
+              {errors.ownerContact && <p id="ownerContact-error" className="mt-1 text-xs text-destructive">{errors.ownerContact.message}</p>}
+            </div>
+            <div>
               <label htmlFor="pincode" className="mb-1.5 block text-sm font-medium">Postal code</label>
               <input id="pincode" inputMode="numeric" maxLength={6} aria-invalid={!!errors.pincode} aria-describedby={errors.pincode ? "pincode-error" : undefined} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register("pincode", {
                 valueAsNumber: true, required: "Postal code is required",
                 validate: value => (Number.isInteger(value) && value >= 100000 && value <= 999999) || "Enter a valid 6-digit PIN code",
               })} />
               {errors.pincode && <p id="pincode-error" className="mt-1 text-xs text-destructive">{errors.pincode.message}</p>}
+            </div>
+            <div>
+              <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number (optional)</label>
+              <input id="gstNumber" maxLength={30} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                {...register("gstNumber", { setValueAs: (value: string) => value.trim() || undefined, maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
+              {errors.gstNumber && <p className="mt-1 text-xs text-destructive">{errors.gstNumber.message}</p>}
             </div>
           </fieldset>
           {create.error && <p role="alert" className="text-sm text-destructive">{create.error.message}</p>}

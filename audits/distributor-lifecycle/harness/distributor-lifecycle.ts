@@ -156,7 +156,8 @@ async function fixture(label: string, type: any, orgId?: string, role: any = 'OW
   record(`fixture-${label}`, { kind: 'direct DB fixture', organizationId: orgId, userId: user.id, type, role, status });
   return login(label, email);
 }
-function registration(label: string, type = 'DISTRIBUTOR') { return { orgName: label, ownerName: label, ownerEmail: `${label}@example.invalid`, orgType: type, city: 'Mumbai', state: 'Maharashtra', pincode: 400001, address: 'Audit organization address' }; }
+let contactSequence = 0;
+function registration(label: string, type = 'DISTRIBUTOR') { return { orgName: label, ownerName: label, ownerEmail: `${label}@example.invalid`, ownerContact: String(9100000000 + ++contactSequence), orgType: type, city: 'Mumbai', state: 'Maharashtra', pincode: 400001, address: 'Audit organization address' }; }
 async function invite(parent: any) {
   const r = await http(`generate-invite-${++seq}`, parent, 'POST', '/api/members/generateInviteCode', undefined, 201);
   if (r.status !== 201) throw new Error('Invite generation prerequisite failed');

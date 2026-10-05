@@ -80,6 +80,17 @@ export const registerOrganization = asyncHandler(
       throw new ApiError(409, "User with this email already exists");
 
     // Generate temporary password
+    const existingContact = await prisma.user.findUnique({
+      where: { contact: validatedData.ownerContact },
+      select: { id: true },
+    }).catch((error: unknown) => {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2022') {
+        throw new ApiError(503, 'Owner contact registration is unavailable until the database migration is applied.');
+      }
+      throw error;
+    });
+    if (existingContact) throw new ApiError(409, 'User with this contact number already exists');
+
 
     const temporaryPassword = crypto.randomBytes(8).toString("base64url");
 
@@ -119,6 +130,7 @@ export const registerOrganization = asyncHandler(
         },
       });
 
+          contact: validatedData.ownerContact,
       const newOrg = await tx.organization.create({
         data: {
           name: validatedData.orgName,
@@ -184,6 +196,7 @@ export const registerOrganization = asyncHandler(
         },
         "Organization created successfully",
       ),
+            contact: validatedData.ownerContact,
     );
   },
 );

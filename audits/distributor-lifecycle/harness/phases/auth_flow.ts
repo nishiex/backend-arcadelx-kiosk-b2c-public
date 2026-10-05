@@ -27,7 +27,8 @@ export async function run(c: any) {
     assert.equal(response.cookies, '', 'registration preserves creator session');
     assert.deepEqual(await counts(), before.map((n: number) => n + 1));
     assert.equal(response.data.data.credentialsEmailSent, send);
-    assert.deepEqual(Object.keys(response.data.data.owner).sort(), ['email', 'id', 'name']);
+    assert.deepEqual(Object.keys(response.data.data.owner).sort(), ['contact', 'email', 'id', 'name']);
+    assert.equal(response.data.data.owner.contact, input.ownerContact);
     assert.ok(!/password|passwordHash/i.test(JSON.stringify(response.data)));
     const owner = await prisma.user.findUniqueOrThrow({
       where: { email: input.ownerEmail }, include: { membership: true },
