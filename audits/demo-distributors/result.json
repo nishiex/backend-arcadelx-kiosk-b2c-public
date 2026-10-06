@@ -1,0 +1,23 @@
+{
+  "database": "localhost:5433/arcadelx_local",
+  "distributors": [
+    {
+      "name": "Demo Pune Distribution",
+      "email": "demo-pune-distributor@example.invalid",
+      "organizationId": "43a4a328-123c-4f7e-afca-f1d5a6a793f3",
+      "result": "created"
+    },
+    {
+      "name": "Demo Mumbai Distribution",
+      "email": "demo-mumbai-distributor@example.invalid",
+      "organizationId": "df371c1c-2e8f-4370-9385-1cea81a22224",
+      "result": "created"
+    }
+  ],
+  "verified": "Active distributor organizations, owner memberships, matching password hashes",
+  "emailSent": false,
+  "schemaChanged": false,
+  "remoteChanged": false,
+  "credentialsFile": ".env.demo-distributors.local",
+  "notes": "Local fixture seed against existing schema; contact column is not installed locally. No networks, agreements, orders or kiosks created."
+}

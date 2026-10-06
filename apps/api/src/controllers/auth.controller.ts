@@ -6,6 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
 import { getUserOrganizationAccess, assertOrganizationActive } from "../services/organization-access";
+import { memberInviteRole } from '../services/member-invite';
 import {
   RegisterOrgSchema,
   JoinOrgSchema,
@@ -79,7 +80,6 @@ export const registerOrganization = asyncHandler(
     if (existingUser)
       throw new ApiError(409, "User with this email already exists");
 
-    // Generate temporary password
     const existingContact = await prisma.user.findUnique({
       where: { contact: validatedData.ownerContact },
       select: { id: true },
@@ -91,6 +91,7 @@ export const registerOrganization = asyncHandler(
     });
     if (existingContact) throw new ApiError(409, 'User with this contact number already exists');
 
+    // Generate temporary password
 
     const temporaryPassword = crypto.randomBytes(8).toString("base64url");
 
@@ -100,6 +101,9 @@ export const registerOrganization = asyncHandler(
 
     const { user, org } = await prisma.$transaction(async (tx) => {
       if (validatedData.orgType === "DISTRIBUTOR") {
+        if (memberInviteRole(validatedData.inviteCode)) {
+          throw new ApiError(400, 'Use a Distributor invitation, not an internal member invitation');
+        }
         // Validate and consume the existing Company invite atomically. A failed
         // creation rolls this back; concurrent requests cannot reuse the code.
         const invite = await tx.organization.updateMany({
@@ -126,11 +130,11 @@ export const registerOrganization = asyncHandler(
         data: {
           name: validatedData.ownerName,
           email: validatedData.ownerEmail,
+          contact: validatedData.ownerContact,
           passwordHash,
         },
       });
 
-          contact: validatedData.ownerContact,
       const newOrg = await tx.organization.create({
         data: {
           name: validatedData.orgName,
@@ -192,11 +196,11 @@ export const registerOrganization = asyncHandler(
             id: user.id,
             name: user.name,
             email: user.email,
+            contact: validatedData.ownerContact,
           },
         },
         "Organization created successfully",
       ),
-            contact: validatedData.ownerContact,
     );
   },
 );
@@ -232,6 +236,17 @@ export const joinOrganization = asyncHandler(
     const passwordHash = await bcrypt.hash(validatedData.password, 10);
 
     const user = await prisma.$transaction(async (tx) => {
+      // Serialize with generation/consumption, then recheck after waiting for the lock.
+      await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${org.id} FOR UPDATE`;
+      const current = await tx.organization.findUnique({
+        where: { id: org.id },
+        select: { inviteCode: true, inviteCodeExpiresAt: true, type: true },
+      });
+      if (!current || current.type !== 'COMPANY' || current.inviteCode !== validatedData.inviteCode ||
+          (current.inviteCodeExpiresAt && current.inviteCodeExpiresAt <= new Date())) {
+        throw new ApiError(400, 'Invite code is expired, replaced, or already used');
+      }
+      const role = memberInviteRole(current.inviteCode);
       const newUser = await tx.user.create({
         data: {
           name: validatedData.name,
@@ -241,8 +256,16 @@ export const joinOrganization = asyncHandler(
       });
 
       await tx.membership.create({
-        data: { userId: newUser.id, organizationId: org.id, status: "PENDING" }, // No role assigned until approved
+        data: { userId: newUser.id, organizationId: org.id, status: role ? "ACTIVE" : "PENDING", role },
       });
+
+      if (role) {
+        await tx.organization.update({
+          where: { id: org.id },
+          data: { inviteCode: null, inviteCodeExpiresAt: null },
+          select: { id: true },
+        });
+      }
 
       return newUser;
     });
@@ -263,8 +286,12 @@ export const joinOrganization = asyncHandler(
       .json(
         new ApiResponse(
           201,
-          { user: { id: user.id, email: user.email } },
-          "Successfully joined organization. Pending approval.",
+          { user: { id: user.id, email: user.email }, membership: {
+            organizationId: org.id,
+            role: memberInviteRole(validatedData.inviteCode),
+            status: memberInviteRole(validatedData.inviteCode) ? 'ACTIVE' : 'PENDING',
+          } },
+          memberInviteRole(validatedData.inviteCode) ? "Account created. Company dashboard access enabled." : "Successfully joined organization. Pending approval.",
         ),
       );
   },

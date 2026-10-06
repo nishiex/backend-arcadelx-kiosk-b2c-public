@@ -10,6 +10,7 @@ import {
   MonitorSmartphone,
   Building2,
   ClipboardList,
+  IndianRupee,
   Settings,
   Menu,
   X,
@@ -27,21 +28,21 @@ type NavItem = {
 }
 
 // Only destinations backed by a live API on this deployment are listed.
-// (Revenue, Settlements, Payments, Reports, Support, Roles and Audit
+// (Settlements, Payments, Reports, Support, Roles and Audit
 // Logs are hidden until their endpoints exist.)
 const NAV: NavItem[] = [
   { name: "Overview", href: "/", icon: LayoutGrid },
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
-  { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact },
+  { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact || (p.orgType === "PARTNER" && p.me?.membership?.status === "ACTIVE" && (p.role === "OWNER" || p.role === "ADMIN")) },
+  { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
   { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canRegisterPartners },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ perms, onNavigate }: { perms: ReturnType<typeof useMe>; onNavigate?: () => void }) {
   const pathname = usePathname()
-  const perms = useMe()
   const items = NAV.filter((i) => (i.show ? i.show(perms) : true))
 
   return (
@@ -74,35 +75,40 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function Brand({ compact = false }: { compact?: boolean }) {
-  const { me, isCompany, role, isError } = useMe()
-  const isMasterAdmin = !isError && isCompany && role === "OWNER" && me?.membership?.status === "ACTIVE"
+const Brand = React.memo(function Brand({ compact = false, accountLabel }: { compact?: boolean; accountLabel: string | null }) {
   return (
     <div className={`flex items-center gap-2 ${compact ? "" : "mb-6 px-1"}`}>
       <img src="/logo.png" alt="ArcadeLX" className="h-8 w-8 rounded-lg object-contain" />
       <div className="leading-tight">
         <span className="block text-lg font-bold tracking-tight">ArcadeLX</span>
-        {isMasterAdmin && <span className="mt-0.5 block text-xs font-medium text-muted-foreground">Master Admin</span>}
+        {accountLabel && <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{accountLabel}</span>}
       </div>
     </div>
   )
-}
+})
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false)
+  // One persistent cache subscription for desktop, mobile branding and drawer.
+  const perms = useMe()
+  const isMasterAdmin = !perms.isError && perms.isCompany && perms.role === "OWNER" && perms.me?.membership?.status === "ACTIVE"
+  const accountLabel = perms.isError || !perms.me ? null
+    : perms.orgType === "DISTRIBUTOR" ? "Distributor"
+      : perms.orgType === "PARTNER" ? "Partner"
+        : isMasterAdmin ? "Master Admin" : null
 
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
-        <Brand />
-        <NavLinks />
+        <Brand accountLabel={accountLabel} />
+        <NavLinks perms={perms} />
         <div className="mt-4 px-1 text-xs text-muted-foreground">v1.0.0</div>
       </aside>
 
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-sidebar-border bg-sidebar p-3 md:hidden">
-        <Brand compact />
+        <Brand compact accountLabel={accountLabel} />
         <button
           aria-label="Open menu"
           onClick={() => setOpen(true)}
@@ -118,7 +124,7 @@ export default function Sidebar() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <aside className="absolute bottom-0 left-0 top-0 flex w-72 flex-col border-r border-sidebar-border bg-sidebar p-4">
             <div className="mb-6 flex items-center justify-between">
-              <Brand />
+              <Brand accountLabel={accountLabel} />
               <button
                 aria-label="Close menu"
                 onClick={() => setOpen(false)}
@@ -127,7 +133,7 @@ export default function Sidebar() {
                 <X size={18} />
               </button>
             </div>
-            <NavLinks onNavigate={() => setOpen(false)} />
+            <NavLinks perms={perms} onNavigate={() => setOpen(false)} />
           </aside>
         </div>
       )}

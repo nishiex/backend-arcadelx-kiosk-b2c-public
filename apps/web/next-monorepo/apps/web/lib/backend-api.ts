@@ -1,4 +1,4 @@
-﻿export type ApiResponse<T> = {
+export type ApiResponse<T> = {
   statusCode: number;
   data: T;
   message: string;
@@ -75,7 +75,7 @@ export type Me = {
 
 // ---- Kiosks ----
 export const KIOSK_STATUSES = [
-  'AVAILABLE'
+  'AVAILABLE', 'RESERVED', 'ASSIGNED', 'INSTALLED', 'MAINTENANCE', 'RETURNED', 'RETIRED'
 ] as const;
 export type KioskStatus = (typeof KIOSK_STATUSES)[number];
 
@@ -197,7 +197,9 @@ export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): 
   return (await handleRes<{ order: KioskOrderDetails }>(res)).order;
 }
 
-export type CreateOrderInput = { type: 'REQUEST'; targetOrgId: string; quantity: number };
+export type CreateOrderInput = 
+  | { type: 'REQUEST'; quantity: number }
+  | { type: 'ALLOCATION'; targetOrgId: string; quantity: number };
 export type CreatedOrder = Omit<KioskOrder, 'parentOrg' | 'childOrg'>;
 
 export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder> {
@@ -213,7 +215,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
 }
 
 // Read every page: current agreements may follow older relationship history.
-export async function fetchOrderRequestCompanies(organizationId: string, signal?: AbortSignal): Promise<OrgRef[]> {
+export async function fetchOrderRequestSuppliers(organizationId: string, orgType: OrgType, signal?: AbortSignal): Promise<OrgRef[]> {
   const readAll = async (kind: 'network' | 'agreements') => {
     const rows: ReviewRequest[] = [];
     let page = 1;
@@ -224,7 +226,8 @@ export async function fetchOrderRequestCompanies(organizationId: string, signal?
       totalPages = result.meta.totalPages;
       page++;
     } while (page <= totalPages);
-    return rows.filter(row => row.status === 'ACTIVE' && row.to.id === organizationId && row.from.type === 'COMPANY');
+    return rows.filter(row => row.status === 'ACTIVE' && row.to.id === organizationId &&
+      (row.from.type === 'COMPANY' || (orgType === 'PARTNER' && row.from.type === 'DISTRIBUTOR')));
   };
   const [agreements, networks] = await Promise.all([readAll('agreements'), readAll('network')]);
   const connected = new Set(networks.map(row => row.from.id));
@@ -264,7 +267,13 @@ export async function decideRequest(kind: 'network' | 'agreements' | 'orders', i
   await handleRes(await apiFetch(`/api/${kind}/${encodeURIComponent(id)}/${operation}`, { method: kind === 'network' ? 'POST' : 'PATCH' }));
 }
 
-export type CompanyInviteCode = { inviteCode: string; expiresAt: string };
+export type CompanyInviteCode = { inviteCode: string; expiresAt: string; role?: ManageableRole };
+
+export async function generateCompanyMemberInvite(role: ManageableRole): Promise<CompanyInviteCode> {
+  return handleRes<CompanyInviteCode>(await apiFetch('/api/members/generateInviteCode', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }),
+  }));
+}
 
 export async function generateCompanyInviteCode(): Promise<CompanyInviteCode> {
   const res = await apiFetch('/api/members/generateInviteCode', { method: 'POST' });
@@ -276,13 +285,13 @@ export type CreateDistributorInput = {
   orgName: string;
   ownerName: string;
   ownerEmail: string;
+  ownerContact: string;
   state: string;
   city: string;
   pincode: number;
   address: string;
   gstNumber?: string;
   phone?: string;
-  ownerContact: string;
   country?: string;
 };
 
@@ -513,6 +522,49 @@ export async function updateKioskStatus(
 }
 
 // ---- Reports / revenue ----
+export type MachineRevenue = {
+  machineCode: string;
+  location: string;
+  distributor: string;
+  partner: string;
+  deployedPartner: string;
+  today: number;
+  thisMonth: number;
+  totalRevenue: number;
+};
+
+export type DeductionRates = {
+  gstPercentage: number;
+  pgFeePercentage: number;
+  tdsPercentage: number;
+};
+
+export async function fetchMachineRevenue(): Promise<MachineRevenue[]> {
+  const res = await apiFetch('/api/revenue/machine-wise', { credentials: 'include' });
+  return (await handleRes<{ kiosks: MachineRevenue[] }>(res)).kiosks;
+}
+
+function normalizeRates(settings: Record<keyof DeductionRates, number | string>): DeductionRates {
+  return {
+    gstPercentage: Number(settings.gstPercentage),
+    pgFeePercentage: Number(settings.pgFeePercentage),
+    tdsPercentage: Number(settings.tdsPercentage),
+  };
+}
+
+export async function fetchDeductionRates(): Promise<DeductionRates> {
+  const res = await apiFetch('/api/revenue/deduction-rates', { credentials: 'include' });
+  return normalizeRates((await handleRes<{ settings: Record<keyof DeductionRates, number | string> }>(res)).settings);
+}
+
+export async function updateDeductionRates(input: DeductionRates): Promise<DeductionRates> {
+  const res = await apiFetch('/api/revenue/deduction-rates', {
+    method: 'PATCH', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  });
+  return normalizeRates((await handleRes<{ settings: Record<keyof DeductionRates, number | string> }>(res)).settings);
+}
+
 export type OrgMini = { id: string; name: string };
 
 export type RevenueReportRow = {
@@ -854,4 +906,46 @@ export async function removeMember(membershipId: string): Promise<void> {
     credentials: 'include',
   });
   await handleRes<unknown>(res);
+}
+
+// ---- Agreements ----
+export type Agreement = {
+  id: string;
+  status: 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED';
+  parentOrg: OrgRef;
+  childOrg: OrgRef;
+  parentSharePct: number;
+  childSharePct: number;
+  depositAmountPerMachine: number;
+  nonRefundableAmountPerMachine: number;
+  createdAt: string;
+};
+
+export type AgreementsResponse = { agreements: Agreement[]; meta: PaginationMeta };
+
+export async function fetchAgreements(page = 1, signal?: AbortSignal): Promise<AgreementsResponse> {
+  const res = await apiFetch(`/api/agreements?page=${page}&limit=20`, { signal, cache: 'no-store' });
+  return handleRes<AgreementsResponse>(res);
+}
+
+export type CreateAgreementInput = {
+  childOrgId: string;
+  networkConnectionId: string;
+  parentSharePct: number;
+  childSharePct: number;
+  depositAmountPerMachine: number;
+  nonRefundableAmountPerMachine: number;
+};
+
+export async function createAgreement(input: CreateAgreementInput): Promise<Agreement> {
+  const res = await apiFetch('/api/agreements/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return (await handleRes<{ agreement: Agreement }>(res)).agreement;
+}
+
+export async function terminateAgreement(id: string): Promise<void> {
+  await handleRes(await apiFetch(`/api/agreements/${encodeURIComponent(id)}/terminate`, { method: 'DELETE' }));
 }

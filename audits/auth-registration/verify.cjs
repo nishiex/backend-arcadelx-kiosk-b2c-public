@@ -2,6 +2,7 @@
 // Run: node -r ./audits/auth-registration/runtime-loader.cjs audits/auth-registration/verify.cjs
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
@@ -38,22 +39,23 @@ async function main() {
     ACCESS_SECRET_TOKEN: crypto.randomBytes(64).toString('hex'), REFRESH_SECRET_TOKEN: crypto.randomBytes(64).toString('hex'),
     INTERNAL_API_SECRET: crypto.randomBytes(32).toString('hex'), ACCESS_EXPIRY: '2h', REFRESH_EXPIRY: '7d',
     MAILJET_API_KEY: 'test-capture', MAILJET_SECRET_KEY: 'test-capture', MAIL_FROM_EMAIL: 'test@example.invalid', MAIL_FROM_NAME: 'Auth test', FRONTEND_LOGIN_URL: 'http://localhost:3000/login',
+    REVENUE_REPORTS_DIR: path.join(os.tmpdir(), database, 'reports'), REVENUE_JOBS_ENABLED: 'false',
   });
   let server, prisma;
   const check = (label, passed) => { assert.ok(passed, label); results.push({ label, pass: true }); console.log('PASS', label); };
   try {
     const dir = path.join(root, 'apps/api/prisma/migrations');
     for (const name of fs.readdirSync(dir).sort()) {
-      const file = path.join(dir, name, 'migration.sql'); if (fs.existsSync(file)) await c.query(fs.readFileSync(file, 'utf8'));
-    }
       if (name === '20261005190000_add_owner_contact') {
         await c.query('INSERT INTO "User" (id,email,name,"passwordHash","updatedAt") VALUES ($1,$2,$3,$4,now())', ['contact-upgrade-user','contact-upgrade@example.invalid','Existing User','unused-test-hash']);
       }
-    const companyId = crypto.randomUUID(), companyUser = crypto.randomUUID();
+      const file = path.join(dir, name, 'migration.sql'); if (fs.existsSync(file)) await c.query(fs.readFileSync(file, 'utf8'));
       if (name === '20261005190000_add_owner_contact') {
         const existing = (await c.query('SELECT name,contact,"passwordHash" FROM "User" WHERE id=$1', ['contact-upgrade-user'])).rows[0];
         check('contact migration preserves existing users without inventing contact', existing.contact === null && existing.name === 'Existing User' && existing.passwordHash === 'unused-test-hash');
       }
+    }
+    const companyId = crypto.randomUUID(), companyUser = crypto.randomUUID();
     await c.query('INSERT INTO "User" (id,email,name,"passwordHash","updatedAt") VALUES ($1,$2,$3,$4,now())', [companyUser,'company@example.invalid','Company Owner',await bcrypt.hash(password,10)]);
     await c.query('INSERT INTO "Organization" (id,"ownerId",name,type,state,city,pincode,address,"updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())', [companyId,companyUser,'Company','COMPANY','Maharashtra','Mumbai',400001,'Test company address']);
     await c.query('INSERT INTO "Membership" (id,"userId","organizationId",role,status,"updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [crypto.randomUUID(),companyUser,companyId,'OWNER','ACTIVE']);
@@ -88,9 +90,9 @@ async function main() {
     check('registration profile fields persisted', registered.gstNumber === data.gstNumber && registered.phone === data.phone && registered.country === data.country);
     const actors = {};
     let sequence = 0;
+    let contactSequence = 0;
     const ctx = {
       prisma, sql:c, auditUrl:url, mails, actors, password,
-    let contactSequence = 0;
       next:()=>++sequence, setFailMail:value=>{failMail=value;},
       check, record:(label,details)=>check(label,details.pass !== false),
       registration:(label,type='DISTRIBUTOR')=>({orgName:label,ownerName:label,ownerEmail:label+'@example.invalid',ownerContact:String(9100000000 + ++contactSequence),orgType:type,state:'Maharashtra',city:'Mumbai',pincode:400001,address:'Auth test address'}),
@@ -122,7 +124,7 @@ async function main() {
       },
     };
     ctx.company = await ctx.login('existing-company','company@example.invalid');
-    for(const phase of ['auth_flow','distributor_invites','owner_contact']) {
+    for(const phase of ['auth_flow','distributor_invites','member_invites','owner_contact','revenue']) {
       const module=await import(pathToFileURL(path.join(root,'audits/distributor-lifecycle/harness/phases',phase+'.ts')).href);
       await module.run(ctx);
     }

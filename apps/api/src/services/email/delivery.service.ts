@@ -8,6 +8,7 @@ import { ApiError } from "../../utils/ApiError";
 import { sendOrganizationCredentialsEmail } from "./auth.email";
 import { sendEmail } from "./email.service";
 import { generateInvoicePDF, INVOICES_DIR } from "../pdf/invoice.pdf";
+import { REVENUE_REPORTS_DIR } from '../pdf/revenue.pdf';
 
 type Credentials = {
   email: string;
@@ -18,7 +19,8 @@ type Credentials = {
 };
 type Payload =
   | { kind: "CREDENTIALS"; credentials: Credentials }
-  | { kind: "INVOICE"; orderId: string };
+  | { kind: "INVOICE"; orderId: string }
+  | { kind: 'REVENUE'; statementId: string };
 // Separate cryptographic domain; the stable internal secret must remain available
 // until pending deliveries are sent. No temporary password is stored in plaintext.
 const key = crypto
@@ -51,6 +53,31 @@ export const credentialDeliveryKey = (organizationId: string) =>
   `organization:${organizationId}:credentials`;
 export const invoiceDeliveryKey = (orderId: string) =>
   `order:${orderId}:invoice`;
+export const revenueDeliveryKey = (statementId: string) => `revenue:${statementId}:statement`;
+
+export async function queueRevenueStatement(tx: Prisma.TransactionClient, organizationId: string, statementId: string) {
+  return tx.emailDelivery.upsert({
+    where: { key: revenueDeliveryKey(statementId) }, update: {},
+    create: { key: revenueDeliveryKey(statementId), kind: 'REVENUE', ownerOrganizationId: organizationId, payload: encrypt({ kind: 'REVENUE', statementId }) },
+  });
+}
+
+async function deliverRevenueStatement(statementId: string) {
+  const statement = await prisma.revenueStatement.findUniqueOrThrow({ where: { id: statementId },
+    include: { organization: { select: { owner: { select: { email: true } } } } },
+  });
+  const root = path.resolve(REVENUE_REPORTS_DIR);
+  const file = path.resolve(root, statement.pdfPath);
+  if (!file.startsWith(root + path.sep)) throw new Error('Invalid report path');
+  const buffer = await fs.readFile(file);
+  await sendEmail({
+    to: statement.organization.owner.email,
+    subject: `ArcadeLX Monthly Revenue Statement: ${statement.Month}/${statement.Year}`,
+    text: 'Please review the attached monthly revenue statement and payout calculations.',
+    html: '<p>Please review the attached monthly revenue statement and payout calculations.</p>',
+    attachment: { filename: path.basename(file), base64Content: buffer.toString('base64'), contentType: 'application/pdf' },
+  });
+}
 
 export async function queueCredentials(
   tx: Prisma.TransactionClient,
@@ -149,6 +176,7 @@ export async function attemptDelivery(deliveryKey: string): Promise<boolean> {
     const payload = decrypt(delivery.payload);
     if (payload.kind === "CREDENTIALS")
       await sendOrganizationCredentialsEmail(payload.credentials);
+    else if (payload.kind === 'REVENUE') await deliverRevenueStatement(payload.statementId);
     else await deliverInvoice(payload.orderId);
     await prisma.emailDelivery.updateMany({
       where: { id: delivery.id, leaseId },

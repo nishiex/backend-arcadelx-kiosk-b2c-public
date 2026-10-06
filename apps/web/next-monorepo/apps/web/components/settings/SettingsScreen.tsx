@@ -79,7 +79,7 @@ export default function SettingsScreen() {
       <div data-reveal>
         <Panel 
           title={<span className="inline-flex items-center gap-2"><Building2 size={16} /> Organization</span>}
-          action={<CompanyInviteCodeDialog />}
+          action={<CompanyInviteCodeDialog purpose="members" />}
         >
           {isLoading ? (
             <Skeleton className="h-5 w-full" />

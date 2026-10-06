@@ -30,7 +30,7 @@ router.get("/:orderId", getOrderDetails);
 //create Orders
 router.post(
   "/create",
-  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireOrgType("COMPANY", "DISTRIBUTOR", "PARTNER"),
   requireRole("OWNER", "ADMIN"),
   createOrder,
 );

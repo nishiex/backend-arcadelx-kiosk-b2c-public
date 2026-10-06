@@ -8,6 +8,55 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Distributor and Partner requests (2026-10-06)
+
+Orders now exposes Request Kiosks to active Distributor/Partner OWNER/ADMIN.
+Partner Owners/Admins also see Orders in the sidebar without gaining other
+canTransact capabilities. fetchOrderRequestSuppliers reads every agreement and
+network page: Distributors select Company suppliers; Partners select Company or
+Distributor suppliers. Both relationships must be ACTIVE and target the requester.
+Partner allocation and supplier decisions remain blocked by the API. No migration
+is needed. order-request-ui-check.tsx covers permissions and supplier selection.
+The existing missing local contact column and disconnected Requests onboarding
+page are separate prerequisites; this change does not create relationships.
+
+## Owner contact (2026-10-05)
+
+Local update (2026-10-06): owner-contact migration is now applied to arcadelx_local;
+the missing-column registration error is resolved locally. Remote status below
+is unchanged.
+
+Distributor and Partner registration require `ownerContact` as a ten-digit string,
+matching `/api/auth/register`. Preserve leading zeros and keep organization phone
+separate. Partner registration also exposes the existing optional GST field.
+`scripts/owner-contact-ui-check.tsx` and `scripts/partner-registration-ui-check.tsx`
+cover validation, request payloads and failure recovery with mocked HTTP.
+The new contact migration is tested locally but not deployed to Supabase.
+
+## Revenue (2026-10-05)
+
+`/revenue` and its sidebar entry are live for active OWNER/ADMIN/MANAGER memberships
+in Company, Distributor and Partner organizations. `useMe().canViewRevenue`
+matches the backend role gate. RevenueScreen uses the authenticated fetch wrapper
+and user/organization/role-scoped React Query keys with 60-second freshness.
+Company OWNER/ADMIN can edit rates; other authorized roles have read-only access.
+Keep gross revenue separate from statement payouts; no statement download API
+is currently exposed. `scripts/revenue-ui-check.tsx` verifies rendering, navigation
+cache, permissions, rate validation/saving and errors using mocked HTTP. See
+the root `audits/revenue/README.md` for verification and deployment limitations.
+
+## Company member invitations (2026-10-05)
+
+Settings uses `CompanyInviteCodeDialog` with `purpose="members"`. Active Company
+OWNER/ADMIN select the invitation's role; ADMIN cannot invite another ADMIN.
+The default dialog purpose remains Distributor registration. Internal invitations
+link to the existing `/join` route, preserve code case, and activate the invited
+member with the Company-selected role. Legacy join codes still require approval.
+Join clears the previous session's query cache before redirecting to `/`.
+`scripts/member-invite-ui-check.tsx` covers Settings permissions/role selection,
+registration submission, cache clearing, and role-based dashboard navigation with
+mocked HTTP/router context. Run using the root auth-registration runtime loader.
+
 ## Request decisions (2026-09-30)
 
 `/user` is pending Company memberships, with 50-row pagination, ten-second polling

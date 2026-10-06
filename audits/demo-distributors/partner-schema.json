@@ -1,0 +1,19 @@
+{
+  "database": "arcadelx_local",
+  "contactColumn": true,
+  "partners": [
+    {
+      "id": "f21df5ae-74e8-41c4-8ad8-c6f82236a2aa",
+      "name": "MyCountryMobile",
+      "role": "OWNER",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "6c66cd4c-ff53-450b-b408-8779901a7505",
+      "name": "expertwise",
+      "role": "OWNER",
+      "status": "ACTIVE"
+    }
+  ],
+  "readOnly": true
+}

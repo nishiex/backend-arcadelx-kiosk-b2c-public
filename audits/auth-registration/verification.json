@@ -1,10 +1,14 @@
 {
-  "checkedAt": "2026-10-05T09:51:29.226Z",
-  "database": "arcadelx_audit_20261005095123305",
+  "checkedAt": "2026-10-05T13:47:18.014Z",
+  "database": "arcadelx_audit_20261005134702293",
   "migration": "20261005121000_restore_registration_fields",
   "checksum": "24d045f04158f52e6a17778f932a61a1f3b134b4d64dd1c6cab31e272bfaffa5",
   "completed": true,
   "results": [
+    {
+      "label": "contact migration preserves existing users without inventing contact",
+      "pass": true
+    },
     {
       "label": "existing Company login",
       "pass": true
@@ -146,7 +150,7 @@
       "pass": true
     },
     {
-      "label": "auth-company-only-/api/network/distributors/07e9b13a-6b42-4320-948b-23c35323d9b8/status",
+      "label": "auth-company-only-/api/network/distributors/fbbe1b98-f0a5-45bd-9b44-a651e54ac721/status",
       "pass": true
     },
     {
@@ -427,6 +431,386 @@
     },
     {
       "label": "invite-concurrent-use-creates-exactly-one-distributor",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-admin",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-manager",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-staff",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-distributor",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-partner",
+      "pass": true
+    },
+    {
+      "label": "member-invite-unauthorized-MANAGER-COMPANY",
+      "pass": true
+    },
+    {
+      "label": "member-invite-unauthorized-STAFF-COMPANY",
+      "pass": true
+    },
+    {
+      "label": "member-invite-unauthorized-OWNER-DISTRIBUTOR",
+      "pass": true
+    },
+    {
+      "label": "member-invite-unauthorized-OWNER-PARTNER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-anonymous-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-admin-cannot-grant-admin",
+      "pass": true
+    },
+    {
+      "label": "member-invite-owner-role-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-register-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-new-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-identity-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-read-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-role-gate-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-reuse-denied-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-complete-ADMIN",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-register-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-new-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-identity-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-read-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-role-gate-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-reuse-denied-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-complete-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-register-STAFF",
+      "pass": true
+    },
+    {
+      "label": "login member-invite-new-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-identity-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-dashboard-read-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-role-gate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-reuse-denied-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-complete-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-MANAGER",
+      "pass": true
+    },
+    {
+      "label": "member-invite-rotated-code-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-tampered-role-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-expired-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-empty-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-wrong-org-type-denied",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-one-concurrent-consumer",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "member-invite-legacy-approval-preserved",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-cannot-register-distributor",
+      "pass": true
+    },
+    {
+      "label": "member-invite-generate-STAFF",
+      "pass": true
+    },
+    {
+      "label": "member-invite-older-schema-register",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "contact-invalid-input-rejected",
+      "pass": true
+    },
+    {
+      "label": "invalid owner contact creates no records/email and preserves invitation",
+      "pass": true
+    },
+    {
+      "label": "contact-distributor-register",
+      "pass": true
+    },
+    {
+      "label": "contact preserves leading zero and stays separate from GST/organization phone",
+      "pass": true
+    },
+    {
+      "label": "login contact-distributor",
+      "pass": true
+    },
+    {
+      "label": "contact-owner-login-and-dashboard",
+      "pass": true
+    },
+    {
+      "label": "generate Company invite",
+      "pass": true
+    },
+    {
+      "label": "contact-duplicate-owner-rejected",
+      "pass": true
+    },
+    {
+      "label": "duplicate contact preserves users, email queue and unconsumed invite",
+      "pass": true
+    },
+    {
+      "label": "concurrent contact uniqueness commits one owner/org/membership/email",
+      "pass": true
+    },
+    {
+      "label": "database enforces contact format outside HTTP validation",
+      "pass": true
+    },
+    {
+      "label": "login contact-legacy-owner",
+      "pass": true
+    },
+    {
+      "label": "contact-legacy-schema-identity",
+      "pass": true
+    },
+    {
+      "label": "contact-legacy-schema-member-invite",
+      "pass": true
+    },
+    {
+      "label": "contact-legacy-schema-staff-join",
+      "pass": true
+    },
+    {
+      "label": "contact-legacy-schema-registration-explains-migration",
+      "pass": true
+    },
+    {
+      "label": "legacy login and staff join remain compatible before contact migration",
+      "pass": true
+    },
+    {
+      "label": "login revenue-distributor",
+      "pass": true
+    },
+    {
+      "label": "login revenue-partner",
+      "pass": true
+    },
+    {
+      "label": "login revenue-other-distributor",
+      "pass": true
+    },
+    {
+      "label": "login revenue-staff",
+      "pass": true
+    },
+    {
+      "label": "revenue-import-device-and-machine-mapping-idempotent",
+      "pass": true
+    },
+    {
+      "label": "revenue-malformed-import-recorded-and-retryable",
+      "pass": true
+    },
+    {
+      "label": "revenue-scoping-revenue-distributor",
+      "pass": true
+    },
+    {
+      "label": "revenue-scoping-revenue-partner",
+      "pass": true
+    },
+    {
+      "label": "revenue-scoping-revenue-other-distributor",
+      "pass": true
+    },
+    {
+      "label": "revenue-staff-denied",
+      "pass": true
+    },
+    {
+      "label": "revenue-anonymous-denied",
+      "pass": true
+    },
+    {
+      "label": "revenue-settings-readable",
+      "pass": true
+    },
+    {
+      "label": "revenue-settings-owner-update",
+      "pass": true
+    },
+    {
+      "label": "revenue-settings-staff-denied",
+      "pass": true
+    },
+    {
+      "label": "revenue-settings-distributor-denied",
+      "pass": true
+    },
+    {
+      "label": "revenue-settings-invalid-deductions",
+      "pass": true
+    },
+    {
+      "label": "revenue-historical-agreements-assignment-windows-IST-and-money",
+      "pass": true
+    },
+    {
+      "label": "revenue-failed-email-retry-without-duplicate-statement-or-send",
+      "pass": true
+    },
+    {
+      "label": "revenue-additive-migration-preserves-existing-statements",
+      "pass": true
+    },
+    {
+      "label": "revenue-partner-payout-unique-jobs-and-IST-year-boundary",
       "pass": true
     },
     {

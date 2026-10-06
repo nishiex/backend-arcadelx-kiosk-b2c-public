@@ -1,0 +1,32 @@
+{
+  "database": "arcadelx_partner_orders_1791270301880",
+  "checks": [
+    "Distributor Owner requests Company",
+    "Distributor Admin requests Company",
+    "Partner Owner requests Distributor",
+    "Partner request direction, status and agreement amounts",
+    "Partner Admin requests Distributor",
+    "Partner cannot allocate",
+    "Partner Admin cannot allocate",
+    "DISTRIBUTOR MANAGER cannot request",
+    "DISTRIBUTOR STAFF cannot request",
+    "PARTNER MANAGER cannot request",
+    "PARTNER STAFF cannot request",
+    "Pending Partner membership cannot request",
+    "Partner cannot request unrelated Company",
+    "Partner cannot request itself",
+    "Invalid quantity 0 rejected",
+    "Invalid quantity 51 rejected",
+    "Invalid quantity 1.5 rejected",
+    "Inactive network blocks Partner request",
+    "Inactive agreement blocks Partner request",
+    "Rejected requests create no orders",
+    "Partner can request directly contracted Company",
+    "Requests do not reserve inventory or enqueue email",
+    "Partner cannot approve orders",
+    "Supplier can see Partner request",
+    "Unrelated Partner cannot read request"
+  ],
+  "emailSent": false,
+  "applicationDatabaseChanged": false
+}

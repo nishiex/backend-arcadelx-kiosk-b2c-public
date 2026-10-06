@@ -18,7 +18,7 @@ export default function OrdersScreen() {
   const organizationId = me?.membership?.organizationId
   const canDecide = me?.membership?.status === "ACTIVE" && (role === "OWNER" || role === "ADMIN")
   const canApproveOrders = canDecide && (orgType === "COMPANY" || orgType === "DISTRIBUTOR")
-  const canRequest = !identityError && canDecide && orgType === "DISTRIBUTOR"
+  const canRequest = !identityError && canDecide && (orgType === "DISTRIBUTOR" || orgType === "PARTNER")
   const [createdMessage, setCreatedMessage] = React.useState("")
   const readiness = useQuery({ queryKey: ["workflow-readiness"], queryFn: fetchWorkflowReadiness, enabled: !!organizationId && canDecide, refetchInterval: 30_000 })
   const orderActionsDisabled = readiness.isError || !readiness.data?.orderDecisions
@@ -44,9 +44,9 @@ export default function OrdersScreen() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-2xl font-semibold tracking-tight">Orders &amp; Requests</h1><p className="mt-1 text-sm text-muted-foreground">Track incoming requests and outgoing machine allocations, including completed deliveries.</p></div>
         <div className="flex flex-wrap gap-2">
-          {canRequest && organizationId && <CreateOrderDialog key={organizationId} organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => {
+          {canRequest && organizationId && orgType && <CreateOrderDialog key={organizationId} organizationId={organizationId} orgType={orgType} disabled={orderActionsDisabled} onCreated={order => {
             setSearch(""); setStatus(""); setDirection("")
-            setCreatedMessage(`Request ${order.orderNumber} submitted for company approval.`)
+            setCreatedMessage(`Request ${order.orderNumber} submitted for supplier approval.`)
           }} />}
           <button type="button" onClick={() => orders.refetch()} disabled={!organizationId || orders.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"><RefreshCw size={16} className={orders.isFetching ? "animate-spin" : ""} /> Refresh</button>
         </div>

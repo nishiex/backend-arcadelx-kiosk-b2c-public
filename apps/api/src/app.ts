@@ -14,6 +14,7 @@ import agreementRoutes from "./routes/Agreements/agreement.routes"
 import kioskRoutes from './routes/Kiosk/kiosk.routes';
 import internalRoutes from './routes/Internal/internal.routes';
 import orderRoutes from './routes/Orders/order.route'
+import revenueRoutes from './routes/Revenue/revenue.routes';
 import { requireAuth, loadMembership } from './middlewares/auth';
 import { asyncHandler } from './utils/asyncHandler';
 import { workflowReadiness } from './services/workflow-readiness';
@@ -40,6 +41,7 @@ app.use('/api/kiosks', kioskRoutes);
     app.use('/api/internal', internalRoutes);
 
 app.use("/api/orders",orderRoutes)
+app.use('/api/revenue', revenueRoutes);
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
 {

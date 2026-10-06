@@ -3,20 +3,26 @@ import { asyncHandler } from "../utils/asyncHandler";
 import crypto from "crypto"
 import { prisma } from "../utils/db";
 import { ApiResponse } from "../utils/ApiResponse";
-import { ApproveRequestSchema, UpdateRoleSchema, PaginationQuerySchema } from '@shared-types/validationSchemas/member.validation';
+import { ApproveRequestSchema, UpdateRoleSchema, PaginationQuerySchema, GenerateInviteSchema } from '@shared-types/validationSchemas/member.validation';
 import { ApiError } from "../utils/ApiError";
+import { createMemberInvite } from '../services/member-invite';
 
 const ROLE_WEIGHT: Record<string, number> = { OWNER: 3, ADMIN: 2, MANAGER: 1, STAFF: 0 };
 
 export const generateInviteCode = asyncHandler(async(req:Request,res:Response) => {
     
     const orgId = req.membership!.organizationId;
+    const { role } = GenerateInviteSchema.parse(req.body ?? {});
+    if (role && ROLE_WEIGHT[role]! >= ROLE_WEIGHT[req.membership!.role]!) {
+      throw new ApiError(403, 'You cannot invite a role equal to or higher than your own');
+    }
     let code = "";
     const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ23456789abcdefghijklmnopqrstuvwxyz";
     for (let i = 0; i < 6; i++) {
         const index = crypto.randomInt(chars.length);
         code += chars[index];
     }
+    if (role) code = createMemberInvite(role);
     const expiresAt = new Date (Date.now()+7*24*60*60*1000);
 
     const org = await prisma.organization.update({
@@ -31,7 +37,8 @@ export const generateInviteCode = asyncHandler(async(req:Request,res:Response) =
         select:{inviteCode:true,inviteCodeExpiresAt:true}
     })
 
-    res.status(201).json(new ApiResponse(201,{inviteCode: org.inviteCode,expiresAt: org.inviteCodeExpiresAt},"New invite code generated successfully"))
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json(new ApiResponse(201,{inviteCode: org.inviteCode,expiresAt: org.inviteCodeExpiresAt, ...(role ? { role } : {})},"New invite code generated successfully"))
 });
 
 export const getPendingRequests = asyncHandler(async (req: Request, res: Response) => {

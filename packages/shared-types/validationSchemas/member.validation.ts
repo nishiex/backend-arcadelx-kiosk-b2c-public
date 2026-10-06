@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const RoleEnum = z.enum(["ADMIN", "MANAGER", "STAFF"]);
 
+export const GenerateInviteSchema = z.object({ role: RoleEnum.optional() });
+
 export const ApproveRequestSchema = z
   .object({
     action: z.enum(["APPROVE", "REJECT"]),

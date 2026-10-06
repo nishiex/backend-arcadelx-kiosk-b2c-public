@@ -1,5 +1,25 @@
 # Backend working guide
 
+## Local owner contact repaired (2026-10-06)
+
+Both root database URLs target arcadelx_local on localhost:5433. The specific
+20261005190000_add_owner_contact migration is now applied and recorded atomically
+there. All nine existing users were preserved; a contact insert/leading-zero probe
+passed and was rolled back. No remote migration or email was performed. Evidence:
+audits/demo-distributors/owner-contact-deployment.json. Other pending migrations
+were not applied. The previous local missing-contact registration blocker is fixed.
+
+## Distributor and Partner kiosk requests (2026-10-06)
+
+Active Distributor and Partner OWNER/ADMIN memberships may POST REQUEST orders.
+Partners may request from a Company or Distributor only through the exact active
+agreement and active network relationship. Partners cannot ALLOCATE or perform
+supplier decisions/payment/dispatch/delivery. Existing quantity 1–50, financial
+snapshots and readiness gates remain. No migration is required for this change.
+`audits/demo-distributors/partner-order-regression.cjs` verifies 25 cases against
+a fresh isolated local database using the auth-registration runtime loader.
+No live demo statuses or agreements are changed by that test.
+
 Updated 2026-09-29 after F1–F11 fixes. Applies to `apps/api`, especially `src` and
 `prisma`. Recheck relevant implementation when editing. The original
 [Distributor audit](../../audits/distributor-lifecycle/REPORT.md) describes the
@@ -21,6 +41,71 @@ pre-fix implementation; current behavior, evidence and deployment status are in
   assumption. Keep this guide current when behavior changes.
 
 ## Environment and deployment status
+
+### Owner contact integrated (2026-10-05)
+
+Backend `1e519e3` is adapted into existing registration. `ownerContact` is required
+for new Distributor/Partner owners and must contain ten digits. User.contact is
+nullable unique text to preserve legacy/staff/seed accounts and leading zeros;
+organization phone and GST remain separate. The shared Prisma client omits
+contact unless explicitly requested. Existing auth remains compatible before
+deployment, while owner registration returns 503 if the column is missing.
+Migration `20261005190000_add_owner_contact` was tested in a new local audit DB;
+it has NOT been applied to Supabase. See `audits/auth-registration/OWNER_CONTACT.md`
+for compatibility decisions and 204 passing regression checks. No live contacts
+were backfilled and no real test emails were sent.
+
+### Revenue backend integrated (2026-10-05)
+
+Revenue functionality from Backend `2d013c9` is integrated alongside the existing
+order/auth/invite work. See [integration and verification](../../audits/revenue/README.md).
+The schema gains only revenue models and relations. An additive compatibility
+migration is checked in the working tree; no remote migration was applied for
+this integration. Original upstream SQL is archived for reconciliation.
+The three revenue endpoints are mounted under `/api/revenue`. Background jobs
+require explicit `REVENUE_JOBS_ENABLED=true`, Redis and a Mothership source URL;
+they use the existing BullMQ scheduler and a connected worker. They remain
+disabled in the current runtime. PDFs/email use persistent report storage and
+the existing leased EmailDelivery queue. Existing organization access fields must
+be deployed before activating workers. Tests create local isolated data only.
+
+### Current remote order repair and email verification (2026-10-05)
+
+After explicit user approval, `20261005120000_restore_order_workflow` was
+applied to the currently configured Supabase database and recorded atomically.
+Four local repair tests passed; all remote preflight checks were clear. The
+deployment verified existing business-row fingerprints were preserved, with
+zero reservations requiring backfill. All three order prerequisites now exist.
+See `audits/order-readiness/deployment.json` for current evidence.
+Mailjet authentication and the configured sender's Active status were verified.
+One user-requested plain test email was accepted by Mailjet, and the user
+confirmed receipt. No account or credential email was created as that test.
+Organization profile/access fields remain missing remotely; new-organization
+registration requires its separate repair and has not been verified here.
+
+### Supabase settings supplied again (2026-10-05)
+
+The user supplied updated environment settings after local demo verification.
+Ignored `.env` now uses Supabase transaction pooler port 6543 for runtime and
+session pooler port 5432 for migrations, with the supplied Mailjet settings.
+API port remains 4000 and the frontend login URL is localhost:3000/login.
+Both database connections pass; read-only checks report `orderDecisions: false`
+because the remote order prerequisites are absent. No remote schema or business
+data was changed. API restarted with these settings. Mail delivery is unverified.
+The preceding local environment was privately backed up in the temporary folder.
+
+### Local database selected again (2026-10-05)
+
+At the user's request, ignored root `.env` was restored from the existing local
+backup and both database URLs now target `arcadelx_local` on localhost:5433.
+Read-only checks confirm all three workflow readiness flags are true. No database
+rows or migrations were changed. The frontend still proxies to localhost:4000.
+The API has now restarted on port 4000 with this environment. Health, database
+health and local owner login pass. Authenticated workflow checks through both
+ports 4000 and 3000 return all three flags true; the verification session was
+logged out. Supabase's current schema is missing the three order prerequisites
+despite the historical repair below.
+The prior environment was backed up privately under the user's temporary folder.
 
 ### Order readiness restored (2026-10-05)
 
@@ -227,6 +312,26 @@ conflicts 409, missing records 404. Unexpected errors return 500 without exposin
 exception messages.
 
 ## Authentication and route permissions
+
+### Company internal invitations (2026-10-05)
+
+Settings generates internal invitations through the existing Company OWNER/ADMIN
+`POST /api/members/generateInviteCode` endpoint with `{role: ADMIN|MANAGER|STAFF}`.
+Only OWNER can invite ADMIN; ADMIN can invite MANAGER/STAFF. The Company role is
+the existing singleton root organization, not a match on its display name.
+The exact ten-character code stores its role prefix and random suffix in the
+existing `Organization.inviteCode` field; no schema change is needed. Prefix
+tampering fails the exact lookup. Generation replaces the organization's prior
+invite. Internal codes expire in seven days and are consumed once under an
+organization row lock. Code consumption, user creation and ACTIVE membership
+creation commit together. The client cannot select a different organization/role.
+`POST /api/auth/join` returns the membership status/role and existing auth cookies.
+Unprefixed legacy codes keep PENDING approval behavior, and no-role generation
+keeps the existing Distributor invitation flow. Internal codes cannot register
+a Distributor. Codes remain absent from `/api/auth/me` and routine responses.
+159 isolated auth/invitation checks passed, including existing Distributor/Partner
+flows, concurrent consumption and older-schema compatibility. No remote accounts
+or emails were created for these tests. Prisma schema fields were not edited.
 
 A User has at most one Membership (`userId` is unique). Membership must be ACTIVE
 for protected organization operations; PENDING/REJECTED cannot mutate lifecycle

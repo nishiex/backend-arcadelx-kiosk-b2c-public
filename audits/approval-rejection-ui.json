@@ -55,11 +55,7 @@
       "pass": true
     },
     {
-      "check": "order-approval-explains-reservation",
-      "pass": true
-    },
-    {
-      "check": "order-approval-refreshes-row",
+      "check": "Approve-readiness-error-retains-enabled-cache",
       "pass": true
     }
   ]

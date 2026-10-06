@@ -123,18 +123,48 @@ async function lockedStock(
 
 export const createOrder = asyncHandler(async (req, res) => {
   await requireWorkflow('orderDecisions');
-  const { type, targetOrgId, quantity } = CreateOrderSchema.parse(req.body);
+  const parsed = CreateOrderSchema.parse(req.body);
   const currentOrgId = req.membership!.organizationId;
-  const parentOrgId = type === "REQUEST" ? targetOrgId : currentOrgId;
-  const childOrgId = type === "REQUEST" ? currentOrgId : targetOrgId;
+  const currentOrgType = req.membership!.type;
+
+  if (currentOrgType === 'PARTNER' && parsed.type !== 'REQUEST') {
+    throw new ApiError(403, 'Partners can request kiosks but cannot allocate them');
+  }
+  if (currentOrgType === 'COMPANY') {
+    throw new ApiError(403, 'Company cannot request kiosks; use ALLOCATION to push kiosks to distributors or partners');
+  }
+
+  let parentOrgId: string;
+  let childOrgId: string;
+
+  if (parsed.type === 'REQUEST') {
+    // Supplier is looked up via the active agreement.
+    // The client does not supply a targetOrgId for REQUEST orders.
+    childOrgId = currentOrgId;
+    const supplierAgreement = await prisma.agreement.findFirst({
+      where: { childOrgId, status: 'ACTIVE' },
+      include: { parentOrg: { select: { id: true, type: true } } },
+    });
+    if (!supplierAgreement)
+      throw new ApiError(
+        403,
+        'Cannot create request: No active agreement with a supplier found',
+      );
+    parentOrgId = supplierAgreement.parentOrg.id;
+  } else {
+    // ALLOCATION: Company or Distributor pushes kiosks down to a child org.
+    parentOrgId = currentOrgId;
+    childOrgId = parsed.targetOrgId;
+  }
+
   const order = await prisma.$transaction(async (tx) => {
     const candidate = await tx.agreement.findFirst({
-      where: { parentOrgId, childOrgId, status: "ACTIVE" },
+      where: { parentOrgId, childOrgId, status: 'ACTIVE' },
     });
     if (!candidate)
       throw new ApiError(
         403,
-        "Cannot create order: No active agreement exists between these organizations",
+        'Cannot create order: No active agreement exists between these organizations',
       );
     await lockAgreementParties(
       tx,
@@ -145,26 +175,26 @@ export const createOrder = asyncHandler(async (req, res) => {
     const agreement = await tx.agreement.findUniqueOrThrow({
       where: { id: candidate.id },
     });
-    if (agreement.status !== "ACTIVE")
-      throw new ApiError(403, "Agreement is no longer active");
+    if (agreement.status !== 'ACTIVE')
+      throw new ApiError(403, 'Agreement is no longer active');
     const year = new Date().getFullYear();
     const sequence = await tx.$queryRaw<
       [{ value: number }]
     >`INSERT INTO "OrderSequence" (year,value) VALUES (${year},1) ON CONFLICT (year) DO UPDATE SET value="OrderSequence".value+1 RETURNING value`;
     const depositPerMachine = agreement.depositAmountPerMachine;
     const nonRefundablePerMachine = agreement.nonRefundableAmountPerMachine;
-    const totalDeposit = depositPerMachine * quantity;
-    const totalNonRefundable = nonRefundablePerMachine * quantity;
+    const totalDeposit = depositPerMachine * parsed.quantity;
+    const totalNonRefundable = nonRefundablePerMachine * parsed.quantity;
     const taxAmount = Math.round(totalNonRefundable * 18) / 100;
     const row = await tx.order.create({
       data: {
-        orderNumber: `ORD-${year}-${String(sequence[0].value).padStart(5, "0")}`,
-        type,
-        status: type === "REQUEST" ? "UNDER_REVIEW" : "APPROVED",
+        orderNumber: `ORD-${year}-${String(sequence[0].value).padStart(5, '0')}`,
+        type: parsed.type,
+        status: parsed.type === 'REQUEST' ? 'UNDER_REVIEW' : 'APPROVED',
         parentOrgId,
         childOrgId,
         agreementId: agreement.id,
-        quantity,
+        quantity: parsed.quantity,
         depositPerMachine,
         nonRefundablePerMachine,
         totalDeposit,
@@ -173,39 +203,33 @@ export const createOrder = asyncHandler(async (req, res) => {
         grandTotal: totalDeposit + totalNonRefundable + taxAmount,
       },
     });
-    if (type === "ALLOCATION") {
-      await reserveKiosks(tx, parentOrgId, quantity, row.id);
+    if (parsed.type === 'ALLOCATION') {
+      await reserveKiosks(tx, parentOrgId, parsed.quantity, row.id);
       await queueInvoice(tx, parentOrgId, row.id);
     }
     return row;
   });
-  if (type === "REQUEST")
+
+  if (parsed.type === 'REQUEST')
     return res
       .status(201)
       .json(
         new ApiResponse(
           201,
           { order },
-          "Order requested successfully. Pending approval.",
+          'Order requested successfully. Pending approval.',
         ),
       );
+
   const invoiceEmailSent = await attemptDelivery(invoiceDeliveryKey(order.id));
-  const updated = await prisma.order.findUniqueOrThrow({
-    where: { id: order.id },
-  });
-  res
-    .status(201)
-    .json(
-      new ApiResponse(
-        201,
-        {
-          order: updated,
-          invoiceEmailSent,
-          invoiceReady: !!updated.invoiceFilename,
-        },
-        "Order created; invoice delivery queued",
-      ),
-    );
+  const updated = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      { order: updated, invoiceEmailSent, invoiceReady: !!updated.invoiceFilename },
+      'Order created; invoice delivery queued',
+    ),
+  );
 });
 
 export const approveOrder = asyncHandler(async (req, res) => {

@@ -51,8 +51,10 @@ export default function JoinForm() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.message || "Could not create your account")
-      await queryClient.invalidateQueries({ queryKey: ["me"] })
-      toast.success("Account created — pending approval")
+      // Registration replaces the browser session; discard the previous user's data.
+      await queryClient.cancelQueries()
+      queryClient.clear()
+      toast.success(json?.data?.membership?.status === "ACTIVE" ? "Account created — Company dashboard access enabled" : "Account created — pending approval")
       router.replace("/")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign up failed")
@@ -119,8 +121,9 @@ export default function JoinForm() {
           <div className="relative">
             <Ticket size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input id="inviteCode" type="text" placeholder="Your organization's code"
-              className={cn(inputCls(!!errors.inviteCode), "font-mono uppercase tracking-wide")}
-              {...register("inviteCode", { required: "Invite code is required", maxLength: { value: 10, message: "Invalid invite code" } })} />
+              autoCapitalize="none" spellCheck={false}
+              className={cn(inputCls(!!errors.inviteCode), "font-mono tracking-wide")}
+              {...register("inviteCode", { required: "Invite code is required", setValueAs: (value: string) => value.trim(), maxLength: { value: 10, message: "Invalid invite code" } })} />
           </div>
           {errors.inviteCode && <p className="mt-1 text-xs text-destructive">{errors.inviteCode.message}</p>}
         </div>

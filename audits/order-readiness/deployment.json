@@ -1,51 +1,51 @@
 {
   "migration": "20261005120000_restore_order_workflow",
   "checksum": "dec7eb6b11b08d6eb338b936f3c0166279a3888bb395051aaf8f1254c7a0142f",
-  "checkedAt": "2026-10-05T08:07:40.605Z",
+  "checkedAt": "2026-10-05T12:15:57.788Z",
   "before": {
     "Agreement": {
-      "count": 1,
-      "digest": "ccffd709e50f983ea5cc04944ee187cf"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "Kiosk": {
-      "count": 131,
-      "digest": "aa302eaab13f655341cdd5b7920938c3"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "KioskAssignment": {
-      "count": 3,
-      "digest": "9a3465e7b56181d17f98e19336ffb2ab"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "MachineSequence": {
-      "count": 1,
-      "digest": "7663650c7b4edee9bc7d04ef20412811"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "Membership": {
-      "count": 5,
-      "digest": "af28ef99b719a71f0ca17176ef7c2f15"
+      "count": 1,
+      "digest": "0e8686bb137bce2002bd9f40758609be"
     },
     "NetworkConnection": {
-      "count": 2,
-      "digest": "ebf501cf17a0f8fdd3b6ed19fda4c029"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "Order": {
-      "count": 3,
-      "digest": "4b3082368b7a9fa08a2e09d62b1f5f71"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "OrderKiosk": {
-      "count": 10,
-      "digest": "f6519838b5eaeb823ec710bf5eafea40"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "Organization": {
-      "count": 4,
-      "digest": "c9a428b7da8ff65d116946a212889bef"
+      "count": 1,
+      "digest": "df95a2effda9b1eaca13af51c58c00f6"
     },
     "PasswordReset": {
-      "count": 3,
-      "digest": "15bbdcb08d78384f9bf19994c5e3c253"
+      "count": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "RefreshToken": {
-      "count": 44,
-      "digest": "7cd276a33c50e4b0d53880081459a716"
+      "count": 4,
+      "digest": "4182a0d8a7d40940b07ec6e1dbca9b87"
     },
     "RevenueStatement": {
       "count": 0,
@@ -64,8 +64,8 @@
       "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "User": {
-      "count": 5,
-      "digest": "b9a6e190d8b475a26490e4167b30f98d"
+      "count": 1,
+      "digest": "d6e22d86ab524a2d2f684bb07c7c3b0c"
     }
   },
   "readinessBefore": {
@@ -78,13 +78,8 @@
     "orderSequence": true,
     "emailDelivery": true
   },
-  "backfilledReservations": 10,
-  "sequences": [
-    {
-      "year": 2026,
-      "value": 2
-    }
-  ],
+  "backfilledReservations": 0,
+  "sequences": [],
   "committed": true,
   "runtimeReadiness": {
     "reservationColumn": true,

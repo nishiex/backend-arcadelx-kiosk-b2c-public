@@ -55,7 +55,7 @@ const { QueryClient, QueryClientProvider } =
   await import("@tanstack/react-query")
 const { default: OrdersScreen } =
   await import("../components/orders/OrdersScreen")
-const { createOrder, fetchOrderRequestCompanies } =
+const { createOrder, fetchOrderRequestSuppliers } =
   await import("../lib/backend-api")
 const distributor = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -156,7 +156,7 @@ globalThis.fetch = async (input, init) => {
       return response(null, 503, "Order requests are temporarily unavailable.")
     const order = {
       ...body,
-      id: "created-order",
+      id: `created-order-${orders.length}`,
       orderNumber: "ORD-TEST-NEW",
       status: "UNDER_REVIEW",
       paymentStatus: "PENDING",
@@ -252,18 +252,23 @@ const posts = () => calls.filter((call) => call.path === "/api/orders/create")
 try {
   check(
     "company-resolved-after-history-pages-and-deduplicated",
-    JSON.stringify(await fetchOrderRequestCompanies(distributor.id)) ===
+    JSON.stringify(await fetchOrderRequestSuppliers(distributor.id, "DISTRIBUTOR")) ===
       JSON.stringify([company])
   )
   activeNetwork.status = "PENDING"
   check(
     "inactive-network-excludes-company",
-    (await fetchOrderRequestCompanies(distributor.id)).length === 0
+    (await fetchOrderRequestSuppliers(distributor.id, "DISTRIBUTOR")).length === 0
   )
   activeNetwork.status = "ACTIVE"
+  const supplierType = company.type
+  company.type = "DISTRIBUTOR"
+  check("partner-can-select-distributor-supplier", (await fetchOrderRequestSuppliers(distributor.id, "PARTNER")).length === 1)
+  check("distributor-cannot-select-distributor-supplier", (await fetchOrderRequestSuppliers(distributor.id, "DISTRIBUTOR")).length === 0)
+  company.type = supplierType
   for (const quantity of [0, 51, 1.5, NaN])
     await assert.rejects(
-      createOrder({ type: "REQUEST", targetOrgId: company.id, quantity }),
+      createOrder({ type: "REQUEST", quantity }),
       /whole number/
     )
   check("invalid-helper-quantities-send-no-post", posts().length === 0)
@@ -275,29 +280,38 @@ try {
     )
   )
   await until(
-    () => !!button("Request Containers"),
+    () => !!button("Request Kiosks"),
     "Distributor action appears"
   )
   check(
     "workflow-unavailable-disables-trigger",
-    button("Request Containers")!.disabled
+    button("Request Kiosks")!.disabled
   )
   for (const deniedRole of ["MANAGER", "STAFF"]) {
     role = deniedRole
     await identity()
-    check(`${deniedRole}-cannot-request`, !button("Request Containers"))
+    check(`${deniedRole}-cannot-request`, !button("Request Kiosks"))
   }
   role = "OWNER"
   membershipStatus = "PENDING"
   await identity()
-  check("pending-membership-cannot-request", !button("Request Containers"))
+  check("pending-membership-cannot-request", !button("Request Kiosks"))
   membershipStatus = "ACTIVE"
   currentOrg = company
   await identity()
-  check("company-cannot-use-distributor-request", !button("Request Containers"))
+  check("company-cannot-use-distributor-request", !button("Request Kiosks"))
   currentOrg = { ...distributor, type: "PARTNER" }
   await identity()
-  check("partner-cannot-request", !button("Request Containers"))
+  check("partner-owner-can-request", !!button("Request Kiosks"))
+  role = "ADMIN"
+  await identity()
+  check("partner-admin-can-request", !!button("Request Kiosks"))
+  for (const deniedRole of ["MANAGER", "STAFF"]) {
+    role = deniedRole
+    await identity()
+    check(`partner-${deniedRole}-cannot-request`, !button("Request Kiosks"))
+  }
+  role = "OWNER"
   currentOrg = distributor
   await identity()
   await React.act(async () => {
@@ -305,10 +319,10 @@ try {
     await qc.invalidateQueries({ queryKey: ["workflow-readiness"] })
   })
   await until(
-    () => button("Request Containers")?.disabled === false,
+    () => button("Request Kiosks")?.disabled === false,
     "Ready workflow enables trigger"
   )
-  await click(button("Request Containers"))
+  await click(button("Request Kiosks"))
   await until(
     () => button("Submit request")?.disabled === false,
     "Active company resolves"
@@ -332,7 +346,7 @@ try {
   )
   check(
     "readiness-error-disables-request-trigger-and-submit",
-    button("Request Containers")!.disabled && button("Submit request")!.disabled
+    button("Request Kiosks")!.disabled && button("Submit request")!.disabled
   )
   await React.act(async () => {
     document
@@ -353,7 +367,7 @@ try {
   )
   check(
     "sole-company-selected",
-    (document.querySelector('[aria-label="Company"]') as HTMLSelectElement)
+    (document.querySelector('[aria-label="Supplier"]') as HTMLSelectElement)
       .value === company.id
   )
   for (const value of ["", "0", "51", "1.5"]) {
@@ -368,7 +382,7 @@ try {
   relationshipError = true
   await refreshCompanies()
   await until(
-    () => document.body.textContent!.includes("Couldn't load your company"),
+    () => document.body.textContent!.includes("Couldn't load your supplier"),
     "Relationship error appears"
   )
   check(
@@ -381,7 +395,7 @@ try {
   await until(
     () =>
       document.body.textContent!.includes(
-        "You need an active company agreement"
+        "You need an active supplier agreement"
       ),
     "No eligible relationship explained"
   )
@@ -440,7 +454,7 @@ try {
   await setValue('[aria-label="Search order number"]', "unrelated")
   await setValue('[aria-label="Filter order status"]', "DELIVERED")
   await setValue('[aria-label="Filter order direction"]', "INCOMING")
-  await click(button("Request Containers"))
+  await click(button("Request Kiosks"))
   await until(
     () => button("Submit request")?.disabled === false,
     "Dialog reopened"
@@ -506,7 +520,7 @@ try {
     "pending-request-disables-form-controls",
     close.disabled &&
       button("Submitting...")!.disabled &&
-      (document.querySelector('[aria-label="Company"]') as HTMLSelectElement)
+      (document.querySelector('[aria-label="Supplier"]') as HTMLSelectElement)
         .disabled &&
       (
         document.querySelector(
@@ -557,7 +571,6 @@ try {
   )
   assert.deepEqual(posts().at(-1)!.body, {
     type: "REQUEST",
-    targetOrgId: company.id,
     quantity: 10,
   })
   check(
@@ -584,14 +597,14 @@ try {
   )
   check(
     "success-explains-company-approval",
-    document.body.textContent!.includes("submitted for company approval")
+    document.body.textContent!.includes("submitted for supplier approval")
   )
   await until(
     () =>
-      button("Request Containers")?.disabled === false && qc.isMutating() === 0,
+      button("Request Kiosks")?.disabled === false && qc.isMutating() === 0,
     "Successful request settles"
   )
-  await click(button("Request Containers"))
+  await click(button("Request Kiosks"))
   await until(
     () => button("Submit request")?.disabled === false,
     "Successful request can be reopened"
@@ -617,6 +630,19 @@ try {
     "settled-successful-request-can-close",
     !document.querySelector('[role="dialog"]')
   )
+  currentOrg = { ...distributor, type: "PARTNER" }
+  role = "ADMIN"
+  holdCreate = false
+  company.type = "DISTRIBUTOR"
+  await identity()
+  await click(button("Request Kiosks"))
+  await until(() => button("Submit request")?.disabled === false, "Partner resolves Distributor supplier")
+  const partnerPostsBefore = posts().length
+  await click(button("Submit request"))
+  await until(() => posts().length === partnerPostsBefore + 1 && !document.querySelector('[role="dialog"]'), "Partner request submitted")
+  assert.deepEqual(posts().at(-1)?.body, { type: "REQUEST", quantity: 1 })
+  check("partner-admin-submits-request-to-distributor", true)
+  company.type = supplierType
 } finally {
   await React.act(async () => root.unmount())
   qc.clear()

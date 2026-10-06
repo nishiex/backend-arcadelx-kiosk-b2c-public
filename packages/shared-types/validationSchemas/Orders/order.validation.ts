@@ -2,11 +2,20 @@ import { z } from "zod";
 
 export const OrderParamsSchema = z.object({ orderId: z.string().uuid() });
 
-export const CreateOrderSchema = z.object({
-  type: z.enum(["REQUEST", "ALLOCATION"]),
-  targetOrgId: z.string().uuid(), // If REQUEST, this is the parent you are asking. If ALLOCATION, this is the child you are sending to.
-  quantity: z.number().int().min(1).max(50),
-});
+// For REQUEST orders the Company supplier is always resolved automatically
+// server-side — the client only needs to specify quantity.
+// For ALLOCATION orders the caller must specify the target child org.
+export const CreateOrderSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("REQUEST"),
+    quantity: z.number().int().min(1).max(50),
+  }),
+  z.object({
+    type: z.literal("ALLOCATION"),
+    targetOrgId: z.string().uuid(), // child org to push kiosks to
+    quantity: z.number().int().min(1).max(50),
+  }),
+]);
 
 export const OrderQuerySchema = z.object({
   status: z

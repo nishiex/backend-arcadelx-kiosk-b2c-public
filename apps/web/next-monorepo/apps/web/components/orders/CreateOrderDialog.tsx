@@ -2,52 +2,41 @@
 
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Plus, X } from "lucide-react"
-import { createOrder, fetchOrderRequestCompanies, type CreatedOrder } from "@/lib/backend-api"
-import { ErrorState } from "@/components/dashboard/ui"
+import { createOrder, type CreatedOrder, type OrgType } from "@/lib/backend-api"
 import { KIOSK_MODELS } from "@/lib/kiosk-models"
 
-export default function CreateOrderDialog({ organizationId, disabled, onCreated }: {
+export default function CreateOrderDialog({ organizationId, orgType, disabled, onCreated }: {
   organizationId: string
+  orgType: OrgType
   disabled: boolean
   onCreated: (order: CreatedOrder) => void
 }) {
   const [open, setOpen] = React.useState(false)
   const [quantity, setQuantity] = React.useState("1")
   const [modelDraft, setModelDraft] = React.useState("")
-  const [selectedCompany, setSelectedCompany] = React.useState("")
   const submitting = React.useRef(false)
   const qc = useQueryClient()
-  const companies = useQuery({
-    queryKey: ["order-request-companies", organizationId],
-    queryFn: ({ signal }) => fetchOrderRequestCompanies(organizationId, signal),
-    enabled: open && !disabled,
-    staleTime: 0,
-    refetchInterval: open ? 30_000 : false,
-  })
-  const choices = companies.data ?? []
-  const isNileeGames = (name: string) => name.replace(/[^a-z0-9]/gi, "").toLowerCase().startsWith("nileegames")
-  const defaultCompany = choices.find(company => isNileeGames(company.name)) ?? (choices.length === 1 ? choices[0] : undefined)
-  const targetOrgId = selectedCompany || defaultCompany?.id || ""
+  
   const validQuantity = quantity.trim() !== "" && Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 50
-  const validCompany = choices.some(company => company.id === targetOrgId)
+  
   const mutation = useMutation({
-    mutationFn: () => createOrder({ type: "REQUEST", targetOrgId, quantity: Number(quantity) }),
+    mutationFn: () => createOrder({ type: "REQUEST", quantity: Number(quantity) }),
     retry: false,
     onSuccess: order => { setOpen(false); onCreated(order) },
     onSettled: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["orders", organizationId] }),
-        qc.invalidateQueries({ queryKey: ["order-request-companies", organizationId] }),
         qc.invalidateQueries({ queryKey: ["workflow-readiness"] }),
       ])
     },
   })
-  const blocked = disabled || companies.isFetching || companies.isError || !validCompany || !validQuantity || mutation.isPending
+  
+  const blocked = disabled || !validQuantity || mutation.isPending
   const changeOpen = (value: boolean) => {
     if (submitting.current) return
-    if (value) { setQuantity("1"); setModelDraft(""); setSelectedCompany(""); mutation.reset() }
+    if (value) { setQuantity("1"); setModelDraft(""); mutation.reset() }
     setOpen(value)
   }
 
@@ -60,7 +49,7 @@ export default function CreateOrderDialog({ organizationId, disabled, onCreated 
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl">
           <Dialog.Title className="pr-7 text-lg font-semibold">Request kiosks </Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm text-muted-foreground">Send a request to your company for approval. Your active agreement determines the order amounts.</Dialog.Description>
+          <Dialog.Description className="mt-2 text-sm text-muted-foreground">Send a request to your supplier for approval. Your active agreement determines the order amounts.</Dialog.Description>
           <Dialog.Close disabled={mutation.isPending} aria-label="Close container request" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"><X size={18} /></Dialog.Close>
           <form className="mt-5 space-y-5" onSubmit={async event => {
             event.preventDefault()
@@ -70,15 +59,7 @@ export default function CreateOrderDialog({ organizationId, disabled, onCreated 
             finally { submitting.current = false }
           }}>
             {disabled && <p role="status" className="text-sm text-muted-foreground">Kiosk requests are temporarily unavailable. Please try again later.</p>}
-            <label className="block space-y-2 text-sm font-medium">Company
-              <select aria-label="Company" value={targetOrgId} disabled={mutation.isPending || disabled || companies.isFetching || !choices.length} onChange={event => setSelectedCompany(event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5">
-                {!targetOrgId && <option value="">NileeGames</option>}
-                {choices.map(company => <option key={company.id} value={company.id}>{isNileeGames(company.name) ? "NileeGames" : company.name}</option>)}
-              </select>
-            </label>
-            {companies.isError ? <ErrorState message="Couldn't load your company relationships." onRetry={() => companies.refetch()} /> : companies.isSuccess && !choices.length ? (
-              <p role="status" className="text-sm text-muted-foreground">You need an active company agreement and network connection before requesting kiosks. Contact your company to complete setup.</p>
-            ) : null}
+            
             <label className="block space-y-2 text-sm font-medium">Number of containers
               <input aria-label="Number of containers" aria-invalid={!validQuantity} aria-describedby="request-quantity-hint" type="number" min={1} max={50} step={1} required value={quantity} disabled={mutation.isPending || disabled} onChange={event => setQuantity(event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5" />
             </label>

@@ -32,6 +32,7 @@ export type Permissions = {
   canManageDistributors: boolean
   canRegisterPartners: boolean
   canReviewRequests: boolean
+  canViewRevenue: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
   /** Fine-grained matrix check. OWNER always passes (never locked out). */
@@ -81,6 +82,9 @@ export function useMe(): Permissions {
     canManageDistributors: isCompany && isOwnerOrAdmin,
     canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor && isOwnerOrAdmin,
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
+    canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
+      (isOwnerOrAdmin || role === "MANAGER") &&
+      (isCompany || isDistributor || orgType === "PARTNER"),
     permissions,
     can,
   }

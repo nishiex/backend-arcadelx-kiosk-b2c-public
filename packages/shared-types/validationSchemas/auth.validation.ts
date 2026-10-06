@@ -95,7 +95,7 @@ export const JoinOrgSchema = z.object({
   name: nameSchema,
   email: emailSchema,
   password: passwordSchema,
-  inviteCode: z.string().trim().max(10, "Invalid invite code"),
+  inviteCode: z.string().trim().min(1, "Invite code is required").max(10, "Invalid invite code"),
 });
 
 export const ResetPasswordSchema = z

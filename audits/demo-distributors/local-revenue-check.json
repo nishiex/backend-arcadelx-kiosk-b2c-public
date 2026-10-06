@@ -1,0 +1,48 @@
+{
+  "database": "arcadelx_local",
+  "jobsEnabled": false,
+  "redisConfigured": false,
+  "sourceConfigured": false,
+  "tables": {
+    "Transaction": {
+      "exists": false
+    },
+    "RevenueStatement": {
+      "exists": false
+    },
+    "SystemSettings": {
+      "exists": false
+    },
+    "RevenueSyncRunLog": {
+      "exists": false
+    },
+    "Kiosk": {
+      "exists": true,
+      "rows": 32
+    },
+    "KioskAssignment": {
+      "exists": true,
+      "rows": 12
+    }
+  },
+  "http": [
+    {
+      "actor": "Company seed",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "actor": "Company seed",
+      "path": "/api/revenue/machine-wise",
+      "status": 500,
+      "message": "Internal Server Error"
+    },
+    {
+      "actor": "Company seed",
+      "path": "/api/revenue/deduction-rates",
+      "status": 500,
+      "message": "Internal Server Error"
+    }
+  ],
+  "migrationRecorded": false
+}

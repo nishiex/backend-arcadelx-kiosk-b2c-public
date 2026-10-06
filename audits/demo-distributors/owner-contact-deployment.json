@@ -1,0 +1,11 @@
+{
+  "database": "localhost:5433/arcadelx_local",
+  "migration": "20261005190000_add_owner_contact",
+  "applied": true,
+  "existingUsersPreserved": true,
+  "existingUserCount": 9,
+  "contactInsertVerified": true,
+  "probeRolledBack": true,
+  "remoteChanged": false,
+  "emailSent": false
+}
