@@ -1,0 +1,60 @@
+{
+  "startedAt": "2026-10-07T10:34:46.709Z",
+  "database": "localhost:5433/arcadelx_local",
+  "before": {
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12,
+    "refresh_tokens": 116,
+    "kiosks": 6,
+    "assignments": 6,
+    "transactions": 3,
+    "orders": 0,
+    "agreements": 2,
+    "connections": 2,
+    "deliveries": 4,
+    "sync_logs": 10
+  },
+  "kept": {
+    "companyId": "6351a611-4c86-4f60-8dfc-fd1701031347",
+    "companyName": "ArcadeLX Local",
+    "ownerId": "3b7d54b4-f852-411a-aa75-32a457f43270",
+    "ownerEmail": "nileegames@gmail.com"
+  },
+  "removed": {
+    "refreshTokens": 23,
+    "memberships": 11,
+    "agreements": 2,
+    "connections": 2,
+    "orderKiosks": 0,
+    "orders": 0,
+    "assignments": 6,
+    "transactions": 3,
+    "kiosks": 6,
+    "deliveries": 4,
+    "syncLogs": 10,
+    "passwordResets": 1,
+    "organizations": 7,
+    "users": 11
+  },
+  "after": {
+    "organizations": 1,
+    "users": 1,
+    "memberships": 1,
+    "refresh_tokens": 93,
+    "kiosks": 0,
+    "assignments": 0,
+    "transactions": 0,
+    "orders": 0,
+    "agreements": 0,
+    "connections": 0,
+    "deliveries": 0,
+    "sync_logs": 0
+  },
+  "survivors": {
+    "companies": 1,
+    "owner_membership": 1
+  },
+  "passed": true,
+  "finishedAt": "2026-10-07T10:34:46.750Z"
+}

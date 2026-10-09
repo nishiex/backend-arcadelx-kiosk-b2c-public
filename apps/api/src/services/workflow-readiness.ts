@@ -2,10 +2,10 @@ import { prisma } from '../utils/db';
 import { ApiError } from '../utils/ApiError';
 
 export async function workflowReadiness() {
-  const [row] = await prisma.$queryRaw<{ networkRejection: boolean; agreementRejection: boolean; orderDecisions: boolean }[]>`
+  // Request rejection was removed (it is not in the base Backend branch), so only the order
+  // workflow columns are still probed.
+  const [row] = await prisma.$queryRaw<{ orderDecisions: boolean }[]>`
     SELECT
-      EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='NetworkStatus' AND e.enumlabel='REJECTED') AS "networkRejection",
-      EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='AgreementStatus' AND e.enumlabel='REJECTED') AS "agreementRejection",
       (EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Kiosk' AND column_name='reservedOrderId')
         AND to_regclass('public."EmailDelivery"') IS NOT NULL
         AND to_regclass('public."OrderSequence"') IS NOT NULL) AS "orderDecisions"`;

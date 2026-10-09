@@ -1,0 +1,57 @@
+{
+  "timings": [
+    {
+      "endpoint": "/api/network",
+      "status": 200,
+      "ms": 46
+    },
+    {
+      "endpoint": "/api/network?page=1&limit=20",
+      "status": 200,
+      "ms": 29
+    },
+    {
+      "endpoint": "/api/network/requests",
+      "status": 200,
+      "ms": 38
+    },
+    {
+      "endpoint": "/api/network/requests?page=1&limit=10",
+      "status": 200,
+      "ms": 30
+    },
+    {
+      "endpoint": "/api/network/distributors",
+      "status": 200,
+      "ms": 42
+    },
+    {
+      "endpoint": "/api/agreements",
+      "status": 200,
+      "ms": 63
+    },
+    {
+      "endpoint": "/api/agreements?page=1&limit=20",
+      "status": 200,
+      "ms": 45
+    },
+    {
+      "endpoint": "/api/workflows",
+      "status": 200,
+      "ms": 31
+    },
+    {
+      "endpoint": "/api/network/requests?page=999999999&limit=999999999",
+      "status": 400,
+      "ms": 28
+    }
+  ],
+  "slow": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "repeated": [],
+  "networkCalls": 12,
+  "networkCallsIn11s": 3,
+  "uniqueConsoleErrors": [],
+  "uniquePageErrors": []
+}

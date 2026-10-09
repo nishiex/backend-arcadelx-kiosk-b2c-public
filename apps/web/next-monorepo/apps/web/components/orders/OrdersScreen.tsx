@@ -7,6 +7,7 @@ import { fetchOrders, fetchWorkflowReadiness, ORDER_STATUSES, type OrderStatus }
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import OrderDetailsDialog from "./OrderDetailsDialog"
+import OrderStatusDialog from "./OrderStatusDialog"
 import CreateOrderDialog from "./CreateOrderDialog"
 import DecisionDialog from "@/components/requests/DecisionDialog"
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_STYLES, orderDate, orderPerspective } from "./order-display"
@@ -91,6 +92,11 @@ export default function OrdersScreen() {
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         {canApproveOrders && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && (
                           <DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} />
+                        )}
+                        {/* Supplier-only lifecycle steps. The API independently
+                            requires the caller to be the parent organization. */}
+                        {canApproveOrders && order.parentOrgId === organizationId && (
+                          <OrderStatusDialog order={order} disabled={orderActionsDisabled} />
                         )}
                         <OrderDetailsDialog order={order} organizationId={organizationId} />
                       </div>

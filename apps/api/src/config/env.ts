@@ -35,7 +35,9 @@ const _env = (process.env.NODE_ENV === 'production' ? productionSchema : envSche
 
 if (!_env.success) {
   console.error(' Invalid environment variables:', _env.error.format());
-  process.exit(1); 
+  // Throw rather than process.exit(1): inside a serverless function an exit kills the
+  // invocation with no diagnosis, whereas a throw reports the real message in the logs.
+  throw new Error('Invalid environment variables');
 }
 
 export const env = _env.data;

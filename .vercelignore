@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+.turbo
+**/.turbo
+.next
+**/.next
+.git
+.env
+**/.env
+**/.env.*
+!**/.env.example
+audits
+output
+.zwork
+apps/api/invoices
+apps/api/uploads

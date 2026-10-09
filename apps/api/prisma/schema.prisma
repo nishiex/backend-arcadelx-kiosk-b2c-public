@@ -140,7 +140,6 @@ model RefreshToken {
 enum NetworkStatus {
   PENDING
   ACTIVE
-  REJECTED
 }
 
 model NetworkConnection {
@@ -163,7 +162,6 @@ enum AgreementStatus {
   PENDING_APPROVAL
   ACTIVE
   TERMINATED
-  REJECTED
 }
 
 model Agreement {

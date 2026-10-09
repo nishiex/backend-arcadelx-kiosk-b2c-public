@@ -3,6 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import crypto from "crypto"
 import { prisma } from "../utils/db";
 import { ApiResponse } from "../utils/ApiResponse";
+import { UNAMBIGUOUS_ALPHABET } from "../utils/temporary-password";
 import { ApproveRequestSchema, UpdateRoleSchema, PaginationQuerySchema, GenerateInviteSchema } from '@shared-types/validationSchemas/member.validation';
 import { ApiError } from "../utils/ApiError";
 import { createMemberInvite } from '../services/member-invite';
@@ -17,7 +18,7 @@ export const generateInviteCode = asyncHandler(async(req:Request,res:Response) =
       throw new ApiError(403, 'You cannot invite a role equal to or higher than your own');
     }
     let code = "";
-    const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ23456789abcdefghijklmnopqrstuvwxyz";
+    const chars = UNAMBIGUOUS_ALPHABET;
     for (let i = 0; i < 6; i++) {
         const index = crypto.randomInt(chars.length);
         code += chars[index];

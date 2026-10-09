@@ -1,0 +1,73 @@
+{
+  "startedAt": "2026-10-07T10:29:45.494Z",
+  "database": "localhost:5433/arcadelx_local",
+  "before": {
+    "orders": 3,
+    "order_kiosks": 0,
+    "assignments": 6,
+    "kiosks": 6,
+    "transactions": 3,
+    "agreements": 2,
+    "deliveries": 5,
+    "order_sequence": 9
+  },
+  "orders": [
+    {
+      "id": "34bb1e0a-be9f-44bb-bfe5-07569df78d78",
+      "orderNumber": "ORD-2026-00001",
+      "invoiceFilename": null
+    },
+    {
+      "id": "f1c380bc-eb1c-45b9-8c48-9658dc8ed151",
+      "orderNumber": "ORD-2026-00002",
+      "invoiceFilename": null
+    },
+    {
+      "id": "b1a065aa-eab3-4101-900c-bb540e5bd357",
+      "orderNumber": "ORD-2026-00004",
+      "invoiceFilename": "ORD-2026-00004.pdf"
+    }
+  ],
+  "blockers": {
+    "order_kiosks": 0,
+    "reserved": 0,
+    "order_assignments": 0
+  },
+  "removed": {
+    "orders": 3,
+    "orderNumbers": [
+      "ORD-2026-00001",
+      "ORD-2026-00002",
+      "ORD-2026-00004"
+    ],
+    "emailDeliveries": 1,
+    "deliveryKeys": [
+      "order:b1a065aa-eab3-4101-900c-bb540e5bd357:invoice"
+    ],
+    "orderSequenceReset": {
+      "year": 2026,
+      "value": 0
+    }
+  },
+  "removedInvoiceFiles": [
+    "ORD-2026-00004.pdf"
+  ],
+  "after": {
+    "orders": 0,
+    "order_kiosks": 0,
+    "assignments": 6,
+    "kiosks": 6,
+    "transactions": 3,
+    "agreements": 2,
+    "deliveries": 4,
+    "order_sequence": 0
+  },
+  "keptIntact": {
+    "kiosks": true,
+    "assignments": true,
+    "transactions": true,
+    "agreements": true
+  },
+  "passed": true,
+  "finishedAt": "2026-10-07T10:29:45.518Z"
+}

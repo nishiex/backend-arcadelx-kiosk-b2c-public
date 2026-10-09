@@ -143,8 +143,6 @@ globalThis.fetch = async (input, init) => {
     return readinessError
       ? response(null, 503, "Readiness unavailable")
       : response({
-          networkRejection: true,
-          agreementRejection: true,
           orderDecisions: available,
         })
   if (url.pathname === "/api/orders/create") {

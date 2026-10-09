@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { prisma } from "../utils/db";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
+import { generateTemporaryPassword } from "../utils/temporary-password";
 import { ApiError } from "../utils/ApiError";
 import { getUserOrganizationAccess, assertOrganizationActive } from "../services/organization-access";
 import { memberInviteRole } from '../services/member-invite';
@@ -93,7 +94,7 @@ export const registerOrganization = asyncHandler(
 
     // Generate temporary password
 
-    const temporaryPassword = crypto.randomBytes(8).toString("base64url");
+    const temporaryPassword = generateTemporaryPassword();
 
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 

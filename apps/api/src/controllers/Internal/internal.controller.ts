@@ -9,6 +9,7 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { PairDeviceSchema } from '@shared-types/validationSchemas/Kiosk/kiosk.validation';
+import { recordOpeningAssignments } from '../../services/kiosk-ownership';
 
 export const getUnpairedKiosks = asyncHandler(async (req: Request, res: Response) => {
   // Fetch all machines that exist in the business DB but haven't been linked to hardware yet
@@ -54,15 +55,26 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
     throw new ApiError(409, `Hardware device ${externalDeviceId} is already paired to machine code ${existingDevice.machineCode}`);
   }
 
-  const updatedKiosk = await prisma.kiosk.update({
-    where: { machineCode },
-    data: { externalDeviceId },
-    select: {
-      machineCode: true,
-      externalDeviceId: true,
-      model: true
-    }
+  const updatedKiosk = await prisma.$transaction(async (tx) => {
+    const kiosk = await tx.kiosk.update({
+      where: { machineCode },
+      data: { externalDeviceId },
+      select: {
+        id: true,
+        machineCode: true,
+        externalDeviceId: true,
+        model: true,
+        currentOrgId: true,
+      }
+    });
+    // Pairing hardware is the point at which the device becomes operational, so it is
+    // also when its ownership ledger starts (see kiosk-ownership.ts). Without this the
+    // kiosk reports no revenue, because attribution only counts assigned windows.
+    await recordOpeningAssignments(tx, [{ id: kiosk.id, currentOrgId: kiosk.currentOrgId }], req.user?.id ?? null);
+    return kiosk;
   });
 
-  res.status(200).json(new ApiResponse(200, { kiosk: updatedKiosk }, 'Hardware device paired successfully'));
+  res.status(200).json(new ApiResponse(200, {
+    kiosk: { machineCode: updatedKiosk.machineCode, externalDeviceId: updatedKiosk.externalDeviceId, model: updatedKiosk.model },
+  }, 'Hardware device paired successfully'));
 });

@@ -1,0 +1,301 @@
+{
+  "startedAt": "2026-10-07T12:07:33.688Z",
+  "infrastructure": {
+    "health": 200,
+    "health/db": 200,
+    "web": 200
+  },
+  "endpoints": [
+    {
+      "endpoint": "/api/auth/me",
+      "description": "identity (current user + membership)",
+      "status": 200,
+      "rows": null,
+      "summary": "{\"user\":{\"id\":\"3b7d54b4-f852-411a-aa75-32a457f43270\",\"email\":\"nileegames@gmail.com\",\"name\""
+    },
+    {
+      "endpoint": "/api/workflows",
+      "description": "workflow readiness flags",
+      "status": 200,
+      "rows": null,
+      "summary": "{\"networkRejection\":true,\"agreementRejection\":true,\"orderDecisions\":true}"
+    },
+    {
+      "endpoint": "/api/kiosks",
+      "description": "kiosk inventory",
+      "status": 200,
+      "rows": 41,
+      "summary": "kiosks: 41"
+    },
+    {
+      "endpoint": "/api/kiosks/summary",
+      "description": "inventory status counts",
+      "status": 200,
+      "rows": null,
+      "summary": "{\"summary\":{\"AVAILABLE\":31}}"
+    },
+    {
+      "endpoint": "/api/orders",
+      "description": "orders and requests",
+      "status": 200,
+      "rows": 1,
+      "summary": "orders: 1"
+    },
+    {
+      "endpoint": "/api/agreements",
+      "description": "agreements",
+      "status": 200,
+      "rows": 1,
+      "summary": "agreements: 1"
+    },
+    {
+      "endpoint": "/api/network",
+      "description": "network connections",
+      "status": 200,
+      "rows": 1,
+      "summary": "requests: 1"
+    },
+    {
+      "endpoint": "/api/network/distributors",
+      "description": "distributor list",
+      "status": 200,
+      "rows": 1,
+      "summary": "distributors: 1"
+    },
+    {
+      "endpoint": "/api/network/requests",
+      "description": "incoming connection requests",
+      "status": 200,
+      "rows": 0,
+      "summary": "data: 0"
+    },
+    {
+      "endpoint": "/api/members/requests",
+      "description": "pending members",
+      "status": 200,
+      "rows": 0,
+      "summary": "data: 0"
+    },
+    {
+      "endpoint": "/api/members",
+      "description": "organization members",
+      "status": 404,
+      "rows": null,
+      "summary": ""
+    },
+    {
+      "endpoint": "/api/revenue/machine-wise",
+      "description": "machine-wise revenue",
+      "status": 200,
+      "rows": 41,
+      "summary": "kiosks: 41"
+    },
+    {
+      "endpoint": "/api/revenue/series?range=30d",
+      "description": "revenue trend",
+      "status": 200,
+      "rows": 30,
+      "summary": "points: 30"
+    },
+    {
+      "endpoint": "/api/revenue/deduction-rates",
+      "description": "deduction rates",
+      "status": 200,
+      "rows": null,
+      "summary": "{\"settings\":{\"id\":\"default\",\"gstPercentage\":18,\"pgFeePercentage\":2.5,\"tdsPercentage\":2}}"
+    },
+    {
+      "endpoint": "/api/audit-logs",
+      "description": "audit logs",
+      "status": 404,
+      "rows": null,
+      "summary": ""
+    },
+    {
+      "endpoint": "/api/roles",
+      "description": "roles and permissions",
+      "status": 404,
+      "rows": null,
+      "summary": ""
+    }
+  ],
+  "pages": [
+    {
+      "page": "/",
+      "httpStatus": 200,
+      "redirectedTo": "/",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 1179,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Good evening, Local Here's what's happening across"
+    },
+    {
+      "page": "/kiosks",
+      "httpStatus": 200,
+      "redirectedTo": "/kiosks",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 1052,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Machines Manage and monitor every kiosk in the com"
+    },
+    {
+      "page": "/orders",
+      "httpStatus": 200,
+      "redirectedTo": "/orders",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 580,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Orders & Requests Track incoming requests and outg"
+    },
+    {
+      "page": "/requests",
+      "httpStatus": 200,
+      "redirectedTo": "/requests",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 325,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Requests Review incoming connections and agreement"
+    },
+    {
+      "page": "/revenue",
+      "httpStatus": 200,
+      "redirectedTo": "/revenue",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 2384,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Revenue Gross revenue across your fleet. All amoun"
+    },
+    {
+      "page": "/distributors",
+      "httpStatus": 200,
+      "redirectedTo": "/distributors",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 384,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Distributors Manage the distributor organizations "
+    },
+    {
+      "page": "/partners",
+      "httpStatus": 200,
+      "redirectedTo": "/partners",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 145,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO You don’t have permission to manage partners."
+    },
+    {
+      "page": "/user",
+      "httpStatus": 200,
+      "redirectedTo": "/user",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 266,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Members Review and approve people requesting to jo"
+    },
+    {
+      "page": "/settings",
+      "httpStatus": 200,
+      "redirectedTo": "/settings",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 399,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Settings Manage your account and organization. Pro"
+    },
+    {
+      "page": "/roles",
+      "httpStatus": 200,
+      "redirectedTo": "/roles",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 275,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Roles & Permissions Define named roles, grant them"
+    },
+    {
+      "page": "/reports",
+      "httpStatus": 200,
+      "redirectedTo": "/reports",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 410,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Reports Revenue analytics for your distributor net"
+    },
+    {
+      "page": "/payments",
+      "httpStatus": 200,
+      "redirectedTo": "/payments",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 409,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Payments All settlement payments issued to your di"
+    },
+    {
+      "page": "/settlements",
+      "httpStatus": 200,
+      "redirectedTo": "/settlements",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 429,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Settlements Monthly revenue-share payout runs acro"
+    },
+    {
+      "page": "/support",
+      "httpStatus": 200,
+      "redirectedTo": "/support",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 400,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Support Track and resolve tickets across the netwo"
+    },
+    {
+      "page": "/audit-logs",
+      "httpStatus": 200,
+      "redirectedTo": "/audit-logs",
+      "apiFailures": [],
+      "showsError": false,
+      "contentChars": 436,
+      "hasEmptyState": false,
+      "sample": "ArcadeLX Master Admin Overview Kiosks Orders Requests Revenue Distributors Users Settings v1.0.0 LO Audit Logs A record of every write action across t"
+    }
+  ],
+  "consoleErrors": [],
+  "problems": [
+    "API /api/members -> 404",
+    "API /api/audit-logs -> 404",
+    "API /api/roles -> 404",
+    "distributor login failed"
+  ],
+  "dataCounts": {
+    "orders": 1,
+    "agreements": 1,
+    "kiosks": 41,
+    "transactions": 3,
+    "organizations": 2,
+    "reserved": 0
+  },
+  "loginWorked": true,
+  "endCounts": {
+    "orders": 1,
+    "agreements": 1,
+    "kiosks": 41,
+    "transactions": 3,
+    "organizations": 2,
+    "reserved": 0
+  },
+  "readOnly": true,
+  "passed": false,
+  "finishedAt": "2026-10-07T12:08:18.946Z"
+}

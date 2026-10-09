@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { initiateConnection, acceptConnection, rejectConnection, getConnections, deleteConnection, getPendingNetworkRequests, getDistributors, setDistributorStatus } from '../../controllers/Network/network.controller';
+import { initiateConnection, acceptConnection, getConnections, deleteConnection, getPendingNetworkRequests, getDistributors } from '../../controllers/Network/network.controller';
 import { requireAuth, loadMembership, requireRole, requireOrgType } from '../../middlewares/auth';
 
 const router = Router();
@@ -14,10 +14,8 @@ router.get("/requests",requireRole("OWNER","ADMIN"),getPendingNetworkRequests)
 
 // Company-only listing of distributor organizations for the dashboard.
 router.get('/distributors', requireOrgType('COMPANY'), getDistributors);
-router.patch('/distributors/:distributorId/status', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), setDistributorStatus);
 
 router.post('/:connectionId/accept', requireRole('OWNER', 'ADMIN'), acceptConnection);
-router.post('/:connectionId/reject', requireRole('OWNER', 'ADMIN'), rejectConnection);
 
 router.delete('/:connectionId',requireOrgType("COMPANY","DISTRIBUTOR"), requireRole('OWNER'), deleteConnection);
 

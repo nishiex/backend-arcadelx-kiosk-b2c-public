@@ -4,8 +4,8 @@ Scope: Frontend-Backend-Merge at 802d932 plus the current uncommitted workspace,
 
 ## Findings
 
-- Scanned 168 source/config/script files. 125 are reachable from the API server or Next app/config entries.
-- 34 source files (1594 line slots, including blank lines) have no current application entry path: 32 web application candidates, one test-only RequestsScreen, and one exported shared-library button.
+- Scanned 143 source/config/script files. 131 are reachable from the API server or Next app/config entries.
+- 0 source files (0 line slots, including blank lines) have no current application entry path: 32 web application candidates, one test-only RequestsScreen, and one exported shared-library button.
 - All API source modules and shared validation modules are reachable. Module reachability does not prove every export or branch within them is used.
 - The API revenue worker is conditionally imported by server.ts when REVENUE_JOBS_ENABLED=true. It is not dead code merely because jobs default to disabled.
 
@@ -28,40 +28,7 @@ Paths relative to repository root. Internal imports within an unreachable compon
 
 | File | Lines | Direct importers in scan |
 | --- | ---: | --- |
-| apps/web/next-monorepo/apps/web/components/common/PlaceholderPage.tsx | 70 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx | 57 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx | 71 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx | 27 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/DashboardKPIs.tsx | 49 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx | 115 | apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/DashboardShell.tsx | 10 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx | 39 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/OverviewChart.tsx | 18 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/RecentActivity.tsx | 26 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx | 97 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx | 65 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/StatsCards.tsx | 25 | None |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/ActivityWidget.tsx | 26 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx, apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/CustomersWidget.tsx | 26 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx, apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx | 32 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx | 38 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/PendingMembersWidget.tsx | 40 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx | 32 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx |
-| apps/web/next-monorepo/apps/web/components/dashboard/widgets/SystemHealthWidget.tsx | 19 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx, apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx |
-| apps/web/next-monorepo/apps/web/components/reactbits/AnimatedNumber.tsx | 43 | None |
-| apps/web/next-monorepo/apps/web/components/reactbits/BlurText.tsx | 52 | None |
-| apps/web/next-monorepo/apps/web/components/reactbits/CountUp.tsx | 74 | None |
-| apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx | 26 | None |
-| apps/web/next-monorepo/apps/web/components/reactbits/SpotlightCard.tsx | 50 | None |
-| apps/web/next-monorepo/apps/web/components/requests/RequestsScreen.tsx | 64 | apps/web/next-monorepo/apps/web/scripts/decision-ui-check.tsx |
-| apps/web/next-monorepo/apps/web/components/ui/button.tsx | 16 | apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx |
-| apps/web/next-monorepo/apps/web/components/ui/card.tsx | 13 | None |
-| apps/web/next-monorepo/apps/web/components/ui/dialog.tsx | 28 | None |
-| apps/web/next-monorepo/apps/web/components/ui/dropdown-menu.tsx | 13 | None |
-| apps/web/next-monorepo/apps/web/components/ui/tooltip.tsx | 16 | None |
-| apps/web/next-monorepo/apps/web/lib/dashboard-data.ts | 35 | apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx, apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx |
-| apps/web/next-monorepo/apps/web/lib/mock-data.ts | 217 | apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx, apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx, apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx |
-| apps/web/next-monorepo/packages/ui/src/components/button.tsx | 65 | apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx |
+
 
 RequestsScreen is still imported by scripts/decision-ui-check.tsx. The /requests page is absent. Treat it as a disconnected feature to restore or intentionally retire, not a disposable untested component. Its shared fetchReviewRequests helper remains used by the active order request flow.
 

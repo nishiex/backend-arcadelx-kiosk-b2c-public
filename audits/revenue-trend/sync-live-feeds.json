@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-10-08T06:22:24.269Z",
+  "database": "aws-0-ap-south-1.pooler.supabase.com",
+  "deviceSource": "https://main.arcadelx.games/api/v1/devices",
+  "paymentSource": "https://main.arcadelx.games/api/v1/payments",
+  "devices": {
+    "totalRecordsFetched": 6,
+    "newKiosksCreated": 6,
+    "kiosksUpdated": 0,
+    "devicesWithoutId": 0,
+    "rejectedRecords": 0,
+    "createdMachineCodes": [
+      "KIOSK-UNIT-02",
+      "KIOSK-UNIT-01",
+      "ADLX-2026-A002",
+      "ADLX-2026-A001",
+      "ADLX-2026-A003",
+      "ADLX-2026-A005"
+    ]
+  },
+  "transactions": {
+    "totalRecordsFetched": 13,
+    "newRecordsInserted": 3,
+    "unattributedCount": 1
+  },
+  "after": {
+    "kiosks": 6,
+    "withExternalDeviceId": 6,
+    "transactions": 3,
+    "totalAmount": 3,
+    "assignments": 6
+  }
+}

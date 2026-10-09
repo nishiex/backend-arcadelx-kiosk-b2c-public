@@ -7,6 +7,7 @@ import { env } from "../../config/env";
 import { ApiError } from "../../utils/ApiError";
 import { sendOrganizationCredentialsEmail } from "./auth.email";
 import { sendEmail } from "./email.service";
+import { emailDataRows, emailParagraph, emailShell } from "./email-theme";
 import { generateInvoicePDF, INVOICES_DIR } from "../pdf/invoice.pdf";
 import { REVENUE_REPORTS_DIR } from '../pdf/revenue.pdf';
 
@@ -73,8 +74,23 @@ async function deliverRevenueStatement(statementId: string) {
   await sendEmail({
     to: statement.organization.owner.email,
     subject: `ArcadeLX Monthly Revenue Statement: ${statement.Month}/${statement.Year}`,
-    text: 'Please review the attached monthly revenue statement and payout calculations.',
-    html: '<p>Please review the attached monthly revenue statement and payout calculations.</p>',
+    text:
+      `Your revenue statement for ${statement.Month}/${statement.Year} is attached. ` +
+      'Please review it and the payout calculations.',
+    html: emailShell({
+      preheader: `Your revenue statement for ${statement.Month}/${statement.Year}`,
+      heading: 'Monthly revenue statement',
+      subtitle: `Statement period ${statement.Month}/${statement.Year}`,
+      content: [
+        emailParagraph(
+          'Please review the attached statement and its payout calculations. All amounts are in INR.',
+        ),
+        emailDataRows([
+          { label: 'Statement', value: path.basename(file), mono: false },
+          { label: 'Period', value: `${statement.Month}/${statement.Year}`, mono: false },
+        ]),
+      ].join(''),
+    }),
     attachment: { filename: path.basename(file), base64Content: buffer.toString('base64'), contentType: 'application/pdf' },
   });
 }
@@ -137,8 +153,22 @@ async function deliverInvoice(orderId: string) {
   await sendEmail({
     to: order.childOrg.owner.email,
     subject: `ArcadeLX Order Invoice: ${order.orderNumber}`,
-    text: `Order ${order.orderNumber}: ${order.quantity} kiosks. Total: INR ${order.grandTotal.toFixed(2)}. Please review the attached invoice.`,
-    html: `<p>Order ${order.orderNumber}: ${order.quantity} kiosks. Total: INR ${order.grandTotal.toFixed(2)}.</p>`,
+    text:
+      `Invoice for order ${order.orderNumber}: ${order.quantity} kiosks, ` +
+      `total INR ${order.grandTotal.toFixed(2)}. Please review the attached invoice.`,
+    html: emailShell({
+      preheader: `Invoice for ${order.orderNumber}`,
+      heading: 'Order invoice',
+      subtitle: `Order ${order.orderNumber}`,
+      content: [
+        emailParagraph('Please review the attached invoice for this order. All amounts are in INR.'),
+        emailDataRows([
+          { label: 'Order', value: order.orderNumber },
+          { label: 'Quantity', value: `${order.quantity} kiosks`, mono: false },
+          { label: 'Total', value: `INR ${order.grandTotal.toFixed(2)}` },
+        ]),
+      ].join(''),
+    }),
     attachment: {
       filename: invoiceFilename,
       base64Content: buffer.toString("base64"),
@@ -188,8 +218,15 @@ export async function attemptDelivery(deliveryKey: string): Promise<boolean> {
       },
     });
     return true;
-  } catch {
-    // Preserve the queued operation and do not expose secrets/provider internals.
+  } catch (error) {
+    // Keep the queued operation recoverable and never expose provider internals. The cause is
+    // still logged in sanitized form: discarding it silently left a production delivery
+    // failure with no diagnostic at all, only an incremented attempt count.
+    const reason = (error instanceof Error
+      ? `${error.name}: ${error.message}`.split("\n")[0] ?? ""
+      : String(error)
+    ).slice(0, 300);
+    console.error("[email-delivery] attempt failed", { key: deliveryKey, reason });
     if (leaseId)
       await prisma.emailDelivery
         .updateMany({

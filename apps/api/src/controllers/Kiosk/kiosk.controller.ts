@@ -8,6 +8,7 @@ import {
   BatchCreateKiosksSchema,
   UpdateKioskStatusSchema,
 } from "@shared-types/validationSchemas/Kiosk/kiosk.validation";
+import { recordOpeningAssignmentsByCode } from "../../services/kiosk-ownership";
 
 // Display-only organization references; do not expose contact or invite details.
 const kioskDisplaySelect = {
@@ -63,7 +64,7 @@ export const batchCreateKiosks = asyncHandler(
     const endValue = seqResult[0].value;
     const startValue = endValue - count + 1;
 
-    const kiosksToInsert = [];
+    const kiosksToInsert: Array<{ machineCode: string; model: string; status: "AVAILABLE"; currentOrgId: string }> = [];
     for (let i = startValue; i <= endValue; i++) {
       kiosksToInsert.push({
         machineCode: formatMachineCode(i, currentYear),
@@ -73,8 +74,15 @@ export const batchCreateKiosks = asyncHandler(
       });
     }
 
-    await prisma.kiosk.createMany({
-      data: kiosksToInsert,
+    // Registration and its opening ownership ledger commit together, so a created
+    // machine can never be missing the assignment that revenue attribution reads.
+    await prisma.$transaction(async (tx) => {
+      await tx.kiosk.createMany({ data: kiosksToInsert });
+      await recordOpeningAssignmentsByCode(
+        tx,
+        kiosksToInsert.map(kiosk => kiosk.machineCode),
+        req.user?.id ?? null,
+      );
     });
 
     res

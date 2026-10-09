@@ -1,0 +1,10 @@
+{
+  "consoleErrors": [],
+  "pageErrors": [],
+  "hardWaits": [],
+  "final": {
+    "connections": 1,
+    "organizations": 2,
+    "users": 2
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "simulatedDOM": true,
+  "liveDataUsed": false,
+  "chartGeometryAsserted": false,
+  "evidence": [
+    {
+      "check": "loading-state-uses-skeleton",
+      "pass": true
+    },
+    {
+      "check": "empty-state-explains-no-revenue",
+      "pass": true
+    },
+    {
+      "check": "empty-state-shows-zero-total",
+      "pass": true
+    },
+    {
+      "check": "total-uses-indian-currency-format",
+      "pass": true
+    },
+    {
+      "check": "subtitle-names-window-and-granularity",
+      "pass": true
+    },
+    {
+      "check": "chart-exposes-accessible-summary",
+      "pass": true
+    },
+    {
+      "check": "range-filter-requests-selected-window",
+      "pass": true
+    },
+    {
+      "check": "range-buttons-expose-pressed-state",
+      "pass": true
+    },
+    {
+      "check": "error-state-offers-retry",
+      "pass": true
+    },
+    {
+      "check": "retry-recovers-after-failure",
+      "pass": true
+    },
+    {
+      "check": "staff-sees-no-revenue-chart",
+      "pass": true
+    },
+    {
+      "check": "staff-issues-no-revenue-series-request",
+      "pass": true
+    },
+    {
+      "check": "revenue-role-sees-chart-on-dashboard",
+      "pass": true
+    },
+    {
+      "check": "dashboard-chart-requests-the-series",
+      "pass": true
+    },
+    {
+      "check": "endpoint-and-route-exist",
+      "pass": true
+    },
+    {
+      "check": "component-uses-the-real-helper",
+      "pass": true
+    }
+  ]
+}

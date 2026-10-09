@@ -146,24 +146,6 @@ export const terminateAgreement = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { agreement }, "Agreement terminated"));
 });
 
-export const rejectAgreement = asyncHandler(async (req, res) => {
-  await requireWorkflow('agreementRejection');
-  const id = req.params.agreementId;
-  if (typeof id !== 'string') throw new ApiError(400, 'Invalid agreement ID');
-  const organizationId = req.membership!.organizationId;
-  const agreement = await prisma.$transaction(async tx => {
-    // Same child-organization lock and ordering as approval/termination.
-    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${organizationId} FOR UPDATE`;
-    const changed = await tx.agreement.updateMany({
-      where: { id, childOrgId: organizationId, status: 'PENDING_APPROVAL' },
-      data: { status: 'REJECTED', effectiveTo: new Date() },
-    });
-    if (changed.count !== 1) throw new ApiError(404, 'Pending agreement not found or already processed');
-    return tx.agreement.findUniqueOrThrow({ where: { id } });
-  });
-  res.json(new ApiResponse(200, { agreement }, 'Agreement rejected; history retained'));
-});
-
 export const getAgreements = asyncHandler(async (req, res) => {
   const { page, limit } = PaginationQuerySchema.parse(req.query);
   const organizationId = req.membership!.organizationId;

@@ -98,7 +98,7 @@ export default function KioskDetailDialog({
                         <option value="RESERVED" disabled>RESERVED</option>
                         <option value="ASSIGNED" disabled>ASSIGNED</option>
                         <option value="INSTALLED">INSTALLED</option>
-                        <option value="MAINTENANCE">MAINTENANCE</option>
+                        {/* Maintenance is hidden for now; the status still exists in the API. */}
                         <option value="RETURNED">RETURNED</option>
                         <option value="RETIRED">RETIRED</option>
                       </select>

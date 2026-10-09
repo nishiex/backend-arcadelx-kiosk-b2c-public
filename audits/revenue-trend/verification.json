@@ -1,0 +1,325 @@
+{
+  "startedAt": "2026-10-07T06:33:07.978Z",
+  "database": "localhost:5433/arcadelx_local",
+  "api": "http://localhost:4000",
+  "checks": [
+    {
+      "check": "company-login",
+      "pass": true,
+      "detail": {
+        "email": "nileegames@gmail.com"
+      }
+    },
+    {
+      "check": "temporary-rows-inserted-inside-assignment-window",
+      "pass": true,
+      "detail": {
+        "insideCount": 3,
+        "outsideAmounts": [
+          99999,
+          77777
+        ]
+      }
+    },
+    {
+      "check": "series-7d-ok",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "points": 7
+      }
+    },
+    {
+      "check": "series-30d-ok",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "points": 30
+      }
+    },
+    {
+      "check": "series-3m-ok",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "points": 14
+      }
+    },
+    {
+      "check": "series-1y-ok",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "points": 13
+      }
+    },
+    {
+      "check": "series-7d-bucket-shape",
+      "pass": true,
+      "detail": {
+        "bucket": "day",
+        "points": 7,
+        "granularity": "Daily"
+      }
+    },
+    {
+      "check": "series-30d-bucket-shape",
+      "pass": true,
+      "detail": {
+        "bucket": "day",
+        "points": 30,
+        "granularity": "Daily"
+      }
+    },
+    {
+      "check": "series-3m-bucket-shape",
+      "pass": true,
+      "detail": {
+        "bucket": "week",
+        "points": 14,
+        "granularity": "Weekly"
+      }
+    },
+    {
+      "check": "series-1y-bucket-shape",
+      "pass": true,
+      "detail": {
+        "bucket": "month",
+        "points": 13,
+        "granularity": "Monthly"
+      }
+    },
+    {
+      "check": "series-currency-is-inr",
+      "pass": true
+    },
+    {
+      "check": "series-labels-present",
+      "pass": true
+    },
+    {
+      "check": "series-7d-grows-by-inserted-payments",
+      "pass": true,
+      "detail": {
+        "observed": 2250.75,
+        "expected": 2250.75,
+        "beforeTotal": 21401.04,
+        "afterTotal": 23651.79
+      }
+    },
+    {
+      "check": "series-30d-grows-by-inserted-payments",
+      "pass": true,
+      "detail": {
+        "observed": 2250.75,
+        "expected": 2250.75,
+        "beforeTotal": 21401.04,
+        "afterTotal": 23651.79
+      }
+    },
+    {
+      "check": "series-3m-grows-by-inserted-payments",
+      "pass": true,
+      "detail": {
+        "observed": 2250.75,
+        "expected": 2250.75,
+        "beforeTotal": 21401.04,
+        "afterTotal": 23651.79
+      }
+    },
+    {
+      "check": "series-1y-grows-by-inserted-payments",
+      "pass": true,
+      "detail": {
+        "observed": 2250.75,
+        "expected": 2250.75,
+        "beforeTotal": 21401.04,
+        "afterTotal": 23651.79
+      }
+    },
+    {
+      "check": "payment-before-assignment-is-excluded",
+      "pass": true,
+      "detail": {
+        "outsideAmount": 99999,
+        "outsideDayKey": "2026-10-05"
+      }
+    },
+    {
+      "check": "future-payment-today-is-not-counted",
+      "pass": true,
+      "detail": {
+        "todayTotal": 3909.79,
+        "futureAmount": 77777
+      }
+    },
+    {
+      "check": "series-windows-are-progressive",
+      "pass": true,
+      "detail": {
+        "7d": 23651.79,
+        "30d": 23651.79,
+        "3m": 23651.79,
+        "1y": 23651.79
+      }
+    },
+    {
+      "check": "machine-wise-still-works",
+      "pass": true
+    },
+    {
+      "check": "machine-wise-total-grows-by-inserted-payments",
+      "pass": true,
+      "detail": {
+        "delta": 2250.7499999999995,
+        "insertedSum": 2250.75
+      }
+    },
+    {
+      "check": "series-1y-agrees-with-machine-wise-sum",
+      "pass": true,
+      "detail": {
+        "seriesTotal": 23651.79,
+        "machineWiseSum": 23651.789999999997
+      }
+    },
+    {
+      "check": "invalid-range-rejected",
+      "pass": true,
+      "detail": {
+        "status": 400
+      }
+    },
+    {
+      "check": "counts-restored-to-pre-run-values",
+      "pass": true,
+      "detail": {
+        "before": {
+          "transactions": 75,
+          "agreements": 1,
+          "assignments": 12
+        },
+        "after": {
+          "transactions": 75,
+          "agreements": 1,
+          "assignments": 12
+        }
+      }
+    }
+  ],
+  "beforeCounts": {
+    "transactions": 75,
+    "agreements": 1,
+    "assignments": 12
+  },
+  "kiosk": {
+    "kioskId": "b617d081-e85d-41fb-9864-4f64b0e07210",
+    "machineCode": "DEMO-LOCAL-001",
+    "assignedFrom": "2026-10-05T06:18:47.663Z"
+  },
+  "machineWiseKioskBefore": {
+    "machineCode": "DEMO-LOCAL-001",
+    "location": "-",
+    "distributor": "-",
+    "partner": "-",
+    "deployedPartner": "-",
+    "today": 188.97,
+    "thisMonth": 1972.69,
+    "totalRevenue": 1972.69
+  },
+  "beforeSeries": {
+    "7d": 21401.04,
+    "30d": 21401.04,
+    "3m": 21401.04,
+    "1y": 21401.04
+  },
+  "insertedRows": [
+    {
+      "id": "verify-revenue-series-in-today-1791354788481",
+      "tag": "in-today",
+      "amount": 250.25,
+      "occurredAt": "2026-10-07T05:33:08.481Z",
+      "key": "2026-10-07"
+    },
+    {
+      "id": "verify-revenue-series-in-1d-1791354788489",
+      "tag": "in-1d",
+      "amount": 1500.5,
+      "occurredAt": "2026-10-06T17:30:00.000Z",
+      "key": "2026-10-06"
+    },
+    {
+      "id": "verify-revenue-series-in-2d-1791354788493",
+      "tag": "in-2d",
+      "amount": 500,
+      "occurredAt": "2026-10-05T17:30:00.000Z",
+      "key": "2026-10-05"
+    },
+    {
+      "id": "verify-revenue-series-before-assignment-1791354788496",
+      "tag": "before-assignment",
+      "amount": 99999,
+      "occurredAt": "2026-10-05T05:18:47.663Z",
+      "key": "2026-10-05"
+    },
+    {
+      "id": "verify-revenue-series-in-the-future-1791354788501",
+      "tag": "in-the-future",
+      "amount": 77777,
+      "occurredAt": "2026-10-07T08:33:08.501Z",
+      "key": "2026-10-07"
+    }
+  ],
+  "insertedIds": [
+    "verify-revenue-series-in-today-1791354788481",
+    "verify-revenue-series-in-1d-1791354788489",
+    "verify-revenue-series-in-2d-1791354788493",
+    "verify-revenue-series-before-assignment-1791354788496",
+    "verify-revenue-series-in-the-future-1791354788501"
+  ],
+  "deltas": {
+    "7d": {
+      "observed": 2250.75,
+      "expected": 2250.75
+    },
+    "30d": {
+      "observed": 2250.75,
+      "expected": 2250.75
+    },
+    "3m": {
+      "observed": 2250.75,
+      "expected": 2250.75
+    },
+    "1y": {
+      "observed": 2250.75,
+      "expected": 2250.75
+    }
+  },
+  "machineWiseKioskAfter": {
+    "machineCode": "DEMO-LOCAL-001",
+    "location": "-",
+    "distributor": "-",
+    "partner": "-",
+    "deployedPartner": "-",
+    "today": 439.22,
+    "thisMonth": 4223.44,
+    "totalRevenue": 4223.44
+  },
+  "passed": true,
+  "seriesTotals": {
+    "7d": 23651.79,
+    "30d": 23651.79,
+    "3m": 23651.79,
+    "1y": 23651.79
+  },
+  "afterCounts": {
+    "transactions": 75,
+    "agreements": 1,
+    "assignments": 12
+  },
+  "removedRows": {
+    "byId": 5,
+    "byPrefixSweep": 0
+  },
+  "finishedAt": "2026-10-07T06:33:08.661Z"
+}

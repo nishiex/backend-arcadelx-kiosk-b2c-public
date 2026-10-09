@@ -1,0 +1,120 @@
+{
+  "tag": "TEMP-REJECT-1791366528439",
+  "startedAt": "2026-10-07T09:48:48.441Z",
+  "steps": [
+    {
+      "step": "before-counts",
+      "orders": 3,
+      "agreements": 2,
+      "connections": 2,
+      "reserved": 10,
+      "order_kiosks": 10
+    },
+    {
+      "step": "request-created",
+      "orderNumber": "ORD-2026-00009",
+      "status": "UNDER_REVIEW",
+      "paymentStatus": "PENDING"
+    },
+    {
+      "step": "reject-response",
+      "status": 200,
+      "message": "Order request rejected; inventory unchanged"
+    },
+    {
+      "step": "verdict",
+      "orderRejected": true,
+      "paymentUntouched": true,
+      "noReservation": true,
+      "noOrderKiosks": true,
+      "noAssignments": true,
+      "kioskStatusesUnchanged": true
+    },
+    {
+      "step": "reject-again",
+      "status": 409
+    },
+    {
+      "step": "reject-by-requester",
+      "status": 403
+    },
+    {
+      "step": "header-expected-counts",
+      "member_requests": 0,
+      "connection_requests": 0,
+      "agreements_awaiting": 0,
+      "orders_awaiting": 2
+    },
+    {
+      "step": "cleanup",
+      "deliveries": 0,
+      "orderKiosks": 0,
+      "orders": 1,
+      "agreements": 1,
+      "connections": 1,
+      "refreshTokens": 1,
+      "memberships": 1,
+      "organizations": 1,
+      "users": 1
+    },
+    {
+      "step": "counts",
+      "before": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "reserved": 10,
+        "order_kiosks": 10
+      },
+      "after": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "reserved": 10,
+        "order_kiosks": 10
+      },
+      "restored": true
+    }
+  ],
+  "before": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "reserved": 10,
+    "order_kiosks": 10
+  },
+  "verdict": {
+    "orderRejected": true,
+    "paymentUntouched": true,
+    "noReservation": true,
+    "noOrderKiosks": true,
+    "noAssignments": true,
+    "kioskStatusesUnchanged": true
+  },
+  "headerExpectedCounts": {
+    "member_requests": 0,
+    "connection_requests": 0,
+    "agreements_awaiting": 0,
+    "orders_awaiting": 2
+  },
+  "passed": true,
+  "removed": {
+    "deliveries": 0,
+    "orderKiosks": 0,
+    "orders": 1,
+    "agreements": 1,
+    "connections": 1,
+    "refreshTokens": 1,
+    "memberships": 1,
+    "organizations": 1,
+    "users": 1
+  },
+  "after": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "reserved": 10,
+    "order_kiosks": 10
+  },
+  "restored": true
+}

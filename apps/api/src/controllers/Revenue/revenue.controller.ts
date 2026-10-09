@@ -3,8 +3,9 @@ import { prisma } from '../../utils/db';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
-import { SettingsSchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
+import { SettingsSchema, RevenueSeriesQuerySchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
 import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-period';
+import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
 
 export const getMachineWiseRevenue = asyncHandler(async (req, res) => {
   const orgId = req.membership!.organizationId, orgType = req.membership!.type;
@@ -41,6 +42,53 @@ export const getMachineWiseRevenue = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, { kiosks: [...rows.values()] }, 'Machine-wise revenue fetched successfully'));
 });
 const defaults = { id: 'default', gstPercentage: 18, pgFeePercentage: 2.5, tdsPercentage: 2 };
+/**
+ * Revenue trend for the dashboard chart.
+ *
+ * Read-only and additive. It applies exactly the same organization scoping and
+ * assignment/INR filters as `getMachineWiseRevenue` above, so the two endpoints
+ * always agree for the same window; it only groups the payments into IST buckets
+ * (day, ISO week, or month) instead of summing them per machine/today/month.
+ */
+export const getRevenueSeries = asyncHandler(async (req, res) => {
+  const { range } = RevenueSeriesQuerySchema.parse(req.query);
+  const orgId = req.membership!.organizationId, orgType = req.membership!.type;
+  const now = new Date();
+  const bucket = sqlBucket(range);
+  const from = rangeFilterStart(range, now);
+  // Same scoping as machine-wise: a Distributor also covers its Partner children
+  // while the governing agreement is in force.
+  const agreements = orgType === 'DISTRIBUTOR' ? await prisma.agreement.findMany({ where: { parentOrgId: orgId, status: { in: ['ACTIVE', 'TERMINATED'] } }, select: { childOrgId: true, effectiveFrom: true, effectiveTo: true } }) : [];
+  const orgIds = [orgId, ...agreements.map(a => a.childOrgId)];
+  const assignments = await prisma.kioskAssignment.findMany({
+    where: orgType === 'COMPANY' ? {} : { organizationId: { in: orgIds } },
+    select: { organizationId: true, assignedFrom: true, assignedTo: true, kiosk: { select: { transactions: { where: { occurredAt: { gte: from, lte: now } }, select: { id: true, amount: true, currency: true, occurredAt: true } } } } },
+    orderBy: [{ assignedFrom: 'desc' }, { id: 'asc' }],
+  });
+  const totals = new Map<string, number>(), seen = new Set<string>();
+  for (const assignment of assignments) {
+    for (const payment of assignment.kiosk.transactions) {
+      const date = payment.occurredAt;
+      // The payment must belong to this organization's assignment window...
+      if (date < assignment.assignedFrom || (assignment.assignedTo && date >= assignment.assignedTo)) continue;
+      // ...and, for a Distributor, to its own organization or a governed Partner.
+      if (orgType === 'DISTRIBUTOR' && assignment.organizationId !== orgId && !agreements.some(a => a.childOrgId === assignment.organizationId && a.effectiveFrom <= date && (!a.effectiveTo || date < a.effectiveTo))) continue;
+      if (seen.has(payment.id)) throw new ApiError(409, 'Overlapping kiosk assignment history');
+      if (payment.currency !== 'INR') throw new ApiError(409, 'Revenue reporting requires INR transactions');
+      seen.add(payment.id);
+      // Bucket the payment into its IST day/week/month.
+      const key = bucketKey(date, bucket);
+      totals.set(key, new Prisma.Decimal(totals.get(key) ?? 0).plus(payment.amount).toNumber());
+    }
+  }
+  // Every bucket in the range is returned, so gaps chart as zero.
+  const points = rangeBuckets(range, now).map(start => {
+    const key = start.toISOString().slice(0, 10);
+    return { key, label: bucketLabel(start, bucket), revenue: totals.get(key) ?? 0 };
+  });
+  const total = points.reduce((sum, point) => new Prisma.Decimal(sum).plus(point.revenue).toNumber(), 0);
+  res.json(new ApiResponse(200, { range, granularity: RANGE_CONFIG[range].granularity, bucket, currency: 'INR', total, points }, 'Revenue series fetched successfully'));
+});
 export const getSystemSettings = asyncHandler(async (_req, res) => {
   const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
   res.json(new ApiResponse(200, { settings: settings ?? defaults }));

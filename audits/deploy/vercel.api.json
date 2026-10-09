@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install --include=dev",
+  "buildCommand": "cd apps/api && npx prisma generate --schema prisma/schema.prisma && node scripts/build-vercel.mjs",
+  "outputDirectory": "api/public",
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "{apps/api/src/assets/**/*,apps/api/prisma/schema.prisma}",
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}

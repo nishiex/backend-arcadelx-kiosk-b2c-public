@@ -29,7 +29,7 @@ const evidence: { check: string; pass: boolean }[] = []
 let role = 'ADMIN'
 const org = { id: 'our-org', name: 'Our Company', type: 'COMPANY' }
 const other = { id: 'other-org', name: 'Other Company', type: 'COMPANY' }
-const readiness = { networkRejection: true, agreementRejection: true, orderDecisions: false }
+const readiness = { orderDecisions: false }
 let readinessError = false
 const members = Array.from({ length: 51 }, (_, i) => ({ id: `member-${i}`, status: 'PENDING', user: { name: `Applicant ${i}`, email: `member-${i}@example.invalid` } }))
 const network = { id: 'network-1', status: 'PENDING', initiator: other, reciever: org, createdAt: new Date().toISOString() }

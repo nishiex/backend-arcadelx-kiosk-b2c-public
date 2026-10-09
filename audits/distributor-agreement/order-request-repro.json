@@ -1,0 +1,130 @@
+{
+  "tag": "TEMP-REPRO-1791355656208",
+  "before": {
+    "orders": 2,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12
+  },
+  "after": {
+    "orders": 2,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12
+  },
+  "removed": {
+    "orders": 1,
+    "agreements": 1,
+    "connections": 1,
+    "refreshTokens": 1,
+    "memberships": 1,
+    "organizations": 1,
+    "users": 1
+  },
+  "results": [
+    {
+      "step": "before-counts",
+      "at": "2026-10-07T06:47:36.237Z",
+      "orders": 2,
+      "agreements": 2,
+      "connections": 2,
+      "organizations": 8,
+      "users": 12,
+      "memberships": 12
+    },
+    {
+      "step": "fixture-created",
+      "at": "2026-10-07T06:47:36.332Z",
+      "organizationId": "b6c8ef75-798b-474b-9d44-e101992f9ba3",
+      "connectionId": "4a6d7a53-1fd8-4a00-bef4-fb3b0b77d134",
+      "distributor": "TEMP-REPRO-1791355656208 Distributor"
+    },
+    {
+      "step": "request-without-any-agreement",
+      "at": "2026-10-07T06:47:36.475Z",
+      "status": 403,
+      "message": "Cannot create request: No active agreement with a supplier found"
+    },
+    {
+      "step": "company-drafted-agreement",
+      "at": "2026-10-07T06:47:36.791Z",
+      "status": 201,
+      "agreementStatus": "PENDING_APPROVAL",
+      "agreementId": "98b7547d-e4e4-46d4-ad97-9ff7cfe18b25"
+    },
+    {
+      "step": "request-while-agreement-pending-approval",
+      "at": "2026-10-07T06:47:36.808Z",
+      "status": 403,
+      "message": "Cannot create request: No active agreement with a supplier found",
+      "reproduced": true
+    },
+    {
+      "step": "distributor-owner-approved",
+      "at": "2026-10-07T06:47:36.840Z",
+      "status": 200,
+      "agreementStatus": "ACTIVE"
+    },
+    {
+      "step": "request-after-activation",
+      "at": "2026-10-07T06:47:36.891Z",
+      "status": 201,
+      "message": "Order requested successfully. Pending approval.",
+      "orderNumber": "ORD-2026-00003"
+    },
+    {
+      "step": "supplier-visible-to-distributor",
+      "at": "2026-10-07T06:47:36.909Z",
+      "activeAgreement": {
+        "id": "98b7547d-e4e4-46d4-ad97-9ff7cfe18b25",
+        "parent": "ArcadeLX Local"
+      }
+    },
+    {
+      "step": "cleanup",
+      "at": "2026-10-07T06:47:36.926Z",
+      "orders": 1,
+      "agreements": 1,
+      "connections": 1,
+      "refreshTokens": 1,
+      "memberships": 1,
+      "organizations": 1,
+      "users": 1
+    },
+    {
+      "step": "after-counts",
+      "at": "2026-10-07T06:47:36.926Z",
+      "orders": 2,
+      "agreements": 2,
+      "connections": 2,
+      "organizations": 8,
+      "users": 12,
+      "memberships": 12
+    },
+    {
+      "step": "restored",
+      "at": "2026-10-07T06:47:36.926Z",
+      "restored": true,
+      "before": {
+        "orders": 2,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12
+      },
+      "after": {
+        "orders": 2,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12
+      }
+    }
+  ]
+}

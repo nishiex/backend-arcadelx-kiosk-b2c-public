@@ -24,14 +24,12 @@ export default function RequestsScreen() {
   } else if (query.data && page > pages) setPage(pages)
   if (isLoading) return <Skeleton className="h-64" />
   if (!canReviewRequests) return <EmptyState message="Only organization Owners and Admins can review requests." />
-  const rejectionReady = kind === "network" ? readiness.data?.networkRejection : readiness.data?.agreementRejection
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header><h1 className="text-2xl font-semibold tracking-tight">Requests</h1><p className="mt-1 text-sm text-muted-foreground">Review incoming connections and agreements, and track your request history.</p></header>
       <div className="flex gap-2" aria-label="Request type">{(["network", "agreements"] as const).map(value => <button key={value} type="button" aria-pressed={kind === value} onClick={() => { setKind(value); setPage(1) }} className={`rounded-lg border px-4 py-2 text-sm font-medium ${kind === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-muted"}`}>{value === "network" ? "Network connections" : "Agreements"}</button>)}</div>
-      {kind === "agreements" && role !== "OWNER" && <p className="text-sm text-muted-foreground">Only your organization’s Owner can approve or reject financial agreements.</p>}
+      {kind === "agreements" && role !== "OWNER" && <p className="text-sm text-muted-foreground">Only your organization’s Owner can approve financial agreements.</p>}
       {readiness.isError && <ErrorState message="Couldn't check action availability." onRetry={() => readiness.refetch()} />}
-      {readiness.data && !rejectionReady && <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Rejection is temporarily unavailable. Please contact your administrator.</p>}
       <section className="rounded-xl border border-border bg-card" aria-busy={query.isFetching}>
         {query.isLoading ? <div className="space-y-4 p-5"><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
           : query.isError ? <ErrorState message="Couldn't load requests." onRetry={() => query.refetch()} />
@@ -52,7 +50,7 @@ export default function RequestsScreen() {
                     <div><dt className="text-xs text-muted-foreground">Deposit / kiosk</dt><dd>{orderMoney(request.depositAmountPerMachine ?? 0)}</dd></div>
                     <div><dt className="text-xs text-muted-foreground">Non-refundable / kiosk</dt><dd>{orderMoney(request.nonRefundableAmountPerMachine ?? 0)}</dd></div>
                   </dl>}
-                  {canDecide && <div className="flex justify-end gap-2"><DecisionDialog kind={kind} id={request.id} subject={subject} action="reject" disabled={!rejectionReady} /><DecisionDialog kind={kind} id={request.id} subject={subject} action="approve" /></div>}
+                  {canDecide && <div className="flex justify-end gap-2"><DecisionDialog kind={kind} id={request.id} subject={subject} action="approve" /></div>}
                   {!incoming && pending && <p className="text-xs text-muted-foreground">Awaiting the recipient’s decision.</p>}
                 </li>
               })}</ul>}

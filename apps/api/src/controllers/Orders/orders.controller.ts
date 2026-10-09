@@ -26,9 +26,15 @@ const reserveKiosks = async (
   quantity: number,
   orderId: string,
 ) => {
+  // Deterministic selection: oldest first, then by machine code. Ordering by `id`
+  // alone is arbitrary because ids are random UUIDs, so kiosks sharing a
+  // `createdAt` (batch-created fleets share one) were picked in no meaningful order
+  // and a request could receive an unexplained, model-mixed set. `machineCode` is
+  // unique, making this a total order: the same inventory always yields the same
+  // kiosks, and a batch allocation now follows the machine codes.
   const kiosks = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='AVAILABLE' AND "reservedOrderId" IS NULL
-    ORDER BY "createdAt", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
+    ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
   if (kiosks.length !== quantity)
     throw new ApiError(
       409,

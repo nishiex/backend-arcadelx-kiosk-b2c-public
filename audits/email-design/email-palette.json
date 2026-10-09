@@ -1,0 +1,67 @@
+{
+  "background": {
+    "oklch": "oklch(1 0 0)",
+    "hex": "#ffffff",
+    "alpha": 1.0
+  },
+  "foreground": {
+    "oklch": "oklch(0.145 0 0)",
+    "hex": "#0a0a0a",
+    "alpha": 1.0
+  },
+  "card": {
+    "oklch": "oklch(1 0 0)",
+    "hex": "#ffffff",
+    "alpha": 1.0
+  },
+  "card-foreground": {
+    "oklch": "oklch(0.145 0 0)",
+    "hex": "#0a0a0a",
+    "alpha": 1.0
+  },
+  "primary": {
+    "oklch": "oklch(0.205 0 0)",
+    "hex": "#171717",
+    "alpha": 1.0
+  },
+  "primary-foreground": {
+    "oklch": "oklch(0.985 0 0)",
+    "hex": "#fafafa",
+    "alpha": 1.0
+  },
+  "muted": {
+    "oklch": "oklch(0.97 0 0)",
+    "hex": "#f5f5f5",
+    "alpha": 1.0
+  },
+  "muted-foreground": {
+    "oklch": "oklch(0.556 0 0)",
+    "hex": "#737373",
+    "alpha": 1.0
+  },
+  "border": {
+    "oklch": "oklch(0.922 0 0)",
+    "hex": "#e5e5e5",
+    "alpha": 1.0
+  },
+  "destructive": {
+    "oklch": "oklch(0.577 0.245 27.325)",
+    "hex": "#e7000b",
+    "alpha": 1.0
+  },
+  "secondary": {
+    "oklch": "oklch(0.97 0 0)",
+    "hex": "#f5f5f5",
+    "alpha": 1.0
+  },
+  "input": {
+    "oklch": "oklch(0.922 0 0)",
+    "hex": "#e5e5e5",
+    "alpha": 1.0
+  },
+  "ring": {
+    "oklch": "oklch(0.708 0 0)",
+    "hex": "#a1a1a1",
+    "alpha": 1.0
+  }
+}

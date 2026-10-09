@@ -1,0 +1,52 @@
+{
+  "startedAt": "2026-10-07T05:43:06.655Z",
+  "database": "localhost:5433/arcadelx_local",
+  "before": {
+    "transactions": 0,
+    "assignments": 12,
+    "open_assignments": 12,
+    "agreements": 1
+  },
+  "after": {
+    "transactions": 8832,
+    "assignments": 20,
+    "open_assignments": 20,
+    "agreements": 1
+  },
+  "series": {
+    "7d": {
+      "status": 200,
+      "granularity": "Daily",
+      "points": 7,
+      "total": 63372.2,
+      "nonZero": 7
+    },
+    "30d": {
+      "status": 200,
+      "granularity": "Daily",
+      "points": 30,
+      "total": 217285.11,
+      "nonZero": 30
+    },
+    "3m": {
+      "status": 200,
+      "granularity": "Weekly",
+      "points": 14,
+      "total": 650908.3,
+      "nonZero": 14
+    },
+    "1y": {
+      "status": 200,
+      "granularity": "Monthly",
+      "points": 13,
+      "total": 2466674.8,
+      "nonZero": 13
+    }
+  },
+  "machineWise": {
+    "status": 200,
+    "kiosks": 20
+  },
+  "passed": true,
+  "finishedAt": "2026-10-07T05:43:07.671Z"
+}

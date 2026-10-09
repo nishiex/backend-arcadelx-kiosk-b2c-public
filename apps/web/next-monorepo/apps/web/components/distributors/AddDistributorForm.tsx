@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { createDistributor, generateCompanyInviteCode, type CreateDistributorInput } from "@/lib/backend-api"
+import { createDistributor, generateCompanyInviteCode, retryOrganizationCredentials, type CreateDistributorInput } from "@/lib/backend-api"
 import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
 import { useMe } from "@/hooks/useMe"
 import { companyInviteCodeKey } from "./CompanyInviteCodeDialog"
@@ -53,6 +53,23 @@ export default function AddDistributorForm() {
   const queryClient = useQueryClient()
   const { canManageDistributors, isLoading, me } = useMe()
   const inviteKey = companyInviteCodeKey(me?.membership?.organizationId)
+  const [pendingCredentials, setPendingCredentials] = React.useState<{ organizationId: string; name: string; email: string } | null>(null)
+
+  /** Re-sends a failed invitation through the existing credentials retry endpoint. */
+  const resend = useMutation({
+    mutationFn: () => retryOrganizationCredentials(pendingCredentials!.organizationId),
+    onSuccess: async (result) => {
+      if (result.credentialsEmailSent) {
+        toast.success(`Login credentials emailed to ${pendingCredentials!.email}`)
+        queryClient.invalidateQueries({ queryKey: ["distributors"] })
+        setPendingCredentials(null)
+        router.push("/distributors")
+      } else {
+        toast.warning("Email delivery is still pending. Please try again later.")
+      }
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't resend the credentials"),
+  })
 
   const {
     register,
@@ -92,7 +109,11 @@ export default function AddDistributorForm() {
       queryClient.removeQueries({ queryKey: inviteKey })
       toast.success(`Distributor "${data.organization.name}" registered`)
       if (data.credentialsEmailSent === false) {
-        toast.warning("Couldn't email login credentials — configure the mail service to send them.")
+        // Stay on the form so the invitation can be re-sent: a Distributor Owner needs
+        // the emailed password to sign in and approve their agreement.
+        setPendingCredentials({ organizationId: data.organization.id, name: data.organization.name, email: data.owner.email })
+        toast.warning("Couldn't email login credentials — resend them below.")
+        return
       }
       queryClient.invalidateQueries({ queryKey: ["distributors"] })
       router.push("/distributors")
@@ -124,6 +145,31 @@ export default function AddDistributorForm() {
         onSubmit={handleSubmit((v) => mutation.mutate(v))}
         className="rounded-2xl border border-border bg-card p-6"
       >
+        {pendingCredentials && (
+          <div role="status" className="mb-5 space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+            <p className="font-medium">
+              “{pendingCredentials.name}” was registered, but login credentials have not been emailed to {pendingCredentials.email} yet.
+            </p>
+            <p className="text-muted-foreground">
+              Their Owner needs those credentials to sign in and approve the agreement before kiosks can be requested.
+            </p>
+            {resend.isError && <p role="alert" className="text-destructive">{resend.error.message}</p>}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={resend.isPending}
+                onClick={() => resend.mutate()}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {resend.isPending && <Loader2 size={16} className="animate-spin" />}
+                {resend.isPending ? "Resending…" : "Resend credentials email"}
+              </button>
+              <Link href="/distributors" className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+                Continue to distributors
+              </Link>
+            </div>
+          </div>
+        )}
         {/* Distributor Information */}
         <h2 className="mb-4 text-sm font-semibold">Distributor Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

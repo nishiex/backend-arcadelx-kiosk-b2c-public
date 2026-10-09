@@ -12,6 +12,14 @@ export type PaginationMeta = {
   totalPages: number;
 }
 
+/**
+ * Upper bound on pages walked by the paging helpers. They loop
+ * `while (page <= totalPages)`, so a response reporting `totalPages: 0` or omitting
+ * `meta` would otherwise leave the exit condition resting on arithmetic alone. The header
+ * bell polls those helpers every 10 seconds, so an unbounded walk could hang the tab.
+ */
+const MAX_PAGES = 100;
+
 export type MemberRequest = {
   id: string;
   userId?: string;
@@ -151,7 +159,6 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return ok ? fetch(input, opts) : res;
 }
 
-
 export async function fetchInventorySummary(): Promise<InventorySummaryResponse> {
   const res = await apiFetch('/api/kiosks/summary', { credentials: 'include' });
   return handleRes<InventorySummaryResponse>(res);
@@ -197,6 +204,34 @@ export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): 
   return (await handleRes<{ order: KioskOrderDetails }>(res)).order;
 }
 
+/**
+ * Post-approval lifecycle steps. Each is supplier-side (the API requires the caller
+ * to be the order's parent organization) and strictly ordered by the API:
+ *   APPROVED + unpaid -> paid -> dispatch -> deliver (DELIVERED, terminal).
+ * `dispatch` assigns the reserved kiosks; `deliver` transfers their ownership to the
+ * child organization and clears their reservation.
+ */
+export async function markOrderAsPaid(orderId: string): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/paid`, { method: 'PATCH' });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
+export async function dispatchOrder(orderId: string): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/dispatch`, { method: 'PATCH' });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
+export async function deliverOrder(orderId: string): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/deliver`, { method: 'PATCH' });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
+/** Rejects a request under review (supplier-side, like the approve step). */
+export async function rejectOrder(orderId: string): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/reject`, { method: 'PATCH' });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
 export type CreateOrderInput = 
   | { type: 'REQUEST'; quantity: number }
   | { type: 'ALLOCATION'; targetOrgId: string; quantity: number };
@@ -223,9 +258,11 @@ export async function fetchOrderRequestSuppliers(organizationId: string, orgType
     do {
       const result = await fetchReviewRequests(kind, page, signal);
       rows.push(...result.requests);
-      totalPages = result.meta.totalPages;
+      // A response may omit `meta`, or report 0 pages; either must not keep the walk alive.
+      const reported = result.meta?.totalPages;
+      totalPages = Number.isFinite(reported) && reported > 0 ? reported : 1;
       page++;
-    } while (page <= totalPages);
+    } while (page <= totalPages && page <= MAX_PAGES);
     return rows.filter(row => row.status === 'ACTIVE' && row.to.id === organizationId &&
       (row.from.type === 'COMPANY' || (orgType === 'PARTNER' && row.from.type === 'DISTRIBUTOR')));
   };
@@ -244,7 +281,7 @@ export async function fetchNetworkRequests(page = 1, limit = 10): Promise<Networ
   return handleRes<NetworkRequestsResponse>(res);
 }
 
-export type WorkflowReadiness = { networkRejection: boolean; agreementRejection: boolean; orderDecisions: boolean };
+export type WorkflowReadiness = { orderDecisions: boolean };
 export async function fetchWorkflowReadiness(): Promise<WorkflowReadiness> {
   return handleRes<WorkflowReadiness>(await apiFetch('/api/workflows'));
 }
@@ -338,6 +375,11 @@ export async function createPartner(input: CreatePartnerInput): Promise<CreatePa
   }));
 }
 
+/**
+ * Re-sends a failed credentials invitation. `attemptDelivery` is the only sender and
+ * runs inside the request, so the boolean it returns is the real outcome; the resend
+ * count lets the caller confirm another attempt actually happened.
+ */
 export async function retryOrganizationCredentials(organizationId: string): Promise<{ credentialsEmailSent: boolean }> {
   return handleRes(await apiFetch(`/api/auth/organizations/${encodeURIComponent(organizationId)}/credentials/retry`, {
     method: 'POST', credentials: 'include',
@@ -367,16 +409,6 @@ export async function fetchDistributors(): Promise<Distributor[]> {
   return json.distributors;
 }
 
-export async function setDistributorStatus(id: string, isActive: boolean): Promise<void> {
-  const res = await apiFetch(`/api/network/distributors/${encodeURIComponent(id)}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ isActive }),
-  });
-  await handleRes(res);
-}
-
-// The nested path receives the existing path-scoped refresh cookie.
 export async function logout(): Promise<void> {
   signingOut = true;
   try {
@@ -542,6 +574,35 @@ export type DeductionRates = {
 export async function fetchMachineRevenue(): Promise<MachineRevenue[]> {
   const res = await apiFetch('/api/revenue/machine-wise', { credentials: 'include' });
   return (await handleRes<{ kiosks: MachineRevenue[] }>(res)).kiosks;
+}
+
+/** Windows offered by the dashboard revenue trend; each also sets its granularity. */
+export const REVENUE_SERIES_RANGES = ['7d', '30d', '3m', '1y'] as const;
+export type RevenueSeriesRange = (typeof REVENUE_SERIES_RANGES)[number];
+
+export type RevenueSeriesPoint = {
+  /** Bucket start (IST), `YYYY-MM-DD`. */
+  key: string;
+  /** Pre-formatted axis label. */
+  label: string;
+  revenue: number;
+};
+
+export type RevenueSeries = {
+  range: RevenueSeriesRange;
+  /** "Daily" | "Weekly" | "Monthly", for the panel subtitle. */
+  granularity: string;
+  bucket: 'day' | 'week' | 'month';
+  currency: string;
+  /** Sum across the returned points, computed by the API. */
+  total: number;
+  /** Every bucket in the range, including zero-revenue ones. */
+  points: RevenueSeriesPoint[];
+};
+
+export async function fetchRevenueSeries(range: RevenueSeriesRange, signal?: AbortSignal): Promise<RevenueSeries> {
+  const res = await apiFetch(`/api/revenue/series?range=${encodeURIComponent(range)}`, { credentials: 'include', signal, cache: 'no-store' });
+  return handleRes<RevenueSeries>(res);
 }
 
 function normalizeRates(settings: Record<keyof DeductionRates, number | string>): DeductionRates {
@@ -909,15 +970,20 @@ export async function removeMember(membershipId: string): Promise<void> {
 }
 
 // ---- Agreements ----
+// Decimal/Int columns arrive as strings over JSON, so display fields are widened
+// and coerced at render time instead of being assumed numeric.
 export type Agreement = {
   id: string;
   status: 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED';
+  networkConnectionId: string;
   parentOrg: OrgRef;
   childOrg: OrgRef;
-  parentSharePct: number;
-  childSharePct: number;
-  depositAmountPerMachine: number;
-  nonRefundableAmountPerMachine: number;
+  parentSharePct: number | string;
+  childSharePct: number | string;
+  depositAmountPerMachine: number | string;
+  nonRefundableAmountPerMachine: number | string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
   createdAt: string;
 };
 
@@ -928,13 +994,37 @@ export async function fetchAgreements(page = 1, signal?: AbortSignal): Promise<A
   return handleRes<AgreementsResponse>(res);
 }
 
+/**
+ * Every agreement for one child organization, newest first. The endpoint lists the
+ * caller's agreements across both roles, so a distributor's latest terms could sit
+ * beyond the first page once other relationship history exists.
+ */
+export async function fetchAgreementsForChild(childOrgId: string, signal?: AbortSignal): Promise<Agreement[]> {
+  const rows: Agreement[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const data = await fetchAgreements(page, signal);
+    rows.push(...data.agreements.filter(agreement => agreement.childOrg.id === childOrgId));
+    const reported = data.meta?.totalPages;
+    totalPages = Number.isFinite(reported) && reported > 0 ? reported : 1;
+    page++;
+  } while (page <= totalPages && page <= MAX_PAGES);
+  return rows;
+}
+
+/**
+ * Terms are required when a Company is the parent. A Distributor drafting for a
+ * Partner omits them and inherits its own Company agreement amounts, so they stay
+ * optional here; the Company dashboard always sends explicit terms.
+ */
 export type CreateAgreementInput = {
   childOrgId: string;
   networkConnectionId: string;
-  parentSharePct: number;
-  childSharePct: number;
-  depositAmountPerMachine: number;
-  nonRefundableAmountPerMachine: number;
+  parentSharePct?: number;
+  childSharePct?: number;
+  depositAmountPerMachine?: number;
+  nonRefundableAmountPerMachine?: number;
 };
 
 export async function createAgreement(input: CreateAgreementInput): Promise<Agreement> {
@@ -948,4 +1038,51 @@ export async function createAgreement(input: CreateAgreementInput): Promise<Agre
 
 export async function terminateAgreement(id: string): Promise<void> {
   await handleRes(await apiFetch(`/api/agreements/${encodeURIComponent(id)}/terminate`, { method: 'DELETE' }));
+}
+
+// ---- Network connections ----
+export type NetworkConnectionStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
+
+/** A connection row as returned by `GET /api/network` (all statuses, paginated). */
+export type NetworkConnection = {
+  id: string;
+  status: NetworkConnectionStatus;
+  initiatorOrgId: string;
+  receiverOrgId: string;
+  initiator: OrgRef;
+  /** Server-side field name retained as-is to match the response body. */
+  reciever: OrgRef;
+  createdAt: string;
+};
+
+/**
+ * Read every page so older relationship history cannot hide the current link,
+ * matching how `fetchOrderRequestSuppliers` resolves relationships.
+ */
+export async function fetchOrganizationConnections(signal?: AbortSignal): Promise<NetworkConnection[]> {
+  const rows: NetworkConnection[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await apiFetch(`/api/network?page=${page}&limit=50`, { signal, cache: 'no-store' });
+    const data = await handleRes<{ requests: NetworkConnection[]; meta: PaginationMeta }>(res);
+    rows.push(...data.requests);
+    const reported = data.meta?.totalPages;
+    totalPages = Number.isFinite(reported) && reported > 0 ? reported : 1;
+    page++;
+  } while (page <= totalPages && page <= MAX_PAGES);
+  return rows;
+}
+
+/**
+ * Network request from a parent to a child. Agreements can only be drafted on an
+ * ACTIVE connection whose initiator is the parent, so the receiver must accept the
+ * request before any terms can be submitted.
+ */
+export async function initiateConnection(targetOwnerEmail: string): Promise<void> {
+  await handleRes(await apiFetch('/api/network/initiate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetOwnerEmail }),
+  }));
 }

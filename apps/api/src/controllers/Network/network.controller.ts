@@ -198,18 +198,6 @@ export const acceptConnection = asyncHandler(
 );
 
 // Recipient decisions compete on the same conditional PENDING transition.
-export const rejectConnection = asyncHandler(async (req, res) => {
-  await requireWorkflow('networkRejection');
-  const connectionId = req.params.connectionId;
-  if (typeof connectionId !== 'string') throw new ApiError(400, 'Invalid connection ID');
-  const changed = await prisma.networkConnection.updateMany({
-    where: { id: connectionId, receiverOrgId: req.membership!.organizationId, status: 'PENDING' },
-    data: { status: 'REJECTED' },
-  });
-  if (changed.count !== 1) throw new ApiError(404, 'Pending connection request not found or already processed');
-  res.status(200).json(new ApiResponse(200, null, 'Connection request rejected'));
-});
-
 export const getConnections = asyncHandler(async (req, res) => {
   const { page, limit } = PaginationQuerySchema.parse(req.query);
   const organizationId = req.membership!.organizationId;
@@ -238,7 +226,6 @@ export const deleteConnection = asyncHandler(
         where: { id: connectionId, initiatorOrgId: currentOrgId },
       });
       if (!connection) throw new ApiError(404, "Connection not found");
-      if (connection.status === 'REJECTED') throw new ApiError(409, 'Rejected connection history must be retained');
       if (
         await tx.agreement.count({
           where: { networkConnectionId: connectionId },
@@ -331,37 +318,3 @@ export const getDistributors = asyncHandler(
       );
   },
 );
-
-export const setDistributorStatus = asyncHandler(async (req: Request, res: Response) => {
-  const { distributorId } = DistributorParamsSchema.parse(req.params);
-  const { isActive } = DistributorStatusSchema.parse(req.body);
-  const columns = await prisma.$queryRaw<{ column_name: string }[]>`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'Organization'
-      AND column_name IN ('isActive', 'accessVersion')
-  `;
-  if (columns.length !== 2) throw new ApiError(503, "Distributor status management requires the database update.");
-
-  const distributor = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${distributorId} FOR UPDATE`;
-    const current = await tx.organization.findFirst({
-      where: { id: distributorId, type: "DISTRIBUTOR" },
-      select: { id: true, isActive: true },
-    });
-    if (!current) throw new ApiError(404, "Distributor not found");
-    const updated = await tx.organization.update({
-      where: { id: distributorId },
-      data: { isActive, ...(!isActive && current.isActive ? { accessVersion: { increment: 1 } } : {}) },
-      select: { id: true, name: true, isActive: true },
-    });
-    if (!isActive) {
-      // Preserve session records as well as business data when disabling access.
-      await tx.refreshToken.updateMany({
-        where: { user: { membership: { organizationId: distributorId } } },
-        data: { revoked: true },
-      });
-    }
-    return updated;
-  });
-  res.status(200).json(new ApiResponse(200, { distributor }, `Distributor ${isActive ? "activated" : "deactivated"} successfully`));
-});

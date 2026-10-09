@@ -1,213 +1,8 @@
 {
   "branch": "Frontend-Backend-Merge working tree",
-  "scannedFiles": 168,
-  "reachableFiles": 125,
-  "candidates": [
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/common/PlaceholderPage.tsx",
-      "lines": 70,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx",
-      "lines": 57,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "lines": 71,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx",
-      "lines": 27,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardKPIs.tsx",
-      "lines": 49,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "lines": 115,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardShell.tsx",
-      "lines": 10,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-      "lines": 39,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OverviewChart.tsx",
-      "lines": 18,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentActivity.tsx",
-      "lines": 26,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx",
-      "lines": 97,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx",
-      "lines": 65,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/StatsCards.tsx",
-      "lines": 25,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/ActivityWidget.tsx",
-      "lines": 26,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/CustomersWidget.tsx",
-      "lines": 26,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx",
-      "lines": 32,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx",
-      "lines": 38,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/PendingMembersWidget.tsx",
-      "lines": 40,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx",
-      "lines": 32,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/SystemHealthWidget.tsx",
-      "lines": 19,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/AnimatedNumber.tsx",
-      "lines": 43,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/BlurText.tsx",
-      "lines": 52,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/CountUp.tsx",
-      "lines": 74,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx",
-      "lines": 26,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/SpotlightCard.tsx",
-      "lines": 50,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/requests/RequestsScreen.tsx",
-      "lines": 64,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/scripts/decision-ui-check.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/button.tsx",
-      "lines": 16,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/card.tsx",
-      "lines": 13,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dialog.tsx",
-      "lines": 28,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dropdown-menu.tsx",
-      "lines": 13,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/tooltip.tsx",
-      "lines": 16,
-      "importedBy": []
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/lib/dashboard-data.ts",
-      "lines": 35,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/lib/mock-data.ts",
-      "lines": 217,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx",
-        "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx"
-      ]
-    },
-    {
-      "file": "apps/web/next-monorepo/packages/ui/src/components/button.tsx",
-      "lines": 65,
-      "importedBy": [
-        "apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx"
-      ]
-    }
-  ],
+  "scannedFiles": 143,
+  "reachableFiles": 131,
+  "candidates": [],
   "unresolved": [
     {
       "file": "apps/web/next-monorepo/apps/web/postcss.config.mjs",
@@ -365,6 +160,10 @@
     },
     {
       "file": "apps/api/src/controllers/auth.controller.ts",
+      "specifier": "../utils/temporary-password"
+    },
+    {
+      "file": "apps/api/src/controllers/auth.controller.ts",
       "specifier": "../utils/ApiError"
     },
     {
@@ -420,6 +219,10 @@
       "specifier": "@shared-types/validationSchemas/Kiosk/kiosk.validation"
     },
     {
+      "file": "apps/api/src/controllers/Internal/internal.controller.ts",
+      "specifier": "../../services/kiosk-ownership"
+    },
+    {
       "file": "apps/api/src/controllers/Kiosk/kiosk.controller.ts",
       "specifier": "express"
     },
@@ -448,6 +251,10 @@
       "specifier": "@shared-types/validationSchemas/Kiosk/kiosk.validation"
     },
     {
+      "file": "apps/api/src/controllers/Kiosk/kiosk.controller.ts",
+      "specifier": "../../services/kiosk-ownership"
+    },
+    {
       "file": "apps/api/src/controllers/membership.controller.ts",
       "specifier": "express"
     },
@@ -466,6 +273,10 @@
     {
       "file": "apps/api/src/controllers/membership.controller.ts",
       "specifier": "../utils/ApiResponse"
+    },
+    {
+      "file": "apps/api/src/controllers/membership.controller.ts",
+      "specifier": "../utils/temporary-password"
     },
     {
       "file": "apps/api/src/controllers/membership.controller.ts",
@@ -590,6 +401,10 @@
     {
       "file": "apps/api/src/controllers/Revenue/revenue.controller.ts",
       "specifier": "../../services/Revenue/revenue-period"
+    },
+    {
+      "file": "apps/api/src/controllers/Revenue/revenue.controller.ts",
+      "specifier": "../../services/Revenue/revenue-series"
     },
     {
       "file": "apps/api/src/middlewares/auth.ts",
@@ -768,6 +583,10 @@
       "specifier": "./email.service"
     },
     {
+      "file": "apps/api/src/services/email/auth.email.ts",
+      "specifier": "./email-theme"
+    },
+    {
       "file": "apps/api/src/services/email/delivery.service.ts",
       "specifier": "node:crypto"
     },
@@ -805,6 +624,10 @@
     },
     {
       "file": "apps/api/src/services/email/delivery.service.ts",
+      "specifier": "./email-theme"
+    },
+    {
+      "file": "apps/api/src/services/email/delivery.service.ts",
       "specifier": "../pdf/invoice.pdf"
     },
     {
@@ -821,15 +644,19 @@
     },
     {
       "file": "apps/api/src/services/email/email.service.ts",
-      "specifier": "path"
-    },
-    {
-      "file": "apps/api/src/services/email/email.service.ts",
-      "specifier": "url"
+      "specifier": "../../utils/asset-file"
     },
     {
       "file": "apps/api/src/services/email/passwordreset.email.ts",
       "specifier": "./email.service"
+    },
+    {
+      "file": "apps/api/src/services/email/passwordreset.email.ts",
+      "specifier": "./email-theme"
+    },
+    {
+      "file": "apps/api/src/services/kiosk-ownership.ts",
+      "specifier": "../generated/prisma/client"
     },
     {
       "file": "apps/api/src/services/member-invite.ts",
@@ -861,11 +688,11 @@
     },
     {
       "file": "apps/api/src/services/pdf/invoice.pdf.ts",
-      "specifier": "node:url"
+      "specifier": "../../config/env"
     },
     {
       "file": "apps/api/src/services/pdf/invoice.pdf.ts",
-      "specifier": "../../config/env"
+      "specifier": "../../utils/asset-file"
     },
     {
       "file": "apps/api/src/services/pdf/revenue.pdf.ts",
@@ -882,6 +709,26 @@
     {
       "file": "apps/api/src/services/pdf/revenue.pdf.ts",
       "specifier": "node:crypto"
+    },
+    {
+      "file": "apps/api/src/services/Revenue/deviceSync.service.ts",
+      "specifier": "zod"
+    },
+    {
+      "file": "apps/api/src/services/Revenue/deviceSync.service.ts",
+      "specifier": "../../utils/db"
+    },
+    {
+      "file": "apps/api/src/services/Revenue/deviceSync.service.ts",
+      "specifier": "../kiosk-ownership"
+    },
+    {
+      "file": "apps/api/src/services/Revenue/deviceSync.service.ts",
+      "specifier": "../machine-code-sequence"
+    },
+    {
+      "file": "apps/api/src/services/Revenue/revenue-series.ts",
+      "specifier": "@shared-types/validationSchemas/Revenue/revenue.validation"
     },
     {
       "file": "apps/api/src/services/Revenue/revenueStatement.service.ts",
@@ -912,12 +759,28 @@
       "specifier": "zod"
     },
     {
+      "file": "apps/api/src/services/Revenue/revenueTransaction.services.ts",
+      "specifier": "../kiosk-ownership"
+    },
+    {
       "file": "apps/api/src/services/workflow-readiness.ts",
       "specifier": "../utils/db"
     },
     {
       "file": "apps/api/src/services/workflow-readiness.ts",
       "specifier": "../utils/ApiError"
+    },
+    {
+      "file": "apps/api/src/utils/asset-file.ts",
+      "specifier": "node:fs"
+    },
+    {
+      "file": "apps/api/src/utils/asset-file.ts",
+      "specifier": "node:path"
+    },
+    {
+      "file": "apps/api/src/utils/asset-file.ts",
+      "specifier": "node:url"
     },
     {
       "file": "apps/api/src/utils/asyncHandler.ts",
@@ -950,6 +813,10 @@
     {
       "file": "apps/api/src/utils/passwordReset.ts",
       "specifier": "crypto"
+    },
+    {
+      "file": "apps/api/src/utils/temporary-password.ts",
+      "specifier": "node:crypto"
     },
     {
       "file": "apps/api/src/utils/token.ts",
@@ -996,6 +863,10 @@
       "specifier": "../../services/Revenue/revenueTransaction.services"
     },
     {
+      "file": "apps/api/src/workers/Revenue/revenue.worker.ts",
+      "specifier": "../../services/Revenue/deviceSync.service"
+    },
+    {
       "file": "packages/shared-types/validationSchemas/agreement.validation.ts",
       "specifier": "zod"
     },
@@ -1029,7 +900,11 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/audit-logs/page.tsx",
-      "specifier": "@/components/audit/AuditLogsScreen"
+      "specifier": "@/components/common/PlaceholderPage"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/audit-logs/page.tsx",
+      "specifier": "lucide-react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/distributors/new/page.tsx",
@@ -1077,11 +952,23 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/payments/page.tsx",
-      "specifier": "@/components/payments/PaymentsScreen"
+      "specifier": "@/components/common/PlaceholderPage"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/payments/page.tsx",
+      "specifier": "lucide-react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/reports/page.tsx",
-      "specifier": "@/components/reports/ReportsScreen"
+      "specifier": "@/components/common/PlaceholderPage"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/reports/page.tsx",
+      "specifier": "lucide-react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/requests/page.tsx",
+      "specifier": "@/components/requests/RequestsScreen"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/revenue/page.tsx",
@@ -1097,11 +984,19 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/settlements/page.tsx",
-      "specifier": "@/components/settlements/SettlementsScreen"
+      "specifier": "@/components/common/PlaceholderPage"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/settlements/page.tsx",
+      "specifier": "lucide-react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/support/page.tsx",
-      "specifier": "@/components/support/SupportScreen"
+      "specifier": "@/components/common/PlaceholderPage"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/support/page.tsx",
+      "specifier": "lucide-react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/app/(dashboard)/user/page.tsx",
@@ -1152,34 +1047,6 @@
       "specifier": "@/components/auth/LoginForm"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "@/hooks/useReveal"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/audit/AuditLogsScreen.tsx",
-      "specifier": "@/components/dashboard/ui"
-    },
-    {
       "file": "apps/web/next-monorepo/apps/web/components/auth/ForgotPasswordForm.tsx",
       "specifier": "react"
     },
@@ -1310,98 +1177,6 @@
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/CountUp.tsx",
       "specifier": "@/lib/gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx",
-      "specifier": "@radix-ui/react-dialog"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx",
-      "specifier": "react-hook-form"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/CustomizeDashboard.tsx",
-      "specifier": "@/components/dashboard/DashboardProvider"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "@/components/dashboard/widgets/RevenueWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "@/components/dashboard/widgets/OrdersWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "@/components/dashboard/widgets/CustomersWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "@/components/dashboard/widgets/SystemHealthWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardGrid.tsx",
-      "specifier": "@/components/dashboard/widgets/ActivityWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx",
-      "specifier": "@/components/ui/button"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardHeader.tsx",
-      "specifier": "@/components/dashboard/CustomizeDashboard"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardKPIs.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardKPIs.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardKPIs.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "@/components/dashboard/widgets/InventoryChartWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "@/components/dashboard/widgets/PendingMembersWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "@/components/dashboard/widgets/CustomersWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "@/components/dashboard/widgets/SystemHealthWidget"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardProvider.tsx",
-      "specifier": "@/components/dashboard/widgets/ActivityWidget"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardScreen.tsx",
@@ -1437,15 +1212,15 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardScreen.tsx",
+      "specifier": "./RevenueTrendChart"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardScreen.tsx",
       "specifier": "./InventoryBreakdown"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardScreen.tsx",
       "specifier": "./RecentKiosks"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardShell.tsx",
-      "specifier": "react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/DashboardWelcome.tsx",
@@ -1528,30 +1303,6 @@
       "specifier": "./ui"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-      "specifier": "@/lib/mock-data"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-      "specifier": "recharts"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OrdersAnalytics.tsx",
-      "specifier": "gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/OverviewChart.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentActivity.tsx",
-      "specifier": "react"
-    },
-    {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentKiosks.tsx",
       "specifier": "react"
     },
@@ -1576,28 +1327,32 @@
       "specifier": "./ui"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx",
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
       "specifier": "react"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RecentOrders.tsx",
-      "specifier": "@/lib/mock-data"
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
+      "specifier": "@tanstack/react-query"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx",
-      "specifier": "react"
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
+      "specifier": "lucide-react"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx",
-      "specifier": "@/lib/mock-data"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx",
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
       "specifier": "recharts"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueAnalytics.tsx",
-      "specifier": "gsap"
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
+      "specifier": "@/lib/backend-api"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
+      "specifier": "@/lib/gsap"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/dashboard/RevenueTrendChart.tsx",
+      "specifier": "./ui"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/Sidebar.tsx",
@@ -1668,10 +1423,6 @@
       "specifier": "./ui"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/StatsCards.tsx",
-      "specifier": "react"
-    },
-    {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/ThemeToggle.tsx",
       "specifier": "react"
     },
@@ -1698,74 +1449,6 @@
     {
       "file": "apps/web/next-monorepo/apps/web/components/dashboard/ui.tsx",
       "specifier": "@/lib/gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/ActivityWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/CustomersWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/InventoryChartWidget.tsx",
-      "specifier": "recharts"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/OrdersWidget.tsx",
-      "specifier": "@/lib/dashboard-data"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/PendingMembersWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/PendingMembersWidget.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/PendingMembersWidget.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx",
-      "specifier": "@/lib/dashboard-data"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/RevenueWidget.tsx",
-      "specifier": "recharts"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/dashboard/widgets/SystemHealthWidget.tsx",
-      "specifier": "react"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/distributors/AddDistributorForm.tsx",
@@ -1848,6 +1531,34 @@
       "specifier": "@/hooks/useMe"
     },
     {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "@radix-ui/react-dialog"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "lucide-react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "@workspace/ui/lib/utils"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "@/lib/backend-api"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorAgreementDialog.tsx",
+      "specifier": "@/components/orders/order-display"
+    },
+    {
       "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorsScreen.tsx",
       "specifier": "react"
     },
@@ -1881,27 +1592,7 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorsScreen.tsx",
-      "specifier": "./DistributorStatusDialog"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorStatusDialog.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorStatusDialog.tsx",
-      "specifier": "@radix-ui/react-dialog"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorStatusDialog.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorStatusDialog.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/distributors/DistributorStatusDialog.tsx",
-      "specifier": "@/lib/backend-api"
+      "specifier": "./DistributorAgreementDialog"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/kiosks/AddMachineDialog.tsx",
@@ -2021,10 +1712,6 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/orders/CreateOrderDialog.tsx",
-      "specifier": "@/components/dashboard/ui"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/orders/CreateOrderDialog.tsx",
       "specifier": "@/lib/kiosk-models"
     },
     {
@@ -2089,6 +1776,10 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/orders/OrdersScreen.tsx",
+      "specifier": "./OrderStatusDialog"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrdersScreen.tsx",
       "specifier": "./CreateOrderDialog"
     },
     {
@@ -2098,6 +1789,26 @@
     {
       "file": "apps/web/next-monorepo/apps/web/components/orders/OrdersScreen.tsx",
       "specifier": "./order-display"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrderStatusDialog.tsx",
+      "specifier": "react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrderStatusDialog.tsx",
+      "specifier": "@radix-ui/react-dialog"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrderStatusDialog.tsx",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrderStatusDialog.tsx",
+      "specifier": "lucide-react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/components/orders/OrderStatusDialog.tsx",
+      "specifier": "@/lib/backend-api"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/partners/AddPartnerForm.tsx",
@@ -2142,118 +1853,6 @@
     {
       "file": "apps/web/next-monorepo/apps/web/components/partners/PartnersScreen.tsx",
       "specifier": "./AddPartnerForm"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "@/hooks/useMe"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "@/hooks/useReveal"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/payments/PaymentsScreen.tsx",
-      "specifier": "@/components/dashboard/ui"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/AnimatedNumber.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/AnimatedNumber.tsx",
-      "specifier": "gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/BlurText.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/BlurText.tsx",
-      "specifier": "gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/BlurText.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/CountUp.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/CountUp.tsx",
-      "specifier": "gsap"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/ShinyButton.tsx",
-      "specifier": "@workspace/ui/components/button"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/SpotlightCard.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reactbits/SpotlightCard.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "jspdf"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "jspdf-autotable"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "@/hooks/useMe"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "@/hooks/useReveal"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/reports/ReportsScreen.tsx",
-      "specifier": "@/components/dashboard/ui"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/requests/DecisionDialog.tsx",
@@ -2412,106 +2011,6 @@
       "specifier": "@/components/distributors/CompanyInviteCodeDialog"
     },
     {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "sonner"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "@/hooks/useMe"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "@/hooks/useReveal"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/settlements/SettlementsScreen.tsx",
-      "specifier": "@/components/dashboard/ui"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "@radix-ui/react-dialog"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "sonner"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/NewTicketDialog.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@tanstack/react-query"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "sonner"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "lucide-react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@/hooks/useMe"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@/hooks/useReveal"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@workspace/ui/lib/utils"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "@/components/dashboard/ui"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/support/SupportScreen.tsx",
-      "specifier": "./NewTicketDialog"
-    },
-    {
       "file": "apps/web/next-monorepo/apps/web/components/theme-provider.tsx",
       "specifier": "react"
     },
@@ -2534,38 +2033,6 @@
     {
       "file": "apps/web/next-monorepo/apps/web/components/ui/avatar.tsx",
       "specifier": "@/lib/backend-api"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/button.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/card.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dialog.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dialog.tsx",
-      "specifier": "@radix-ui/react-dialog"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dropdown-menu.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/dropdown-menu.tsx",
-      "specifier": "@radix-ui/react-dropdown-menu"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/tooltip.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/apps/web/components/ui/tooltip.tsx",
-      "specifier": "@radix-ui/react-tooltip"
     },
     {
       "file": "apps/web/next-monorepo/apps/web/components/users/UsersScreen.tsx",
@@ -2704,6 +2171,58 @@
       "specifier": "../components/orders/OrdersScreen"
     },
     {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "node:assert/strict"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "node:fs"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "node:os"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "node:path"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "node:module"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "react-dom/client"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/app-router-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/hooks-client-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "../components/distributors/DistributorsScreen"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "../components/dashboard/Sidebar"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/distributor-agreement-ui-check.tsx",
+      "specifier": "../lib/gsap"
+    },
+    {
       "file": "apps/web/next-monorepo/apps/web/scripts/member-invite-ui-check.tsx",
       "specifier": "node:assert/strict"
     },
@@ -2753,6 +2272,62 @@
     },
     {
       "file": "apps/web/next-monorepo/apps/web/scripts/member-invite-ui-check.tsx",
+      "specifier": "../lib/gsap"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "node:assert/strict"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "node:fs"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "node:os"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "node:path"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "node:module"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "react-dom/client"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/app-router-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/hooks-client-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "../components/dashboard/Header"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "../components/theme-provider"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
+      "specifier": "../components/orders/OrderStatusDialog"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/notifications-and-order-reject-ui-check.tsx",
       "specifier": "../lib/gsap"
     },
     {
@@ -2868,6 +2443,58 @@
       "specifier": "../components/partners/AddPartnerForm"
     },
     {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "node:assert/strict"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "node:fs"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "node:os"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "node:path"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "node:module"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "react"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "react-dom/client"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/app-router-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "next/dist/shared/lib/hooks-client-context.shared-runtime.js"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "../components/dashboard/RevenueTrendChart"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "../components/dashboard/DashboardScreen"
+    },
+    {
+      "file": "apps/web/next-monorepo/apps/web/scripts/revenue-trend-ui-check.tsx",
+      "specifier": "../lib/gsap"
+    },
+    {
       "file": "apps/web/next-monorepo/apps/web/scripts/revenue-ui-check.tsx",
       "specifier": "node:assert/strict"
     },
@@ -2958,22 +2585,6 @@
     {
       "file": "apps/web/next-monorepo/apps/web/scripts/sidebar-cache-ui-check.tsx",
       "specifier": "../hooks/useMe"
-    },
-    {
-      "file": "apps/web/next-monorepo/packages/ui/src/components/button.tsx",
-      "specifier": "react"
-    },
-    {
-      "file": "apps/web/next-monorepo/packages/ui/src/components/button.tsx",
-      "specifier": "class-variance-authority"
-    },
-    {
-      "file": "apps/web/next-monorepo/packages/ui/src/components/button.tsx",
-      "specifier": "cn"
-    },
-    {
-      "file": "apps/web/next-monorepo/packages/ui/src/components/button.tsx",
-      "specifier": "radix-ui"
     },
     {
       "file": "apps/web/next-monorepo/packages/ui/src/lib/utils.ts",

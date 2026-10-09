@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-10-07T09:54:10.424Z",
+  "actualPendingWork": {
+    "member_requests": 0,
+    "connection_requests": 0,
+    "agreements_awaiting": 0,
+    "orders_awaiting": 2,
+    "undelivered_emails": 1
+  },
+  "company": {
+    "label": "COMPANY owner",
+    "bellVisible": true,
+    "pollingCalls": [
+      "/api/auth/me",
+      "/api/members/requests?page=1&limit=1",
+      "/api/network?page=1&limit=20",
+      "/api/agreements?page=1&limit=20",
+      "/api/workflows",
+      "/api/kiosks/summary",
+      "/api/revenue/series?range=30d",
+      "/api/kiosks",
+      "/api/orders?status=UNDER_REVIEW"
+    ],
+    "ariaLabel": "Notifications (2)",
+    "badge": "2",
+    "dropdownText": "Pending work Orders awaiting approval 2"
+  },
+  "distributor": {
+    "label": "DISTRIBUTOR owner",
+    "bellVisible": true,
+    "pollingCalls": [
+      "/api/auth/me",
+      "/api/network?page=1&limit=20",
+      "/api/agreements?page=1&limit=20",
+      "/api/workflows",
+      "/api/kiosks/summary",
+      "/api/revenue/series?range=30d",
+      "/api/kiosks",
+      "/api/orders?status=UNDER_REVIEW"
+    ],
+    "ariaLabel": "Notifications",
+    "badge": null,
+    "dropdownText": "Pending work You're all caught up 🎉 DP Good afternoon, Demo Here's what's happening across your kiosk network today. Demo Pune Distribution DISTRIBUTOR · OWNER Total Kiosks 0 Across your inventory Available 0 Share of fleet 0% Installed 0 Share of fleet 0% Maintenance 0 Share of fleet 0% Network Requests 0 Incoming connections Revenue trend Gross revenue · Last 30 days · Daily 7D 30D 3M 1Y ₹0 gross · INR No revenue recorded in last 30 days. Fleet composition No kiosks in your inventory yet. Recent kiosks Latest machines added to the fleet View all No kiosks in your inventory."
+  },
+  "misleadsWhenActionable": false,
+  "badgeUnderstates": false,
+  "finishedAt": "2026-10-07T09:54:24.766Z"
+}

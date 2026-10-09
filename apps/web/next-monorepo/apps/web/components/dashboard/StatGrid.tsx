@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Box,
   CheckCircle2,
-  Wrench,
   Users,
   Network,
   MapPin,
@@ -44,7 +43,6 @@ export default function StatGrid() {
   const total = Object.values(summary).reduce((a, b) => a + (b || 0), 0)
   const installed = summary["INSTALLED"] || 0
   const available = summary["AVAILABLE"] || 0
-  const maintenance = summary["MAINTENANCE"] || 0
 
   const share = (n: number) => (total > 0 ? (n / total) * 100 : 0)
 
@@ -62,7 +60,6 @@ export default function StatGrid() {
     { label: "Total Kiosks", value: total, icon: <Box size={18} />, iconClass: "bg-primary/10 text-primary", hint: "Across your inventory" },
     { label: "Available", value: available, icon: <MapPin size={18} />, iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", accent: "bg-emerald-500", pct: share(available) },
     { label: "Installed", value: installed, icon: <CheckCircle2 size={18} />, iconClass: "bg-violet-500/10 text-violet-600 dark:text-violet-400", accent: "bg-violet-500", pct: share(installed) },
-    { label: "Maintenance", value: maintenance, icon: <Wrench size={18} />, iconClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400", accent: "bg-orange-500", pct: share(maintenance) },
   ]
 
   if (canManageMembers) {
@@ -89,7 +86,7 @@ export default function StatGrid() {
   if (inventory.isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-[112px]" />
         ))}
       </div>

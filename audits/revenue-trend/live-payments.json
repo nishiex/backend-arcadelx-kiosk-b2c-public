@@ -1,0 +1,115 @@
+{
+  "startedAt": "2026-10-07T06:24:13.145Z",
+  "source": "https://main.arcadelx.games/api/v1/payments",
+  "database": "localhost:5433/arcadelx_local",
+  "feed": {
+    "httpStatus": 200,
+    "reportedTotal": 11,
+    "records": 11,
+    "completed": 4,
+    "pendingOrOther": 7,
+    "devices": [
+      "ADLX-2026-A005",
+      "AUTO"
+    ],
+    "currencies": [
+      "INR"
+    ]
+  },
+  "deviceMapping": {
+    "ADLX-2026-A005": {
+      "matchesMachineCode": true,
+      "matchesExternalDeviceId": false
+    },
+    "AUTO": {
+      "matchesMachineCode": false,
+      "matchesExternalDeviceId": false
+    }
+  },
+  "beforeCounts": {
+    "transactions": 8835,
+    "syncLogs": 3
+  },
+  "sync": {
+    "firstRun": {
+      "totalRecordsFetched": 11,
+      "newRecordsInserted": 0,
+      "unattributedCount": 1
+    },
+    "secondRun": {
+      "totalRecordsFetched": 11,
+      "newRecordsInserted": 0,
+      "unattributedCount": 1
+    },
+    "before": {
+      "transactions": 8835,
+      "syncLogs": 3
+    },
+    "after": {
+      "transactions": 8835,
+      "syncLogs": 5
+    }
+  },
+  "importedRows": [
+    {
+      "txnid": "ADLX_1791283432_E37685",
+      "amount": "1",
+      "currency": "INR",
+      "occurredAt": "2026-10-06T10:44:38.599Z",
+      "kiosk": "ADLX-2026-A005"
+    },
+    {
+      "txnid": "ADLX_1791282556_EBFED9",
+      "amount": "1",
+      "currency": "INR",
+      "occurredAt": "2026-10-06T10:36:04.582Z",
+      "kiosk": "ADLX-2026-A005"
+    },
+    {
+      "txnid": "ADLX_1790321887_E692FE",
+      "amount": "1",
+      "currency": "INR",
+      "occurredAt": "2026-09-25T07:42:59.643Z",
+      "kiosk": "ADLX-2026-A005"
+    }
+  ],
+  "series": {
+    "7d": {
+      "granularity": "Daily",
+      "total": 63374.2,
+      "points": 7
+    },
+    "30d": {
+      "granularity": "Daily",
+      "total": 217288.11,
+      "points": 30
+    },
+    "3m": {
+      "granularity": "Weekly",
+      "total": 650911.3,
+      "points": 14
+    },
+    "1y": {
+      "granularity": "Monthly",
+      "total": 2466677.8,
+      "points": 13
+    }
+  },
+  "machineWiseKiosk": {
+    "machineCode": "ADLX-2026-A005",
+    "location": "-",
+    "distributor": "-",
+    "partner": "-",
+    "deployedPartner": "-",
+    "today": 78.38,
+    "thisMonth": 4928.32,
+    "totalRevenue": 310153.6
+  },
+  "payloadShapes": {
+    "bareArray": "{\"totalRecordsFetched\":0,\"newRecordsInserted\":0,\"unattributedCount\":0}",
+    "envelope": "{\"totalRecordsFetched\":0,\"newRecordsInserted\":0,\"unattributedCount\":0}",
+    "malformed": "rejected: Expected a transaction array"
+  },
+  "passed": true,
+  "finishedAt": "2026-10-07T06:24:14.125Z"
+}

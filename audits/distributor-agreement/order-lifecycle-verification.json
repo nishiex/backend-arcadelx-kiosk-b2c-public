@@ -1,0 +1,217 @@
+{
+  "tag": "TEMP-LIFECYCLE-1791357831715",
+  "startedAt": "2026-10-07T07:23:51.986Z",
+  "steps": [
+    {
+      "step": "before-counts",
+      "orders": 3,
+      "agreements": 2,
+      "connections": 2,
+      "organizations": 8,
+      "users": 12,
+      "memberships": 12,
+      "assignments": 12,
+      "reserved": 10
+    },
+    {
+      "step": "approved",
+      "status": "APPROVED",
+      "paymentStatus": "PENDING",
+      "orderNumber": "ORD-2026-00008"
+    },
+    {
+      "step": "ui-offers-paid",
+      "button": "Mark as paid",
+      "visible": true
+    },
+    {
+      "step": "confirm-paid",
+      "dialogTitle": "Record payment?",
+      "hasConsequence": true
+    },
+    {
+      "step": "persisted-paid",
+      "order": {
+        "status": "APPROVED",
+        "paymentStatus": "PAID"
+      },
+      "kiosks": [
+        {
+          "kiosk_status": "RESERVED",
+          "currentOrgId": "6351a611-4c86-4f60-8dfc-fd1701031347",
+          "n": 2
+        }
+      ],
+      "matches": true
+    },
+    {
+      "step": "ui-offers-dispatch",
+      "button": "Dispatch",
+      "visible": true
+    },
+    {
+      "step": "confirm-dispatch",
+      "dialogTitle": "Dispatch this order?",
+      "hasConsequence": true
+    },
+    {
+      "step": "persisted-dispatch",
+      "order": {
+        "status": "DISPATCHED",
+        "paymentStatus": "PAID"
+      },
+      "kiosks": [
+        {
+          "kiosk_status": "ASSIGNED",
+          "currentOrgId": "6351a611-4c86-4f60-8dfc-fd1701031347",
+          "n": 2
+        }
+      ],
+      "matches": true
+    },
+    {
+      "step": "ui-offers-deliver",
+      "button": "Mark delivered",
+      "visible": true
+    },
+    {
+      "step": "confirm-deliver",
+      "dialogTitle": "Mark as delivered?",
+      "hasConsequence": true
+    },
+    {
+      "step": "persisted-deliver",
+      "order": {
+        "status": "DELIVERED",
+        "paymentStatus": "PAID"
+      },
+      "kiosks": [
+        {
+          "kiosk_status": "AVAILABLE",
+          "currentOrgId": "b80f5611-e6bf-4452-905a-60c7653e49c1",
+          "n": 2
+        }
+      ],
+      "matches": true
+    },
+    {
+      "step": "final-verdict",
+      "paid": true,
+      "dispatched": true,
+      "delivered": true,
+      "ownershipMoved": true,
+      "reservedCleared": true,
+      "noFurtherStepOffered": true
+    },
+    {
+      "step": "cleanup",
+      "deliveries": 1,
+      "assignments": 2,
+      "kiosksRestored": 2,
+      "orderKiosks": 2,
+      "orders": 1,
+      "agreements": 1,
+      "connections": 1,
+      "refreshTokens": 1,
+      "memberships": 1,
+      "organizations": 1,
+      "users": 1,
+      "invoiceFiles": 0
+    },
+    {
+      "step": "counts",
+      "before": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12,
+        "assignments": 12,
+        "reserved": 10
+      },
+      "after": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12,
+        "assignments": 12,
+        "reserved": 10
+      },
+      "restored": true
+    }
+  ],
+  "before": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12,
+    "assignments": 12,
+    "reserved": 10
+  },
+  "persistedApproved": {
+    "order": {
+      "status": "APPROVED",
+      "paymentStatus": "PENDING"
+    },
+    "kiosks": [
+      {
+        "kiosk_status": "RESERVED",
+        "currentOrgId": "6351a611-4c86-4f60-8dfc-fd1701031347",
+        "n": 2
+      }
+    ]
+  },
+  "paid": true,
+  "dispatched": true,
+  "delivered": true,
+  "finalState": {
+    "order": {
+      "status": "DELIVERED",
+      "paymentStatus": "PAID"
+    },
+    "kiosks": [
+      {
+        "kiosk_status": "AVAILABLE",
+        "currentOrgId": "b80f5611-e6bf-4452-905a-60c7653e49c1",
+        "n": 2
+      }
+    ]
+  },
+  "apiCalls": [
+    "PATCH /api/orders/81a0bf7f-1811-4a67-b377-29d912006153/paid 200",
+    "PATCH /api/orders/81a0bf7f-1811-4a67-b377-29d912006153/dispatch 200",
+    "PATCH /api/orders/81a0bf7f-1811-4a67-b377-29d912006153/deliver 200"
+  ],
+  "noFurtherStepOffered": true,
+  "passed": true,
+  "removed": {
+    "deliveries": 1,
+    "assignments": 2,
+    "kiosksRestored": 2,
+    "orderKiosks": 2,
+    "orders": 1,
+    "agreements": 1,
+    "connections": 1,
+    "refreshTokens": 1,
+    "memberships": 1,
+    "organizations": 1,
+    "users": 1,
+    "invoiceFiles": 0
+  },
+  "after": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12,
+    "assignments": 12,
+    "reserved": 10
+  },
+  "restored": true
+}

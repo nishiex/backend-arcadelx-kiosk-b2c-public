@@ -1,0 +1,41 @@
+{
+  "serverErrors": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "alerts": [
+    {
+      "page": "/kiosks",
+      "alerts": [
+        "Showing 1–6 of 6 machinesPage 1 of 1"
+      ]
+    },
+    {
+      "page": "/orders",
+      "alerts": [
+        "0 orders"
+      ]
+    },
+    {
+      "page": "/requests",
+      "alerts": [
+        "0 requests · Page 1 of 1"
+      ]
+    },
+    {
+      "page": "/partners",
+      "alerts": [
+        "You don’t have permission to manage partners."
+      ]
+    },
+    {
+      "page": "/user",
+      "alerts": [
+        "0 pending requests · Page 1 of 1"
+      ]
+    }
+  ],
+  "uniqueConsoleErrors": [],
+  "uniquePageErrors": [],
+  "uniqueFailedRequests": []
+}

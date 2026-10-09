@@ -8,11 +8,14 @@ import { fetchDistributors } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Skeleton, ErrorState, EmptyState } from "@/components/dashboard/ui"
-import DistributorStatusDialog from "./DistributorStatusDialog"
+import DistributorAgreementDialog from "./DistributorAgreementDialog"
 
 export default function DistributorsScreen() {
-  const { canManageDistributors, can, isCompany, me } = useMe()
+  const { canManageDistributors, canManageAgreements, can, isCompany, me } = useMe()
   const canAdd = canManageDistributors && can("DISTRIBUTORS", "CREATE")
+  const organizationId = me?.membership?.organizationId
+  // Agreement decisions are Owner-only on the API, so the action follows the same rule.
+  const canManageAgreementTerms = canManageAgreements && Boolean(organizationId)
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["distributors", me?.membership?.organizationId],
     queryFn: fetchDistributors,
@@ -81,6 +84,7 @@ export default function DistributorsScreen() {
                   <th className="px-4 py-3 text-right font-medium">Kiosks</th>
                   <th className="px-4 py-3 text-right font-medium">Members</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  {canManageAgreementTerms && <th className="px-4 py-3 text-right font-medium">Agreement</th>}
                   {canManageDistributors && <th className="px-4 py-3 text-right font-medium">Actions</th>}
                 </tr>
               </thead>
@@ -112,7 +116,7 @@ export default function DistributorsScreen() {
                     <td className="px-4 py-3 text-right tabular-nums">{d._count.kiosks}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{d._count.memberships}</td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${d.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-red-500/10 text-red-700 dark:text-red-300"}`}>{d.isActive ? "Active" : "Inactive"}</span></td>
-                    {canManageDistributors && <td className="px-4 py-3 text-right"><DistributorStatusDialog distributor={d} /></td>}
+                    {canManageAgreementTerms && <td className="px-4 py-3 text-right">{organizationId && <DistributorAgreementDialog distributor={d} organizationId={organizationId} />}</td>}
                   </tr>
                 ))}
               </tbody>

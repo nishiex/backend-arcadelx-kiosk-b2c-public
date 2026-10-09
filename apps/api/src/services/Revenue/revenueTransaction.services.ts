@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/db";
 import { z } from "zod";
+import { ensureAssignmentCovering } from "../kiosk-ownership";
 
 const recordSchema = z.object({
   txnid: z.string().min(1),
@@ -24,12 +25,18 @@ export async function syncRevenueData() {
     const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok)
       throw new Error("Transaction source returned HTTP " + response.status);
-    const records: unknown = await response.json();
+    const payload: unknown = await response.json();
+    // Accept both a bare array and a `{ data: [...] }` envelope: the configured
+    // payment feed wraps its rows alongside status/total. Anything else is still
+    // rejected rather than silently treated as no records.
+    const records: unknown = Array.isArray(payload)
+      ? payload
+      : (payload as { data?: unknown } | null)?.data ?? null;
     if (!Array.isArray(records))
       throw new Error("Expected a transaction array");
     totalRecordsFetched = records.length;
     const kiosks = await prisma.kiosk.findMany({
-      select: { id: true, machineCode: true, externalDeviceId: true },
+      select: { id: true, machineCode: true, externalDeviceId: true, currentOrgId: true },
     });
     const devices = new Map(
       kiosks
@@ -56,18 +63,32 @@ export async function syncRevenueData() {
         continue;
       }
       try {
-        const inserted = await prisma.transaction.createMany({
-          data: [
-            {
+        const inserted = await prisma.$transaction(async tx => {
+          // Revenue is only counted inside an assignment window, so the window has to
+          // cover the payment's own date. Without this, a payment imported for a past
+          // date is stored but never attributed.
+          const kiosk = kiosks.find(k => k.id === kioskId);
+          if (kiosk?.currentOrgId) {
+            await ensureAssignmentCovering(tx, {
               kioskId,
-              gameId: record.game_id,
-              amount: record.amount,
-              currency: record.currency,
-              externalTransactionId: record.txnid,
+              organizationId: kiosk.currentOrgId,
+              assignedById: null,
               occurredAt: record.updated_at,
-            },
-          ],
-          skipDuplicates: true,
+            });
+          }
+          return tx.transaction.createMany({
+            data: [
+              {
+                kioskId,
+                gameId: record.game_id,
+                amount: record.amount,
+                currency: record.currency,
+                externalTransactionId: record.txnid,
+                occurredAt: record.updated_at,
+              },
+            ],
+            skipDuplicates: true,
+          });
         });
         newRecordsInserted += inserted.count;
       } catch {

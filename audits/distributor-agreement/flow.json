@@ -1,0 +1,101 @@
+{
+  "startedAt": "2026-10-07T05:32:22.812Z",
+  "distributor": "Demo Pune Distribution",
+  "database": "localhost:5433/arcadelx_local",
+  "steps": [
+    {
+      "step": "company-login",
+      "at": "2026-10-07T05:32:25.567Z",
+      "email": "nileegames@gmail.com",
+      "ok": true
+    },
+    {
+      "step": "dialog-offers-connection-request",
+      "at": "2026-10-07T05:32:26.768Z",
+      "ok": true
+    },
+    {
+      "step": "connection-request-sent",
+      "at": "2026-10-07T05:32:27.023Z",
+      "viaUi": true
+    },
+    {
+      "step": "connection-row-created",
+      "at": "2026-10-07T05:32:27.077Z",
+      "status": "PENDING"
+    },
+    {
+      "step": "distributor-owner-login",
+      "at": "2026-10-07T05:32:29.048Z",
+      "email": "demo-pune-distributor@example.invalid",
+      "ok": true
+    },
+    {
+      "step": "connection-accepted-by-receiver",
+      "at": "2026-10-07T05:32:30.649Z",
+      "viaUi": true,
+      "status": "ACTIVE"
+    },
+    {
+      "step": "terms-drafted-via-ui",
+      "at": "2026-10-07T05:32:32.032Z",
+      "depositPerKiosk": 10000,
+      "nonRefundablePerKiosk": 2000
+    },
+    {
+      "step": "agreement-row-created",
+      "at": "2026-10-07T05:32:32.033Z",
+      "status": "PENDING_APPROVAL",
+      "parentSharePct": "60.00",
+      "childSharePct": "40.00"
+    },
+    {
+      "step": "requests-page-lists-pending-agreement",
+      "at": "2026-10-07T05:32:33.163Z",
+      "ok": true,
+      "note": "company view shows PENDING_APPROVAL"
+    },
+    {
+      "step": "agreement-approved-by-receiver",
+      "at": "2026-10-07T05:32:34.687Z",
+      "viaUi": true,
+      "status": "ACTIVE"
+    },
+    {
+      "step": "active-terms-rendered",
+      "at": "2026-10-07T05:32:35.812Z",
+      "depositShown": true
+    },
+    {
+      "step": "agreement-terminated-via-ui",
+      "at": "2026-10-07T05:32:36.065Z",
+      "status": "TERMINATED",
+      "effectiveToSet": true,
+      "effectiveFrom": "2026-10-07T00:02:34.469Z"
+    }
+  ],
+  "createdConnectionId": "70d63525-7970-4d79-9f32-0e4ea872e688",
+  "createdAgreementId": "5af17d83-6462-4916-a67e-2d109ef4c60f",
+  "distributorId": "43a4a328-123c-4f7e-afca-f1d5a6a793f3",
+  "before": {
+    "connections": 1,
+    "agreements": 1,
+    "active_agreements": 1
+  },
+  "after": {
+    "connections": 2,
+    "agreements": 2,
+    "active_agreements": 1
+  },
+  "finishedAt": "2026-10-07T05:32:36.066Z",
+  "passed": true,
+  "rollback": {
+    "agreement": 1,
+    "connection": 1
+  },
+  "afterCleanup": {
+    "connections": 1,
+    "agreements": 1,
+    "active_agreements": 1
+  }
+}

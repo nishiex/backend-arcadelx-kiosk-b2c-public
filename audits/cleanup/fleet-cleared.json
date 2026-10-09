@@ -1,0 +1,60 @@
+{
+  "startedAt": "2026-10-07T10:59:25.364Z",
+  "database": "localhost:5433/arcadelx_local",
+  "before": {
+    "kiosks": 17,
+    "assignments": 17,
+    "transactions": 3,
+    "order_kiosks": 0,
+    "orders": 0,
+    "invoiced_orders": 0,
+    "agreements": 0,
+    "organizations": 1
+  },
+  "deletedKioskCodes": [
+    "ADLX-2026-A001",
+    "ADLX-2026-A002",
+    "ADLX-2026-A003",
+    "ADLX-2026-A005",
+    "ADLX-2026-A006",
+    "ADLX-2026-A007",
+    "ADLX-2026-A008",
+    "ADLX-2026-A009",
+    "ADLX-2026-A010",
+    "ADLX-2026-A011",
+    "ADLX-2026-A012",
+    "ADLX-2026-A013",
+    "ADLX-2026-A014",
+    "ADLX-2026-A015",
+    "ADLX-2026-A016",
+    "KIOSK-UNIT-01",
+    "KIOSK-UNIT-02"
+  ],
+  "realFeedTransactions": [
+    "ADLX_1791283432_E37685",
+    "ADLX_1791282556_EBFED9",
+    "ADLX_1790321887_E692FE"
+  ],
+  "removed": {
+    "kiosks": 17,
+    "assignments": 17,
+    "transactions": 3,
+    "orderKiosks": 0
+  },
+  "machineSequence": {
+    "year": 2026,
+    "value": 0
+  },
+  "after": {
+    "kiosks": 0,
+    "assignments": 0,
+    "transactions": 0,
+    "order_kiosks": 0,
+    "orders": 0,
+    "invoiced_orders": 0,
+    "agreements": 0,
+    "organizations": 1
+  },
+  "passed": true,
+  "finishedAt": "2026-10-07T10:59:25.386Z"
+}

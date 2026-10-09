@@ -1,4 +1,10 @@
 import { sendEmail } from "./email.service";
+import {
+  emailCallout,
+  emailCredential,
+  emailParagraph,
+  emailShell,
+} from "./email-theme";
 
 type PasswordResetEmailParams = {
   email: string;
@@ -11,6 +17,8 @@ export const sendPasswordResetOtpEmail = async ({
   name,
   otp,
 }: PasswordResetEmailParams) => {
+  const loginUrl = process.env.FRONTEND_LOGIN_URL ?? "";
+
   await sendEmail({
     to: email,
     toName: name,
@@ -22,55 +30,31 @@ Hello ${name},
 
 We received a request to reset your password.
 
-Your OTP is:
+Your one-time code is:
 
 ${otp}
 
-This OTP will expire in 10 minutes.
+This code will expire in 10 minutes. If you did not request it, you can ignore this email.
 
 Regards,
 ${process.env.MAIL_FROM_NAME}
 `,
 
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
-
-        <h2>Password Reset</h2>
-
-        <p>Hello ${name},</p>
-
-        <p>
-          We received a request to reset your password.
-        </p>
-
-        <p>Your verification code is:</p>
-
-        <div
-          style="
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            padding: 16px;
-            background: #f3f4f6;
-            width: fit-content;
-            border-radius: 8px;
-          "
-        >
-          ${otp}
-        </div>
-
-        <p>
-          This OTP will expire in <strong>10 minutes</strong>.
-        </p>
-
-        <p>
-          Regards,<br />
-          TEAM ${process.env.MAIL_FROM_NAME},<br />
-          Nilee Games and Future Technologies Pvt. Ltd.
-        </p>
-
-      </div>
-    `,
+    html: emailShell({
+      preheader: `Your password reset code expires in 10 minutes`,
+      heading: "Reset your password",
+      subtitle: "We received a request to reset your password.",
+      content: [
+        emailParagraph(`Hello ${name}, enter this one-time code to continue.`),
+        // Monospace with wide tracking: the credential style also fixes the ambiguous
+        // l/I/1 glyph problem that plain sans-serif caused on emailed passwords.
+        emailCredential(otp),
+        emailParagraph("This code expires in <strong>10 minutes</strong>."),
+        emailCallout(
+          "If you did not request a password reset, ignore this email and consider changing your password from Settings.",
+        ),
+      ].join(""),
+    }),
   });
 };
 
@@ -97,20 +81,17 @@ If you did not make this change, please contact support immediately.
 Regards,
 ${process.env.MAIL_FROM_NAME}
 `,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
-        <h2>Password Changed Successfully</h2>
-        <p>Hello ${name},</p>
-        <p>This is a confirmation that the password for your account has been successfully changed.</p>
-        <p style="color: #d9534f; font-weight: bold;">
-          If you did not initiate this password change, please contact the ARCADELX Support Team immediately to secure your account
-        </p>
-        <p>
-          Regards,<br />
-          TEAM ${process.env.MAIL_FROM_NAME},<br />
-          Nilee Games and Future Technologies Pvt. Ltd.
-        </p>
-      </div>
-    `,
+    html: emailShell({
+      preheader: "Your password was changed",
+      heading: "Password changed",
+      subtitle: "Your account password was updated successfully.",
+      content: [
+        emailParagraph(`Hello ${name}, this confirms the password on your account was changed.`),
+        emailCallout(
+          "If you did not make this change, contact the ARCADELX support team immediately to secure your account.",
+          "destructive",
+        ),
+      ].join(""),
+    }),
   });
 };

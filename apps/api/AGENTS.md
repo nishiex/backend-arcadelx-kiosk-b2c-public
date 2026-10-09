@@ -1,5 +1,162 @@
 # Backend working guide
 
+## Machine-code numbering fixes (2026-10-07)
+
+Two defects surfaced once the device feed started registering kiosks under their own
+`device_id`, and both broke ordinary operations:
+
+1. **Add Machine failed with 409 on any database that contained synced devices.** The batch
+   generator mints `ADLX-<year>-A<nnn>` from `MachineSequence`, while the device sync
+   registered `ADLX-2026-A001`/`A002`/`A003`/`A005` at counter 0 without advancing it. The
+   next batch tried to mint `ADLX-2026-A001`, collided on the unique `Kiosk.machineCode`, and
+   the whole transaction failed. `services/machine-code-sequence.ts` now returns the counter
+   floor a synced code occupies, and the sync raises `MachineSequence` with
+   `GREATEST(value, floor)` so the two writers share one numbering space.
+
+2. **Pairing hardware conflicted with the kiosk's own opening assignment.** Pairing calls
+   `recordOpeningAssignments`, but batch create had already opened one, and
+   `KioskAssignment_one_open_key` is a partial unique index on `(kioskId) WHERE assignedTo IS
+   NULL` -- so the second insert raised a unique-violation, reported as 409. The helper is now
+   idempotent: it skips kiosks that already have an open assignment.
+
+Neither was reachable before the device feed was configured, because nothing else registered
+kiosks outside the batch generator.
+
+Verified after the fix, driving the real dialog in a browser rather than the endpoint:
+Add Machine minted `A006`, then `A007..A008`, with **zero failed API calls and no 409**, and
+every new machine received its opening assignment. Pairing returns 200 with exactly one
+assignment. Re-checked from a wiped fleet: a fresh sync raises the counter to **5** (not 0),
+so the next Add Machine mints `A006` instead of colliding -- the ordering of "sync then mint"
+no longer matters. Evidence: `audits/health/add-machine-result.png` and
+`audits/health/add-machine-ui-check.json`.
+
+The internal routes authenticate with the **`X-Internal-Api-Key`** header
+(`middlewares/internal.auth.ts`), not `x-internal-secret`; a wrong header name returns 401
+"Missing internal authentication key".
+
+## Live device and payment feeds (2026-10-07)
+
+Both public feeds are configured in the ignored root `.env` (and documented in
+`.env.example`):
+
+| Key | Endpoint | Purpose |
+| --- | --- | --- |
+| `MOTHERSHIP_DEVICE_API_URL` | `/api/v1/devices` | Registers/freshens kiosks and their `externalDeviceId` |
+| `MOTHERSHIP_TRANSACTION_API_URL` | `/api/v1/payments` | Imports completed payments |
+
+`externalDeviceId` is documented in `internal.controller.ts` as "Mothership's UUID (The
+Link)", and the payment sync resolves a kiosk by it (then by `machineCode`), so the device
+feed is what makes payments attributable. `syncDevices` in
+`services/Revenue/deviceSync.service.ts` therefore runs **before** `syncRevenueData` in the
+worker's `sync-transactions` job; devices are processed oldest-seen first so a numbering gap
+is filled by the earliest device. An unknown device becomes an `AVAILABLE` kiosk owned by the
+company, keeping the device id verbatim as its machine code. Nothing is deleted: the feed is
+a snapshot, and hardware can simply be switched off.
+
+Three rules this work established, each of which cost a debugging cycle to find:
+
+1. **Registering a kiosk must open an ownership assignment.** `getMachineWiseRevenue`
+   iterates `KioskAssignment` and only counts payments inside an assignment window, so a
+   kiosk with no assignment row reports no revenue even when its transactions are stored.
+   `services/kiosk-ownership.ts` opens one on batch create, on device pairing, and on
+   device sync.
+2. **The window must cover the payment's own date.** An assignment opened "now" leaves a
+   historical payment outside every window, so the row is stored but never attributed.
+   `ensureAssignmentCovering` backdates the kiosk's open assignment to the payment when
+   needed; backdating rather than inserting keeps `KioskAssignment_one_open_key` (one open
+   row per kiosk) satisfied.
+3. **`Transaction.occurredAt` is a naive `timestamp without time zone`** and the API server
+   may run in any local timezone. Prisma writes a JS `Date` using the client's local
+   offset, so the same instant is stored differently depending on where the server runs.
+   This is latent rather than fixed; a container running UTC would shift stored times.
+
+On demand locally (the schedulers need Redis and `REVENUE_JOBS_ENABLED`, both still unset):
+
+```powershell
+node -r ./audits/auth-registration/runtime-loader.cjs audits/revenue-trend/fetch-live-devices-and-payments.ts
+```
+
+It runs the same two services the worker runs, twice each to prove idempotency, and records
+the result in `audits/revenue-trend/live-devices-and-payments.json`.
+
+## Reservation ordering and company allocation (2026-10-07)
+
+`reserveKiosks` used to select stock with `ORDER BY "createdAt", id LIMIT n`. Since
+`id` is a random UUID, kiosks sharing a `createdAt` -- and a batch-created fleet
+shares one -- were picked in no meaningful order. An approved 10-kiosk request
+therefore received an unexplained, mixed-model set: measured on the local data it
+took DEMO-LOCAL-{004,008,003,002,010,011,001,007,012,006} instead of 001..010, and
+mixed Arcade-LX B2C, ADLX-Pro-X1 and Arcade-LX Healthcare machines.
+
+Ordering is now `ORDER BY "createdAt", "machineCode", id`. `machineCode` is unique,
+so this is a total order: the same inventory always yields the same kiosks, and a
+batch follows the machine codes. No schema change was needed.
+`audits/distributor-agreement/verify-reservation-order.cjs` proves it through the
+API on an isolated fixture and removes everything it creates; the ordering
+comparison covers all 15 kiosks of a tied batch, where the old rule provably
+differs. The 10 kiosks already reserved by ORD-2026-00004 were deliberately left
+alone: that order is APPROVED with an issued invoice and a sent invoice email, so
+re-picking its stock would desync the invoice.
+
+**Separate pre-existing defect:** in `createOrder`, the `currentOrgType ===
+'COMPANY'` guard throws unconditionally, so it also rejects `ALLOCATION` and the
+`else` branch below it is unreachable -- while the message says "use ALLOCATION to
+push kiosks". Consequences: a COMPANY cannot create an allocation at all, no
+allocation can ever link `OrderKiosk`/invoice rows, and the only reachable
+reservation path is a Distributor `REQUEST` being approved (which is how
+ORD-2026-00004 reserved its kiosks). That is a product decision I did not change;
+fixing it means moving the ALLOCATION branch above the guard.
+
+## Live payment feed (2026-10-07)
+
+The revenue source is now configured locally: ignored root `.env` sets
+`MOTHERSHIP_TRANSACTION_API_URL=https://main.arcadelx.games/api/v1/payments`
+(the key `.env.example` already documents and `syncRevenueData` already reads). The
+endpoint is public -- it answers 200 without credentials, which is why the existing
+service fetches it unauthenticated -- so the URL is configuration, not a secret.
+
+`syncRevenueData` previously required a bare JSON array. This feed returns an
+envelope (`{ data: [...], status, total }`), so the first sync failed with
+"Expected a transaction array". The reader now accepts either shape and still
+rejects anything else, rather than treating an unexpected payload as "no records".
+Existing sync behaviour is unchanged: only `status: 'completed'` rows are kept, each
+is validated, `device_id` is mapped to a kiosk via `externalDeviceId` then
+`machineCode`, duplicates are skipped by `txnid`, unattributable rows are counted,
+and every attempt is recorded in `RevenueSyncRunLog`.
+
+Nightly and monthly jobs remain **disabled**: `REVENUE_JOBS_ENABLED` and
+`REDIS_URL` are still unset, so `startRevenueJobs` never runs. Importing on demand
+is deliberate for now; enabling the schedulers is a separate step.
+
+`audits/revenue-trend/fetch-live-payments.ts` runs the existing service against the
+configured source (local database only) and records the feed summary, device
+mapping, before/after counts, imported rows, both payload-shape acceptance cases and
+the API totals in `audits/revenue-trend/live-payments.json`.
+
+## Revenue trend endpoint (2026-10-07)
+
+`GET /api/revenue/series?range=7d|30d|3m|1y` serves the dashboard revenue chart.
+It is read-only, additive, and requires no migration. Guards match
+`/api/revenue/machine-wise` (`requireOrgType(COMPANY|DISTRIBUTOR|PARTNER)` plus
+`requireRole(OWNER|ADMIN|MANAGER)`), and it applies that endpoint's exact scoping:
+COMPANY sees all assignments; a DISTRIBUTOR sees its own organization plus Partner
+children while the governing agreement is in force; the assignment date window and
+the INR-only rule are unchanged. Payments are only counted at or before `now`.
+
+Bucketing lives in `src/services/Revenue/revenue-series.ts` and reuses the
+`330 * 60000` (UTC+5:30) IST convention already used by `getMachineWiseRevenue`, so
+the two endpoints agree. Granularity is day for 7d/30d, ISO week for 3m, and month
+for 1y; every bucket in the range is returned, so gaps chart as zero. The response
+is `{ range, granularity, bucket, currency: 'INR', total, points[{ key, label,
+revenue }] }`. `getMachineWiseRevenue` was not modified.
+
+Note for test data: `Transaction.occurredAt` is `timestamp without time zone` and
+Prisma reads it as UTC (the database session timezone is Etc/UTC). Raw `pg` inserts
+must pass a naive UTC wall clock, otherwise the stored day shifts by the client's
+offset. `audits/revenue-trend/verify-revenue-series.cjs` proves the endpoint with
+temporary rows (including one before the assignment began and one in the future,
+both of which must be excluded) and removes them again.
+
 ## Local owner contact repaired (2026-10-06)
 
 Both root database URLs target arcadelx_local on localhost:5433. The specific
@@ -153,7 +310,7 @@ to database `arcadelx_local` on Docker `arcadelx-pg`, localhost port 5433. This 
 fresh database; all twelve checked-in migrations applied successfully and Prisma
 reported no difference against `schema.prisma`. The existing local `arcadelx`
 database and Supabase were not modified. The original environment is preserved
-in `.env.supabase-backup-20261001`, excluded via `.git/info/exclude`; keep it private.
+in the private local env backups (`.env.local-backup-20261005`), excluded via `.git/info/exclude`; keep them private.
 
 The owner/company seed uses the user's selected local test login from ignored
 `.env`, with placeholder company details. Mailjet uses dummy local keys, so real
@@ -523,3 +680,44 @@ gates with and without the profile columns, restoring renamed test columns after
 For schema changes validate Prisma, inspect the new migration and data impact,
 then regenerate via Prisma CLI. Do not reset a database as validation. The current
 `npm test` remains a placeholder; documentation-only edits need no runtime tests.
+
+
+## Vercel deployment (2026-10-07)
+
+The API is deployable to Vercel as a single serverless Function. Three things had to change
+first, and each is a real constraint rather than a preference.
+
+**tsconfig path aliases do not survive Vercel's function bundler.** Nine files import runtime
+Zod values from `@shared-types/*`, resolved only through the `paths` alias into
+`../../packages/shared-types`. That directory sits outside the API project, is not uploaded,
+and has no `package.json`, so it cannot be installed either. `scripts/build-vercel.mjs`
+bundles `api/index.ts` with esbuild (which does honour the alias) so first-party code is
+inlined and the alias stops existing at runtime. npm packages and the generated Prisma client
+stay external. Never remove that step from `build:vercel`; without it the function fails to
+resolve `@shared-types` at runtime.
+
+**`fs.mkdirSync` at module load is fatal on Vercel.** The filesystem is read-only except
+`/tmp`, so the import-time directory creation in `invoice.pdf.ts` killed the function before
+it could serve anything. It is now deferred to the first invoice write, and `INVOICES_DIR`
+defaults to `/tmp/invoices` when `VERCEL` is set. `revenue.pdf.ts` mirrors this with
+`/tmp/reports`. `config/env.ts` throws on invalid configuration instead of calling
+`process.exit(1)`, which would end a serverless invocation with no diagnosis.
+
+Local development is untouched: `server.ts`, `npm run dev` and the `invoices/` path behave
+exactly as before whenever `VERCEL` is unset.
+
+**Worker.** `revenue.worker.ts` is a long-lived BullMQ process and cannot run on Vercel. Keep
+`REVENUE_JOBS_ENABLED` unset there.
+
+Environment: `DATABASE_URL` uses the pooler on port 6543; `DIRECT_URL` uses 5432 for
+migrations. `pg` v9 changed SSL semantics, so a bare `sslmode=require` fails with `P1011`;
+append `uselibpqcompat=true`. `NODE_ENV=production` activates the strict branch of
+`config/env.ts`, making every variable there mandatory.
+
+Invoices and revenue PDFs do **not** persist on Vercel because `/tmp` is per-invocation;
+`GET /api/orders/:id/invoice` will 404 after the fact until object storage is added.
+
+Verification lives in `audits/deploy/` and the full runbook in `audits/deploy/README.md`:
+`verify-vercel-bundle.mjs` (8/8) proves the bundle boots outside the project, and
+`verify-api-against-supabase.mjs` (7/7) proves the production server reaches Supabase,
+authenticates the seeded owner and starts no worker.

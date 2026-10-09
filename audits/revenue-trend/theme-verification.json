@@ -1,0 +1,99 @@
+{
+  "verifiedAt": "2026-10-07T06:14:52.896Z",
+  "databaseWritesPerformed": false,
+  "expected": {
+    "--primary (area line)": "near-black in light, near-white in dark",
+    "--border (grid)": "solid light grey in light, translucent white in dark"
+  },
+  "allColoursResolved": true,
+  "themeAware": {
+    "curveStrokeDiffers": true,
+    "tickFillDiffers": true,
+    "gridStrokeDiffers": true,
+    "backgroundDiffers": true
+  },
+  "themes": {
+    "light": {
+      "theme": "light",
+      "appliedDarkClass": false,
+      "colours": {
+        "7D": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(7.78201 -0.0000149012 0)",
+          "tickFill": "lab(48.496 0 0)",
+          "gridStroke": "lab(90.952 -0.0000596046 0)",
+          "bodyBackground": "lab(100 0 0)"
+        },
+        "30D": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(7.78201 -0.0000149012 0)",
+          "tickFill": "lab(48.496 0 0)",
+          "gridStroke": "lab(90.952 -0.0000596046 0)",
+          "bodyBackground": "lab(100 0 0)"
+        },
+        "3M": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(7.78201 -0.0000149012 0)",
+          "tickFill": "lab(48.496 0 0)",
+          "gridStroke": "lab(90.952 -0.0000596046 0)",
+          "bodyBackground": "lab(100 0 0)"
+        },
+        "1Y": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(7.78201 -0.0000149012 0)",
+          "tickFill": "lab(48.496 0 0)",
+          "gridStroke": "lab(90.952 -0.0000596046 0)",
+          "bodyBackground": "lab(100 0 0)"
+        }
+      },
+      "screenshots": [
+        "audits/revenue-trend/revenue-7d-light.png",
+        "audits/revenue-trend/revenue-30d-light.png",
+        "audits/revenue-trend/revenue-3m-light.png",
+        "audits/revenue-trend/revenue-1y-light.png",
+        "audits/revenue-trend/dashboard-light.png"
+      ]
+    },
+    "dark": {
+      "theme": "dark",
+      "appliedDarkClass": true,
+      "colours": {
+        "7D": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(90.952 -0.0000596046 0)",
+          "tickFill": "lab(66.128 -0.0000298023 0.0000119209)",
+          "gridStroke": "lab(100 0 0 / 0.1)",
+          "bodyBackground": "lab(2.75381 0 0)"
+        },
+        "30D": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(90.952 -0.0000596046 0)",
+          "tickFill": "lab(66.128 -0.0000298023 0.0000119209)",
+          "gridStroke": "lab(100 0 0 / 0.1)",
+          "bodyBackground": "lab(2.75381 0 0)"
+        },
+        "3M": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(90.952 -0.0000596046 0)",
+          "tickFill": "lab(66.128 -0.0000298023 0.0000119209)",
+          "gridStroke": "lab(100 0 0 / 0.1)",
+          "bodyBackground": "lab(2.75381 0 0)"
+        },
+        "1Y": {
+          "areaFill": "url(\"#revenue-trend-_r_0_\")",
+          "curveStroke": "lab(90.952 -0.0000596046 0)",
+          "tickFill": "lab(66.128 -0.0000298023 0.0000119209)",
+          "gridStroke": "lab(100 0 0 / 0.1)",
+          "bodyBackground": "lab(2.75381 0 0)"
+        }
+      },
+      "screenshots": [
+        "audits/revenue-trend/revenue-7d-dark.png",
+        "audits/revenue-trend/revenue-30d-dark.png",
+        "audits/revenue-trend/revenue-3m-dark.png",
+        "audits/revenue-trend/revenue-1y-dark.png",
+        "audits/revenue-trend/dashboard-dark.png"
+      ]
+    }
+  }
+}

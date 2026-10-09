@@ -4,6 +4,7 @@ import { revenueRedisOptions } from '../../config/redis';
 import { createRevenueQueue, statementJobId, type RevenueJobData } from '../../queues/Revenue/revenueStatement.queue';
 import { processRevenueStatement } from '../../services/Revenue/revenueStatement.service';
 import { syncRevenueData } from '../../services/Revenue/revenueTransaction.services';
+import { syncDevices } from '../../services/Revenue/deviceSync.service';
 
 export function previousRevenueMonth(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric' }).formatToParts(now);
@@ -19,7 +20,13 @@ export async function startRevenueJobs() {
   if (!process.env.MOTHERSHIP_TRANSACTION_API_URL) throw new Error('MOTHERSHIP_TRANSACTION_API_URL is required for revenue jobs');
   const queue = createRevenueQueue();
   const worker = new Worker<RevenueJobData>('revenue-statements', async job => {
-    if (job.name === 'sync-transactions') return syncRevenueData();
+    // Register/refresh devices first: the transaction sync attributes a payment by
+    // looking a kiosk up by externalDeviceId, so a device that is not recorded yet
+    // would leave its payments unattributed.
+    if (job.name === 'sync-transactions') {
+      const devices = process.env.MOTHERSHIP_DEVICE_API_URL ? await syncDevices() : null;
+      return { devices, transactions: await syncRevenueData() };
+    }
     if (job.name === 'monthly-statements') {
       const { month, year } = revenueJobPeriod(job);
       const orgs = await prisma.organization.findMany({ where: { type: { in: ['DISTRIBUTOR', 'PARTNER'] }, isActive: true }, select: { id: true } });

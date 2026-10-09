@@ -8,12 +8,13 @@ import { useMe } from "@/hooks/useMe"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
 import DashboardWelcome from "./DashboardWelcome"
 import StatGrid from "./StatGrid"
+import RevenueTrendChart from "./RevenueTrendChart"
 import InventoryBreakdown from "./InventoryBreakdown"
 import RecentKiosks from "./RecentKiosks"
 
 export default function DashboardScreen() {
   const router = useRouter()
-  const { isError, isLoading, me } = useMe()
+  const { isError, isLoading, me, canViewRevenue } = useMe()
   const gridRef = useScrollReveal<HTMLDivElement>([isError])
 
   // Session invalid → bounce to login (preserve intent via ?next).
@@ -53,6 +54,9 @@ export default function DashboardScreen() {
           )}
 
           <StatGrid />
+
+          {/* Revenue trend is role-gated, so unauthorized roles issue no request. */}
+          {canViewRevenue && <RevenueTrendChart />}
 
           <div ref={gridRef} className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div data-reveal className="min-w-0">

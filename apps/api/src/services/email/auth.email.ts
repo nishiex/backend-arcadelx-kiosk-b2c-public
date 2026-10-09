@@ -1,4 +1,12 @@
 import { sendEmail } from "./email.service";
+import {
+  emailButton,
+  emailCallout,
+  emailCredential,
+  emailDataRows,
+  emailParagraph,
+  emailShell,
+} from "./email-theme";
 
 type OrganizationCredentialsEmailParams = {
   email: string;
@@ -16,6 +24,12 @@ export const sendOrganizationCredentialsEmail = async ({
   temporaryPassword,
 }: OrganizationCredentialsEmailParams) => {
   const loginUrl = process.env.FRONTEND_LOGIN_URL!;
+  const productName = process.env.MAIL_FROM_NAME ?? "ARCADELX";
+
+  // The heading previously read "Welcome to ARCADELX-DISTRIBUTORAccount Created", because
+  // the template concatenated `-${organizationType}Account Created` with no space.
+  const heading = `Welcome to ${productName}`;
+  const subtitle = `Your ${organizationType} account has been created.`;
 
   await sendEmail({
     to: email,
@@ -26,87 +40,42 @@ export const sendOrganizationCredentialsEmail = async ({
     text: `
 Hello ${name},
 
-Your organization account has been created successfully.
+Your ${organizationType} organization account has been created successfully.
 
 Organization: ${organizationName}
 Organization Type: ${organizationType}
 
-Login:
-${loginUrl}
+Login: ${loginUrl}
+Email: ${email}
 
-Email:
-${email}
-
-Temporary Password:
-${temporaryPassword}
-
-Please login and change your password after your first login.
+Sign in with the generated password from your welcome email, then set your own password
+from Settings straight away and keep it private.
 
 Regards,
-${process.env.MAIL_FROM_NAME}
+Team ${process.env.MAIL_FROM_NAME}
 `,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
-        
-        <h2>Welcome to ${process.env.MAIL_FROM_NAME}-${organizationType}Account Created</h2>
 
-        <p>Hello ${name},</p>
-
-        <p>
-          Your <strong>${organizationType}</strong> organization account
-          has been created successfully.
-        </p>
-        <p>
-          <strong>Organization:</strong> ${organizationName}
-        </p>
-
-        <p>
-          <strong>Organization Type:</strong> ${organizationType}
-        </p>
-
-        <hr />
-
-        <h3>Login Details</h3>
-
-        <p>
-          <strong>Email:</strong> ${email}
-        </p>
-
-        <p>
-          <strong>Temporary Password:</strong> ${temporaryPassword}
-        </p>
-
-        <p>
-          <a
-            href="${loginUrl}"
-            style="
-              display: inline-block;
-              padding: 12px 20px;
-              background-color: #2563eb;
-              color: white;
-              text-decoration: none;
-              border-radius: 6px;
-            "
-          >
-            Login to your account
-          </a>
-        </p>
-
-        <p>
-          Please use the above temporary credentials to log in to your account. For security purposes, we strongly recommend changing your password immediately after your first login.
-        </p>
-        <P>
-          We look forward to working with you and building the ARCADELX network together.
-        </p>
-        <p>
-          Regards,<br />
-          Team ${process.env.MAIL_FROM_NAME},<br />
-          Nilee Games and Future Technologies Pvt. Ltd.
-        </p>
-
-
-      </div>
-    `,
+    html: emailShell({
+      preheader: `Sign-in details for ${organizationName}`,
+      heading,
+      subtitle,
+      content: [
+        emailParagraph(
+          `Hello ${name}, your <strong>${organizationType}</strong> organization account has been created successfully.`,
+        ),
+        emailDataRows([
+          { label: "Organization", value: organizationName, mono: false },
+          { label: "Organization type", value: organizationType, mono: false },
+          { label: "Email", value: email },
+        ]),
+        emailParagraph("Sign in with this password to get started:"),
+        emailCredential(temporaryPassword),
+        emailCallout(
+          "Set your own password from Settings straight after your first sign-in. Anyone who can read this email can sign in as you until you do.",
+          "destructive",
+        ),
+        emailButton("Sign in to your account", loginUrl),
+      ].join(""),
+    }),
   });
 };
-

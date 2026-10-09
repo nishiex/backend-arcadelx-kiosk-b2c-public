@@ -1,13 +1,22 @@
 import PDFDocument from 'pdfkit';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { env } from '../../config/env';
+import { assetFile } from '../../utils/asset-file';
 
-export const INVOICES_DIR = path.resolve(env.INVOICES_DIR ?? path.join(process.cwd(), 'invoices'));
-fs.mkdirSync(INVOICES_DIR, { recursive: true });
+// Vercel exposes only /tmp as writable. Creating the directory at module load would
+// throw during import and fail the whole function, so the mkdir is deferred to the
+// first generated invoice and a failure surfaces there instead.
+export const INVOICES_DIR = path.resolve(
+  env.INVOICES_DIR ?? (process.env.VERCEL ? '/tmp/invoices' : path.join(process.cwd(), 'invoices')),
+);
 
-const assets = fileURLToPath(new URL('../../assets/', import.meta.url));
+export function ensureInvoicesDir(): void {
+  fs.mkdirSync(INVOICES_DIR, { recursive: true });
+}
+
+// Assets are resolved through asset-file.ts rather than a URL relative to this module: once
+// the API is bundled for Vercel, that relative path points outside the function root.
 const colors = {
   navy: '#000519', ink: '#172033', muted: '#687386', line: '#E2E6ED',
   light: '#F5F7FA', violet: '#6B36CE', lavender: '#F2ECFC', cyan: '#00C9E3',
@@ -44,8 +53,8 @@ export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
     doc.on('end', () => resolve(Buffer.concat(chunks)));
 
     try {
-      doc.registerFont('Regular', path.join(assets, 'fonts/Lato-Regular.ttf'));
-      doc.registerFont('Bold', path.join(assets, 'fonts/Lato-Bold.ttf'));
+      doc.registerFont('Regular', assetFile('fonts/Lato-Regular.ttf'));
+      doc.registerFont('Bold', assetFile('fonts/Lato-Bold.ttf'));
       const pageWidth = doc.page.width;
       const left = 44;
       const right = pageWidth - left;
@@ -69,7 +78,7 @@ export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
       doc.rect(0, 0, pageWidth, 130).fill(colors.navy);
       doc.rect(0, 0, pageWidth / 2, 3).fill(colors.cyan);
       doc.rect(pageWidth / 2, 0, pageWidth / 2, 3).fill(colors.violet);
-      doc.image(path.join(assets, 'invoice-logo.png'), left, 35, { width: 215 });
+      doc.image(assetFile('invoice-logo.png'), left, 35, { width: 215 });
       text('KIOSK ORDER', left, 90, 220, 8, '#B4C0D6', true);
       text('Order invoice', 310, 39, right - 310, 25, '#FFFFFF', true, 'right');
       fitted(data.orderNumber, 310, 82, right - 310, 10, '#D5DBE9');
@@ -150,6 +159,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<string> => 
   const filename = data.orderNumber + '.pdf';
   const filePath = path.resolve(INVOICES_DIR, filename);
   if (path.dirname(filePath) !== INVOICES_DIR) throw new Error('Invalid invoice filename');
+  ensureInvoicesDir();
   await fs.promises.writeFile(filePath, await renderInvoicePDF(data));
   return filename;
 };

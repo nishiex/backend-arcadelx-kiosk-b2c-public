@@ -1,0 +1,94 @@
+{
+  "startedAt": "2026-10-07T11:00:37.209Z",
+  "database": "localhost:5433/arcadelx_local",
+  "deviceSource": "https://main.arcadelx.games/api/v1/devices",
+  "paymentSource": "https://main.arcadelx.games/api/v1/payments",
+  "before": {
+    "kiosks": 6,
+    "paired": 6,
+    "transactions": 0
+  },
+  "devices": {
+    "totalRecordsFetched": 6,
+    "newKiosksCreated": 0,
+    "kiosksUpdated": 0,
+    "devicesWithoutId": 0,
+    "rejectedRecords": 0,
+    "createdMachineCodes": []
+  },
+  "devicesSecondRun": {
+    "totalRecordsFetched": 6,
+    "newKiosksCreated": 0,
+    "kiosksUpdated": 0,
+    "devicesWithoutId": 0,
+    "rejectedRecords": 0,
+    "createdMachineCodes": []
+  },
+  "payments": {
+    "totalRecordsFetched": 11,
+    "newRecordsInserted": 3,
+    "unattributedCount": 1
+  },
+  "paymentsSecondRun": {
+    "totalRecordsFetched": 11,
+    "newRecordsInserted": 0,
+    "unattributedCount": 1
+  },
+  "after": {
+    "kiosks": 6,
+    "paired": 6,
+    "transactions": 3
+  },
+  "fleet": [
+    {
+      "machineCode": "ADLX-2026-A001",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "ADLX-2026-A001",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 0
+    },
+    {
+      "machineCode": "ADLX-2026-A002",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "ADLX-2026-A002",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 0
+    },
+    {
+      "machineCode": "ADLX-2026-A003",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "ADLX-2026-A003",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 0
+    },
+    {
+      "machineCode": "ADLX-2026-A005",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "ADLX-2026-A005",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 3
+    },
+    {
+      "machineCode": "KIOSK-UNIT-01",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "KIOSK-UNIT-01",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 0
+    },
+    {
+      "machineCode": "KIOSK-UNIT-02",
+      "model": "Unassigned",
+      "status": "AVAILABLE",
+      "externalDeviceId": "KIOSK-UNIT-02",
+      "location": "Mumbai, Maharashtra, India",
+      "transactions": 0
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-07T11:00:38.043Z"
+}

@@ -53,7 +53,16 @@ export const errorHandler = (
     });
   }
 
-  // Fallback for unhandled errors
+  // Fallback for unhandled errors. The stack is logged because returning a bare 500 with no
+  // server-side trace made a production failure undiagnosable. The response body is unchanged,
+  // so nothing internal is exposed to the client.
+  console.error("[unhandled]", {
+    method: req.method,
+    path: req.originalUrl,
+    name: err instanceof Error ? err.name : typeof err,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack?.split("\n").slice(0, 6).join("\n") : undefined,
+  });
   return res.status(500).json({
     success: false,
     message: "Internal Server Error",

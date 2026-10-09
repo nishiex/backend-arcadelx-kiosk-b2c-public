@@ -3,7 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'node:crypto';
 
-export const REVENUE_REPORTS_DIR = process.env.REVENUE_REPORTS_DIR || path.join(process.cwd(), 'uploads', 'reports');
+// /tmp is the only writable location on Vercel.
+export const REVENUE_REPORTS_DIR = process.env.REVENUE_REPORTS_DIR
+  || (process.env.VERCEL ? '/tmp/reports' : path.join(process.cwd(), 'uploads', 'reports'));
 if (process.env.NODE_ENV === 'production' && process.env.REVENUE_JOBS_ENABLED === 'true' && (!process.env.REVENUE_REPORTS_DIR || !path.isAbsolute(REVENUE_REPORTS_DIR))) {
   throw new Error('Production revenue jobs require an absolute REVENUE_REPORTS_DIR');
 }

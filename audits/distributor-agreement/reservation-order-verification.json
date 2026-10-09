@@ -1,0 +1,192 @@
+{
+  "tag": "TEMP-ORDERFIX-1791357123478",
+  "startedAt": "2026-10-07T07:12:03.480Z",
+  "steps": [
+    {
+      "step": "before-counts",
+      "orders": 3,
+      "agreements": 2,
+      "connections": 2,
+      "organizations": 8,
+      "users": 12,
+      "memberships": 12,
+      "assignments": 12,
+      "reserved_kiosks": 10
+    },
+    {
+      "step": "old-ordering-would-pick",
+      "kiosks": [
+        "DEMO-LOCAL-005",
+        "DEMO-LOCAL-009"
+      ]
+    },
+    {
+      "step": "fixture-created",
+      "organizationId": "fef47456-e34a-4691-89e0-4b29c7e1d319",
+      "agreementId": "85217098-6833-4e49-b308-50145fb42240"
+    },
+    {
+      "step": "distributor-request",
+      "status": 201,
+      "message": "Order requested successfully. Pending approval.",
+      "orderNumber": "ORD-2026-00007"
+    },
+    {
+      "step": "reserved-before-approval",
+      "count": 0
+    },
+    {
+      "step": "company-approval",
+      "status": 200,
+      "message": "Order approved; invoice delivery queued",
+      "invoiceReady": true
+    },
+    {
+      "step": "ordering-comparison",
+      "tiedBatchSize": 15,
+      "oldRule": "ADLX-2026-A027 ADLX-2026-A026 ADLX-2026-A030 ADLX-2026-A029 ADLX-2026-A034 ADLX-2026-A031 ADLX-2026-A032 ADLX-2026-A023 ADLX-2026-A028 ADLX-2026-A035 ADLX-2026-A033 ADLX-2026-A022 ADLX-2026-A024 ADLX-2026-A025 ADLX-2026-A021",
+      "newRule": "ADLX-2026-A021 ADLX-2026-A022 ADLX-2026-A023 ADLX-2026-A024 ADLX-2026-A025 ADLX-2026-A026 ADLX-2026-A027 ADLX-2026-A028 ADLX-2026-A029 ADLX-2026-A030 ADLX-2026-A031 ADLX-2026-A032 ADLX-2026-A033 ADLX-2026-A034 ADLX-2026-A035",
+      "differs": true
+    },
+    {
+      "step": "reserved-kiosks",
+      "kiosks": [
+        "DEMO-LOCAL-005",
+        "DEMO-LOCAL-009"
+      ]
+    },
+    {
+      "step": "verdict",
+      "deterministic": true,
+      "ascending": true,
+      "matchesQueueHead": true,
+      "orderingDiffers": true
+    },
+    {
+      "step": "cleanup",
+      "deliveries": 1,
+      "assignments": 0,
+      "kiosksReleased": 2,
+      "orderKiosks": 2,
+      "orders": 1,
+      "agreements": 1,
+      "connections": 1,
+      "refreshTokens": 1,
+      "memberships": 1,
+      "organizations": 1,
+      "users": 1,
+      "invoiceFiles": 0
+    },
+    {
+      "step": "counts",
+      "before": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12,
+        "assignments": 12,
+        "reserved_kiosks": 10
+      },
+      "after": {
+        "orders": 3,
+        "agreements": 2,
+        "connections": 2,
+        "organizations": 8,
+        "users": 12,
+        "memberships": 12,
+        "assignments": 12,
+        "reserved_kiosks": 10
+      },
+      "restored": true
+    }
+  ],
+  "before": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12,
+    "assignments": 12,
+    "reserved_kiosks": 10
+  },
+  "oldOrderingWouldPick": [
+    "DEMO-LOCAL-005",
+    "DEMO-LOCAL-009"
+  ],
+  "availablePoolHead": [
+    "DEMO-LOCAL-005",
+    "DEMO-LOCAL-009"
+  ],
+  "tiedBatchSize": 15,
+  "orderingOldRule": [
+    "ADLX-2026-A027",
+    "ADLX-2026-A026",
+    "ADLX-2026-A030",
+    "ADLX-2026-A029",
+    "ADLX-2026-A034",
+    "ADLX-2026-A031",
+    "ADLX-2026-A032",
+    "ADLX-2026-A023",
+    "ADLX-2026-A028",
+    "ADLX-2026-A035",
+    "ADLX-2026-A033",
+    "ADLX-2026-A022",
+    "ADLX-2026-A024",
+    "ADLX-2026-A025",
+    "ADLX-2026-A021"
+  ],
+  "orderingNewRule": [
+    "ADLX-2026-A021",
+    "ADLX-2026-A022",
+    "ADLX-2026-A023",
+    "ADLX-2026-A024",
+    "ADLX-2026-A025",
+    "ADLX-2026-A026",
+    "ADLX-2026-A027",
+    "ADLX-2026-A028",
+    "ADLX-2026-A029",
+    "ADLX-2026-A030",
+    "ADLX-2026-A031",
+    "ADLX-2026-A032",
+    "ADLX-2026-A033",
+    "ADLX-2026-A034",
+    "ADLX-2026-A035"
+  ],
+  "orderingDiffers": true,
+  "reservedKiosks": [
+    "DEMO-LOCAL-005",
+    "DEMO-LOCAL-009"
+  ],
+  "deterministic": true,
+  "ascending": true,
+  "matchesQueueHead": true,
+  "passed": true,
+  "removed": {
+    "deliveries": 1,
+    "assignments": 0,
+    "kiosksReleased": 2,
+    "orderKiosks": 2,
+    "orders": 1,
+    "agreements": 1,
+    "connections": 1,
+    "refreshTokens": 1,
+    "memberships": 1,
+    "organizations": 1,
+    "users": 1,
+    "invoiceFiles": 0
+  },
+  "after": {
+    "orders": 3,
+    "agreements": 2,
+    "connections": 2,
+    "organizations": 8,
+    "users": 12,
+    "memberships": 12,
+    "assignments": 12,
+    "reserved_kiosks": 10
+  },
+  "restored": true
+}
