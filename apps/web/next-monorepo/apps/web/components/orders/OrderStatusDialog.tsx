@@ -7,7 +7,6 @@ import { Loader2, X } from "lucide-react"
 import {
   dispatchOrder,
   markOrderAsPaid,
-  rejectOrder,
   type KioskOrder,
 } from "@/lib/backend-api"
 import { deliverOrderWithLocation } from "@/lib/order-delivery"
@@ -76,21 +75,6 @@ export function nextStep(order: KioskOrder): Step | null {
   return null
 }
 
-/**
- * Rejection is a supplier-side decision on an unpaid request under review, exactly
- * like approval -- the API allows it only from that state, and it never touches
- * stock or payment commitments.
- */
-const REJECT: Step = {
-  run: rejectOrder,
-  button: "Reject",
-  title: "Reject this request?",
-  description: "Declines the request before any inventory is reserved for it.",
-  confirm: "No stock moves and nothing is charged. The rejected request stays in the history for both organizations.",
-}
-
-type Action = Step & { destructive?: boolean }
-
 export default function OrderStatusDialog({
   order,
   disabled,
@@ -102,14 +86,11 @@ export default function OrderStatusDialog({
   onChanged?: (order: KioskOrder) => void
 }) {
   const step = nextStep(order)
-  // While a request is still under review the supplier can decline it as well as
-  // approve it; the API rejects a decision made from any other state.
-  const actions: Action[] = step
-    ? [{ ...step }]
-    : order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING"
-      ? [{ ...REJECT, destructive: true }]
-      : []
-  const [selected, setSelected] = React.useState<Action | null>(null)
+  // Only forward lifecycle steps are offered. Rejection was removed from this dialog:
+  // an unpaid request under review now simply shows no action, so nothing can be
+  // declined from the Orders page.
+  const actions: Step[] = step ? [step] : []
+  const [selected, setSelected] = React.useState<Step | null>(null)
   const [open, setOpen] = React.useState(false)
   // Delivery-only: the site the kiosks are installed at. Required by the API.
   const [location, setLocation] = React.useState("")
@@ -154,7 +135,6 @@ export default function OrderStatusDialog({
         setOpen(value)
       }}
     >
-      {/* The reject action needs its own trigger beside the forward step. */}
       {actions.map(action => (
         <Dialog.Trigger key={action.button} asChild>
           <button
@@ -162,11 +142,7 @@ export default function OrderStatusDialog({
             disabled={disabled}
             aria-label={`${action.button} ${order.orderNumber}`}
             onClick={() => setSelected(action)}
-            className={
-              action.destructive
-                ? "ml-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
-                : "rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
-            }
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             {action.button}
           </button>
@@ -221,11 +197,7 @@ export default function OrderStatusDialog({
               type="button"
               disabled={mutation.isPending || disabled || (active.requireLocation === true && location.trim().length < 3)}
               onClick={() => mutation.mutate()}
-              className={
-                active.destructive
-                  ? "inline-flex items-center gap-2 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  : "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-              }
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
               {mutation.isPending && <Loader2 size={16} className="animate-spin" />}
               {mutation.isPending ? "Saving…" : active.button}
