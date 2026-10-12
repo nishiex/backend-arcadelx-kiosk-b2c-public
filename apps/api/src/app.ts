@@ -16,6 +16,7 @@ import internalRoutes from './routes/Internal/internal.routes';
 import orderRoutes from './routes/Orders/order.route'
 import revenueRoutes from './routes/Revenue/revenue.routes';
 import adminGatewayRoutes from './routes/Admin/gateway.routes';
+import deviceRoutes from './routes/Admin/device.routes';
 import { requireAuth, loadMembership } from './middlewares/auth';
 import { asyncHandler } from './utils/asyncHandler';
 import { workflowReadiness } from './services/workflow-readiness';
@@ -46,6 +47,10 @@ app.use('/api/revenue', revenueRoutes);
 // Payment-gateway administration (proxied to Mothership). Session-authenticated and
 // limited to COMPANY OWNER/ADMIN inside the router.
 app.use('/api/admin/gateways', adminGatewayRoutes);
+// Device fleet and per-device game pricing (proxied to Mothership). Reads are open to
+// COMPANY/DISTRIBUTOR/PARTNER; the price write is limited to COMPANY OWNER/ADMIN inside
+// the router, because it changes what a live kiosk charges.
+app.use('/api/devices', deviceRoutes);
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
 {

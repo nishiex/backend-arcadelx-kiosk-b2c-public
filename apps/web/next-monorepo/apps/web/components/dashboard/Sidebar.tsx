@@ -11,6 +11,7 @@ import {
   Building2,
   ClipboardList,
   Inbox,
+  Cpu,
   IndianRupee,
   CreditCard,
   Settings,
@@ -35,6 +36,9 @@ type NavItem = {
 const NAV: NavItem[] = [
   { name: "Overview", href: "/", icon: LayoutGrid },
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
+  // Hardware as Mothership reports it. Read scope matches revenue; the price write inside
+  // is COMPANY OWNER/ADMIN only.
+  { name: "Devices", href: "/devices", icon: Cpu, show: (p) => p.canViewDevices },
   { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact || (p.orgType === "PARTNER" && p.me?.membership?.status === "ACTIVE" && (p.role === "OWNER" || p.role === "ADMIN")) },
   // Incoming connection requests must be approved by their RECEIVER, and the receiver is
   // usually the downstream org. Distributors is COMPANY-only, so for a DISTRIBUTOR or
