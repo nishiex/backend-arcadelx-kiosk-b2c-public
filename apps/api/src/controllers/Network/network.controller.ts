@@ -258,7 +258,8 @@ export const deleteConnection = asyncHandler(
  * Select only available profile columns; retain nulls for absent fields.
  */
 export const getDistributors = asyncHandler(
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
+    const companyOrgId = req.membership!.organizationId;
     const profileColumns = await prisma.$queryRaw<{ column_name: string }[]>`
       SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'Organization'
@@ -298,6 +299,125 @@ export const getDistributors = asyncHandler(
       },
     });
 
+    // Partners genuinely associated with each Distributor, reachable from this Company.
+    //
+    // A Partner registration records no parent pointer (Organization has no self-relation),
+    // so "associated" is taken from relationships that do exist and that the Company is
+    // legitimately a party to. Two sources, both intersected with the Company's own network:
+    //
+    //   1. an ACTIVE NetworkConnection between a Distributor and the Partner, where the
+    //      Distributor is one this Company is connected to, or
+    //   2. an Agreement/Order between that Distributor and the Partner.
+    //
+    // Scoping rule: a Partner is only reported when a row links it to a Distributor *and* the
+    // calling Company holds an ACTIVE connection to that Distributor, so every returned
+    // organization stays inside the caller's own network. No schema change.
+    const companyConnections = await prisma.networkConnection.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [{ initiatorOrgId: companyOrgId }, { receiverOrgId: companyOrgId }],
+      },
+      select: { initiatorOrgId: true, receiverOrgId: true },
+    });
+
+    // The organizations this Company is actually connected to (its own network).
+    const connectedOrgIds = Array.from(
+      new Set(
+        companyConnections.map((connection) =>
+          connection.initiatorOrgId === companyOrgId
+            ? connection.receiverOrgId
+            : connection.initiatorOrgId,
+        ),
+      ),
+    );
+
+    const partnersByDistributor = new Map<
+      string,
+      { id: string; name: string; type: string; state: string | null; city: string | null; owner: { id: string; name: string; email: string } | null }[]
+    >();
+
+    if (connectedOrgIds.length > 0) {
+      const partnerSelect = {
+        id: true,
+        name: true,
+        type: true,
+        state: true,
+        city: true,
+        owner: { select: { id: true, name: true, email: true } },
+      } as const;
+
+      // Source 1: connection-linked Partners.
+      const partnerConnections = await prisma.networkConnection.findMany({
+        where: {
+          status: "ACTIVE",
+          OR: [
+            { initiatorOrgId: { in: connectedOrgIds } },
+            { receiverOrgId: { in: connectedOrgIds } },
+          ],
+        },
+        include: { initiator: { select: partnerSelect }, reciever: { select: partnerSelect } },
+      });
+
+      // Source 2: Partners sharing an Agreement or an Order with a connected organization.
+      const [agreementLinks, orderLinks] = await Promise.all([
+        prisma.agreement.findMany({
+          where: {
+            OR: [
+              { parentOrgId: { in: connectedOrgIds } },
+              { childOrgId: { in: connectedOrgIds } },
+            ],
+          },
+          select: {
+            parentOrgId: true,
+            childOrgId: true,
+            parentOrg: { select: partnerSelect },
+            childOrg: { select: partnerSelect },
+          },
+        }),
+        prisma.order.findMany({
+          where: {
+            OR: [
+              { parentOrgId: { in: connectedOrgIds } },
+              { childOrgId: { in: connectedOrgIds } },
+            ],
+          },
+          select: {
+            parentOrgId: true,
+            childOrgId: true,
+            parentOrg: { select: partnerSelect },
+            childOrg: { select: partnerSelect },
+          },
+        }),
+      ]);
+
+      const links = [
+        ...partnerConnections.map((connection) => ({
+          aId: connection.initiatorOrgId,
+          bId: connection.receiverOrgId,
+          a: connection.initiator,
+          b: connection.reciever,
+        })),
+        ...agreementLinks.map((row) => ({ aId: row.parentOrgId, bId: row.childOrgId, a: row.parentOrg, b: row.childOrg })),
+        ...orderLinks.map((row) => ({ aId: row.parentOrgId, bId: row.childOrgId, a: row.parentOrg, b: row.childOrg })),
+      ];
+
+      for (const link of links) {
+        // One end must be an organization in this Company's network; the other end is then
+        // the candidate, and only a genuine PARTNER is reported.
+        for (const [anchorId, anchor, candidate] of [
+          [link.aId, link.a, link.b],
+          [link.bId, link.b, link.a],
+        ] as const) {
+          if (!connectedOrgIds.includes(anchorId)) continue;
+          if (anchor.type !== "DISTRIBUTOR") continue;
+          if (candidate.type !== "PARTNER" || candidate.id === companyOrgId) continue;
+          const list = partnersByDistributor.get(anchorId) ?? [];
+          if (!list.some((partner) => partner.id === candidate.id)) list.push(candidate);
+          partnersByDistributor.set(anchorId, list);
+        }
+      }
+    }
+
     const distributors = organizations.map((organization) => ({
       ...organization,
       gstNumber: organization.gstNumber ?? null,
@@ -305,6 +425,7 @@ export const getDistributors = asyncHandler(
       country: organization.country ?? null,
       isActive: organization.isActive ?? true,
       statusManagementAvailable: availableProfileColumns.has("isActive") && availableProfileColumns.has("accessVersion"),
+      partners: partnersByDistributor.get(organization.id) ?? [],
     }));
 
     res

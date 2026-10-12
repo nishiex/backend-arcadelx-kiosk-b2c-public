@@ -58,7 +58,10 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
   const updatedKiosk = await prisma.$transaction(async (tx) => {
     const kiosk = await tx.kiosk.update({
       where: { machineCode },
-      data: { externalDeviceId },
+      // Pairing is the point at which the hardware becomes operational, so the kiosk
+      // moves to INSTALLED here (from the Backend branch). The ownership ledger below
+      // is kept as well: it is what makes the kiosk's revenue attributable.
+      data: { externalDeviceId, status: 'INSTALLED' },
       select: {
         id: true,
         machineCode: true,

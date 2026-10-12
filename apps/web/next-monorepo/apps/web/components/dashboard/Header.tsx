@@ -30,11 +30,16 @@ type Notice = {
  * them are empty. Each entry links to the screen where the decision is made.
  */
 export default function Header() {
-  const { me, role, canManageMembers, isLoading: loadingMe } = useMe()
+  const { me, role, canManageMembers, isCompany, isLoading: loadingMe } = useMe()
   const [open, setOpen] = React.useState(false)
   const bellRef = React.useRef<HTMLButtonElement>(null)
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
   const canReview = me?.membership?.status === "ACTIVE" && isOwnerOrAdmin
+  // A Company reviews connections and agreements per distributor under Distributors →
+  // View More. Everyone else uses the Requests page, which is the only surface their org
+  // type can reach -- Distributors is COMPANY-only, and accepting a connection requires
+  // being its receiver, so a Distributor or Partner has nowhere else to approve one.
+  const reviewHref = isCompany ? "/distributors" : "/requests"
 
   // Member requests are an organization-management concern, so they are gated the
   // same way the Users screen is.
@@ -105,7 +110,7 @@ export default function Header() {
     notices.push({
       key: "connections",
       label: "Connection requests",
-      href: "/requests",
+      href: reviewHref,
       count: pendingIncoming(incomingConnections.data?.requests, "PENDING"),
       icon: <Share2 size={15} />,
     })
@@ -114,7 +119,7 @@ export default function Header() {
     notices.push({
       key: "agreements",
       label: "Agreements to approve",
-      href: "/requests",
+      href: reviewHref,
       count: pendingIncoming(pendingAgreements.data?.requests, "PENDING_APPROVAL"),
       icon: <ScrollText size={15} />,
     })

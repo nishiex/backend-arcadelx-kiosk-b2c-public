@@ -13,4 +13,16 @@ export const prisma = new PrismaClient({
   // Contact is only selected explicitly where needed. Routine auth and nested
   // user responses also remain compatible before the contact migration deploys.
   omit: { user: { contact: true } },
+  // Prisma's defaults (maxWait 2s, timeout 5s) assume a local database. The hosted
+  // pooler answers a round-trip in ~380ms versus ~6ms locally, so an order transaction
+  // issuing a handful of sequential queries exceeded 5s and failed to commit:
+  //     PATCH /api/orders/:id/deliver -> 500
+  //     "A commit cannot be executed on an expired transaction"
+  // These match the values prisma/seed.ts already passes for its long transaction. The
+  // timeout does not make the work faster; it stops a slow-but-correct transaction from
+  // being rolled back purely on wall-clock time.
+  transactionOptions: {
+    maxWait: 15000,
+    timeout: 30000,
+  },
 });

@@ -16,6 +16,7 @@ import { lockAgreementParties } from "../../services/agreement-rules";
 import { requireWorkflow } from '../../services/workflow-readiness';
 import {
   CreateOrderSchema,
+  DeliverOrderSchema,
   OrderQuerySchema,
   OrderParamsSchema,
 } from "@shared-types/validationSchemas/Orders/order.validation";
@@ -26,26 +27,48 @@ const reserveKiosks = async (
   quantity: number,
   orderId: string,
 ) => {
+  // Only INSTALLED kiosks may be reserved.
+  //
+  // A kiosk is created AVAILABLE and becomes INSTALLED when real hardware is paired to
+  // it (see internal.controller.ts). Reserving AVAILABLE stock would therefore hand out
+  // machines that have no device attached, which is the opposite of the business rule:
+  // an order must only ever commit hardware that exists.
+  //
   // Deterministic selection: oldest first, then by machine code. Ordering by `id`
   // alone is arbitrary because ids are random UUIDs, so kiosks sharing a
   // `createdAt` (batch-created fleets share one) were picked in no meaningful order
   // and a request could receive an unexplained, model-mixed set. `machineCode` is
   // unique, making this a total order: the same inventory always yields the same
   // kiosks, and a batch allocation now follows the machine codes.
+  //
+  // FOR UPDATE SKIP LOCKED makes the availability check atomic: two concurrent orders
+  // cannot select the same row, and the guarded updateMany below re-checks the same
+  // predicate so a row that changed between SELECT and UPDATE cannot slip through.
   const kiosks = await tx.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='AVAILABLE' AND "reservedOrderId" IS NULL
+    SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL
     ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
-  if (kiosks.length !== quantity)
+  if (kiosks.length !== quantity) {
+    // Distinguish "none installed yet" from "installed but already committed", so the
+    // operator knows whether to pair hardware or wait for stock to free up.
+    const [installedTotal] = await tx.$queryRaw<{ n: bigint }[]>`
+      SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED'`;
+    if (Number(installedTotal?.n ?? 0) === 0) {
+      throw new ApiError(
+        409,
+        "No installed kiosks are available to reserve. A kiosk becomes reservable only after its hardware is paired (status INSTALLED).",
+      );
+    }
     throw new ApiError(
       409,
-      "Insufficient unreserved inventory; retry if another allocation is in progress",
+      "Insufficient installed, unreserved inventory; retry if another allocation is in progress",
     );
+  }
   const ids = kiosks.map((k) => k.id);
   const updated = await tx.kiosk.updateMany({
     where: {
       id: { in: ids },
       currentOrgId: orgId,
-      status: "AVAILABLE",
+      status: "INSTALLED",
       reservedOrderId: null,
     },
     data: { status: "RESERVED", reservedOrderId: orderId },
@@ -191,7 +214,14 @@ export const createOrder = asyncHandler(async (req, res) => {
     const nonRefundablePerMachine = agreement.nonRefundableAmountPerMachine;
     const totalDeposit = depositPerMachine * parsed.quantity;
     const totalNonRefundable = nonRefundablePerMachine * parsed.quantity;
-    const taxAmount = Math.round(totalNonRefundable * 18) / 100;
+    // GST is configuration, not a constant: read the shared rate so a change in
+    // System Settings applies to new orders without a code change. Falls back to
+    // the schema default (18%) if the settings row is absent.
+    const settings = await tx.systemSettings.findUnique({
+      where: { id: 'default' },
+    });
+    const gstRate = settings ? Number(settings.gstPercentage) / 100 : 0.18;
+    const taxAmount = Math.round(totalNonRefundable * gstRate * 100) / 100;
     const row = await tx.order.create({
       data: {
         orderNumber: `ORD-${year}-${String(sequence[0].value).padStart(5, '0')}`,
@@ -349,6 +379,9 @@ export const dispatchOrder = asyncHandler(async (req, res) => {
 export const deliverOrder = asyncHandler(async (req, res) => {
   const id = req.params.orderId;
   if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
+  // Parsed before the transaction opens: a missing location must fail without touching
+  // stock, so the order keeps its DISPATCHED state and nothing is transferred.
+  const { location } = DeliverOrderSchema.parse(req.body);
   const order = await prisma.$transaction(async (tx) => {
     const current = await lockedOrder(tx, id, req.membership!.organizationId);
     if (current.status !== "DISPATCHED")
@@ -379,7 +412,10 @@ export const deliverOrder = asyncHandler(async (req, res) => {
       data: {
         currentOrgId: current.childOrgId,
         status: "AVAILABLE",
-        location: null,
+        // The site the kiosks were delivered to. This is the only place a delivery
+        // location is recorded, so the validated value is written onto every kiosk in
+        // the same transaction that transfers ownership.
+        location,
         reservedOrderId: null,
       },
     });

@@ -9,6 +9,10 @@ import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Skeleton, ErrorState, EmptyState } from "@/components/dashboard/ui"
 import DistributorAgreementDialog from "./DistributorAgreementDialog"
+import DistributorViewMoreDialog from "./DistributorViewMoreDialog"
+
+/** Indian digit grouping, matching the currency format used elsewhere in the app. */
+const countFormat = new Intl.NumberFormat("en-IN")
 
 export default function DistributorsScreen() {
   const { canManageDistributors, canManageAgreements, can, isCompany, me } = useMe()
@@ -85,7 +89,7 @@ export default function DistributorsScreen() {
                   <th className="px-4 py-3 text-right font-medium">Members</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   {canManageAgreementTerms && <th className="px-4 py-3 text-right font-medium">Agreement</th>}
-                  {canManageDistributors && <th className="px-4 py-3 text-right font-medium">Actions</th>}
+                  <th className="px-4 py-3 text-right font-medium">Details</th>
                 </tr>
               </thead>
               <tbody ref={bodyRef}>
@@ -113,10 +117,13 @@ export default function DistributorsScreen() {
                     </td>
                     <td className="px-4 py-3">{d.gstNumber ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-3">{d.phone ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{d._count.kiosks}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{d._count.memberships}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.kiosks)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.memberships)}</td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${d.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-red-500/10 text-red-700 dark:text-red-300"}`}>{d.isActive ? "Active" : "Inactive"}</span></td>
                     {canManageAgreementTerms && <td className="px-4 py-3 text-right">{organizationId && <DistributorAgreementDialog distributor={d} organizationId={organizationId} />}</td>}
+                    <td className="px-4 py-3 text-right">
+                      <DistributorViewMoreDialog distributor={d} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Inbox,
   IndianRupee,
+  CreditCard,
   Settings,
   Menu,
   X,
@@ -35,8 +36,15 @@ const NAV: NavItem[] = [
   { name: "Overview", href: "/", icon: LayoutGrid },
   { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone },
   { name: "Orders", href: "/orders", icon: ClipboardList, show: (p) => p.canTransact || (p.orgType === "PARTNER" && p.me?.membership?.status === "ACTIVE" && (p.role === "OWNER" || p.role === "ADMIN")) },
-  { name: "Requests", href: "/requests", icon: Inbox, show: (p) => p.canReviewRequests },
+  // Incoming connection requests must be approved by their RECEIVER, and the receiver is
+  // usually the downstream org. Distributors is COMPANY-only, so for a DISTRIBUTOR or
+  // PARTNER this page is the only surface where an incoming request can be accepted --
+  // without it they cannot approve anything. A Company does not need it: it reviews per
+  // distributor under Distributors → View More, and a Company cannot accept a request it
+  // itself initiated (the API matches on receiverOrgId).
+  { name: "Requests", href: "/requests", icon: Inbox, show: (p) => p.canReviewRequests && !p.isCompany },
   { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue },
+  { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
   { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canRegisterPartners },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },

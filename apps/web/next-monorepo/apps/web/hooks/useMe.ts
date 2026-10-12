@@ -33,6 +33,8 @@ export type Permissions = {
   canRegisterPartners: boolean
   canReviewRequests: boolean
   canViewRevenue: boolean
+  /** Payment gateway administration is COMPANY + OWNER/ADMIN only. */
+  canManageGateways: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
   /** Fine-grained matrix check. OWNER always passes (never locked out). */
@@ -85,6 +87,7 @@ export function useMe(): Permissions {
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
       (isOwnerOrAdmin || role === "MANAGER") &&
       (isCompany || isDistributor || orgType === "PARTNER"),
+    canManageGateways: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     permissions,
     can,
   }

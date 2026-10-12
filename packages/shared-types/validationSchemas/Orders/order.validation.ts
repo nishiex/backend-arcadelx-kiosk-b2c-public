@@ -2,6 +2,20 @@ import { z } from "zod";
 
 export const OrderParamsSchema = z.object({ orderId: z.string().uuid() });
 
+/**
+ * Delivery must record where the kiosks physically go. The location is written onto each
+ * kiosk as part of the ownership transfer, so it cannot be optional: previously the handler
+ * hardcoded `location: null`, which erased any location and left delivered kiosks with no
+ * recorded site.
+ */
+export const DeliverOrderSchema = z.object({
+  location: z
+    .string()
+    .trim()
+    .min(3, "Enter the delivery location")
+    .max(200, "Delivery location must be 200 characters or fewer"),
+});
+
 // For REQUEST orders the Company supplier is always resolved automatically
 // server-side — the client only needs to specify quantity.
 // For ALLOCATION orders the caller must specify the target child org.

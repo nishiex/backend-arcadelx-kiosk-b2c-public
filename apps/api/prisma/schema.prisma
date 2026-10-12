@@ -42,6 +42,9 @@ model User {
   tokens               RefreshToken[]
   kioskAssignmentsMade KioskAssignment[] // Assignments made to a organization
 
+  // Return requests this user raised for a kiosk owned by their organization.
+  kioskReturnRequests KioskReturnRequest[]
+
   passwordResets PasswordReset[]
 
   createdAt DateTime @default(now())
@@ -100,6 +103,8 @@ model Organization {
 
   parentAgreements Agreement[]       @relation("ParentAgreements")
   childAgreements  Agreement[]       @relation("ChildAgreements")
+
+  kioskReturnRequests KioskReturnRequest[]
   kiosks           Kiosk[]
   kioskAssignments KioskAssignment[]
   ordersAsParent   Order[]           @relation("OrderParent")
@@ -201,6 +206,14 @@ enum KioskStatus {
   MAINTENANCE
   RETURNED
   RETIRED
+  // Added by the Backend branch's return-request flow. Kept alongside RETIRED rather
+  // than replacing it: the frontend still lists RETIRED as a real kiosk status.
+  RETURN_REQUESTED
+}
+
+enum ReturnRequestStatus {
+  PENDING
+  APPROVED
 }
 
 model Kiosk {
@@ -221,6 +234,28 @@ model Kiosk {
   orderKiosks   OrderKiosk[]
   transactions  Transaction[]
   reservedOrder Order?            @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
+  returnRequests KioskReturnRequest[]
+}
+
+// A kiosk owner asking to hand a machine back, and the supplier's decision on it.
+// Ported from the Backend branch. Kept separate from KioskStatus history: the request
+// carries its own status so a decision is auditable after the kiosk moves on.
+model KioskReturnRequest {
+  id     String @id @default(uuid())
+  kioskId String
+  organizationId String
+  requestedById  String
+
+  status ReturnRequestStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kiosk          Kiosk        @relation(fields: [kioskId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  requestedBy    User         @relation(fields: [requestedById], references: [id])
+
+  @@index([kioskId, status])
 }
 
 // audit/history ledger for kiosk ownership/assignment movement.

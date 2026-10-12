@@ -19,7 +19,9 @@ import { useReveal } from "@/hooks/useReveal"
 import StatCard from "./StatCard"
 import { Skeleton, ErrorState } from "./ui"
 
-const nf = new Intl.NumberFormat("en-US")
+// Indian digit grouping (1,00,000) to match the currency formatting used across the app;
+// en-US grouped the same numbers differently from every INR figure beside them.
+const nf = new Intl.NumberFormat("en-IN")
 
 export default function StatGrid() {
   const { canManageMembers, canManageNetwork } = useMe()

@@ -29,34 +29,6 @@
     {
       "check": "owner-can-select-admin",
       "pass": true
-    },
-    {
-      "check": "network-rejection-explains-history-retention",
-      "pass": true
-    },
-    {
-      "check": "network-rejection-sends-correct-endpoint",
-      "pass": true
-    },
-    {
-      "check": "agreement-admin-cannot-decide",
-      "pass": true
-    },
-    {
-      "check": "agreement-rejection-uses-patch",
-      "pass": true
-    },
-    {
-      "check": "order-unavailable-controls-disabled",
-      "pass": true
-    },
-    {
-      "check": "no-order-actions-for-other-supplier",
-      "pass": true
-    },
-    {
-      "check": "Approve-readiness-error-retains-enabled-cache",
-      "pass": true
     }
   ]
 }

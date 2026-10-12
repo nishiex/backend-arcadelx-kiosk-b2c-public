@@ -5,12 +5,12 @@ import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, X } from "lucide-react"
 import {
-  deliverOrder,
   dispatchOrder,
   markOrderAsPaid,
   rejectOrder,
   type KioskOrder,
 } from "@/lib/backend-api"
+import { deliverOrderWithLocation } from "@/lib/order-delivery"
 
 type Step = {
   /** The API call for this step. */
@@ -20,6 +20,12 @@ type Step = {
   description: string
   /** Consequence shown in the confirmation, or null when there is none to explain. */
   confirm: string | null
+  /**
+   * When set, the confirmation asks for a required text value before running. Delivery
+   * uses this: the location is written onto every kiosk during the ownership transfer,
+   * so the API rejects a missing value and the kiosks must not move without it.
+   */
+  requireLocation?: boolean
 }
 
 /**
@@ -44,11 +50,14 @@ const DISPATCH: Step = {
 }
 
 const DELIVER: Step = {
-  run: deliverOrder,
+  // A required location is collected in the confirmation, so this step cannot run from
+  // the plain mutation callback: the dialog passes the entered value through.
+  run: (orderId: string) => deliverOrderWithLocation(orderId, ""),
   button: "Mark delivered",
   title: "Mark as delivered?",
   description: "Transfers ownership of the dispatched machines to the receiving organization.",
   confirm: "This transfers the machines to the other organization and clears their reservation. It cannot be undone here.",
+  requireLocation: true,
 }
 
 /**
@@ -102,13 +111,21 @@ export default function OrderStatusDialog({
       : []
   const [selected, setSelected] = React.useState<Action | null>(null)
   const [open, setOpen] = React.useState(false)
+  // Delivery-only: the site the kiosks are installed at. Required by the API.
+  const [location, setLocation] = React.useState("")
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: () => selected!.run(order.id),
+    // When a location is required it is sent with the call; otherwise the step's own
+    // run() is used unchanged so no other lifecycle step is affected.
+    mutationFn: () =>
+      selected!.requireLocation
+        ? deliverOrderWithLocation(order.id, location.trim())
+        : selected!.run(order.id),
     onSuccess: async updated => {
       onChanged?.(updated)
       setOpen(false)
       setSelected(null)
+      setLocation("")
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["orders"] }),
         queryClient.invalidateQueries({ queryKey: ["kiosks"] }),
@@ -130,7 +147,10 @@ export default function OrderStatusDialog({
         // Only clear on close. Radix fires onOpenChange after the trigger's own
         // onClick, so clearing here while opening would discard the selection and
         // the confirm button would have no action to run.
-        if (!value) setSelected(null)
+        if (!value) {
+          setSelected(null)
+          setLocation("")
+        }
         setOpen(value)
       }}
     >
@@ -161,6 +181,28 @@ export default function OrderStatusDialog({
           {active.confirm && (
             <p className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">{active.confirm}</p>
           )}
+          {active.requireLocation && (
+            <div className="mt-4">
+              <label htmlFor={`delivery-location-${order.id}`} className="mb-1.5 block text-sm font-medium">
+                Delivery location <span className="text-destructive">*</span>
+              </label>
+              <input
+                id={`delivery-location-${order.id}`}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                placeholder="e.g. Phoenix Mall, Pune"
+                required
+                minLength={3}
+                maxLength={200}
+                disabled={mutation.isPending}
+                value={location}
+                onChange={event => setLocation(event.target.value)}
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Recorded on each kiosk as its installed site. The machines are not
+                transferred until this is saved.
+              </p>
+            </div>
+          )}
           <Dialog.Close
             disabled={mutation.isPending}
             aria-label="Close order action"
@@ -177,7 +219,7 @@ export default function OrderStatusDialog({
             </Dialog.Close>
             <button
               type="button"
-              disabled={mutation.isPending || disabled}
+              disabled={mutation.isPending || disabled || (active.requireLocation === true && location.trim().length < 3)}
               onClick={() => mutation.mutate()}
               className={
                 active.destructive
