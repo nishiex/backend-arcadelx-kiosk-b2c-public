@@ -6,6 +6,14 @@ import { ApiError } from '../../utils/ApiError';
 import { SettingsSchema, RevenueSeriesQuerySchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
 import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-period';
 import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
+import { getMothershipPayments } from '../../services/Revenue/revenueTransaction.services';
+
+export const getMothershipPaymentsFeed = asyncHandler(async (_req, res) => {
+  const result = await getMothershipPayments();
+  res.json(
+    new ApiResponse(200, result, 'Mothership payments fetched successfully'),
+  );
+});
 
 export const getMachineWiseRevenue = asyncHandler(async (req, res) => {
   const orgId = req.membership!.organizationId, orgType = req.membership!.type;

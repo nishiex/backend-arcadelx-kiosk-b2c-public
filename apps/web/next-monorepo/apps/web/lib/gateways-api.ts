@@ -122,11 +122,13 @@ export async function toggleGateway(
   return handleRes<unknown>(res)
 }
 
-export async function reorderGateways(order: string[]): Promise<unknown> {
+export async function reorderGateways(
+  gateways: { provider: string; priority: number }[]
+): Promise<unknown> {
   const res = await apiFetch("/api/admin/gateways/reorder", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ order }),
+    body: JSON.stringify({ gateways }),
   })
   return handleRes<unknown>(res)
 }

@@ -1,15 +1,26 @@
 import { z } from "zod";
 
 /**
- * Device fleet and per-device game pricing, as served by Mothership.
+ * Device fleet and game pricing, as served by Mothership.
  *
- * Shapes below were established by reading the live host on 2026-10-12 with
+ * Shapes below were established by reading the live host on 2026-10-12 and 2026-10-13 with
  * **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                       → 9 devices
  *   - `GET  /api/v1/devices/{device_id}/prices`               → 30 rows (15 games × 2)
+ *   - `GET  /api/v1/games`                                    → 16 catalog entries with price
  *
- * Pricing is read per device but WRITTEN per game: see `SetDeviceGamePriceSchema` below for
- * which upstream endpoint actually persists a change.
+ * Prices are read per device. A write is requested in an explicit scope, because the two
+ * achievable scopes are not equivalent:
+ *   - `DEVICE`       the default: one device's override, verified against the catalog and
+ *                    every other device. Mothership's per-device endpoint currently answers
+ *                    2xx without persisting anything, so this scope can legitimately fail.
+ *   - `GAME_CATALOG`  only after the operator confirms it: the game's catalog price, which
+ *                    every kiosk offering that game charges.
+ *
+ * `scope` is therefore a required, explicit part of the request contract rather than a
+ * fallback the server chooses on the caller's behalf: a global price change must never be
+ * the silent result of a device-scoped request.
+ * Resetting existing overrides uses Mothership's device-scoped reset endpoint.
  */
 
 export const DeviceParamsSchema = z.object({
@@ -62,18 +73,10 @@ export const DevicePricesResponseSchema = z.object({
 /**
  * Body for setting one game's price.
  *
- * These are OUR field names. The API forwards them to Mothership's CATALOG endpoint
- * (`POST /api/v1/games/{game_id}/metadata`) as `price` / `replay_price`, which is the
- * write path that actually persists — confirmed live on 2026-10-13 (Empire Saviour
- * 100 → 101 → 100, observed on adlx-2026-a005's own pricing read).
- *
- * Why not the per-device endpoint `POST /api/v1/devices/{id}/games/{id}/price`: it answers
- * 200 `{"status":"success"}` and changes nothing, echoing the unchanged price while
- * `has_override` stays 0. Probed on 2026-10-13 with every body shape that returns 200;
- * adding `price` to that body returns 500 instead. See `devices.service.ts` for the detail.
- *
- * Consequence for callers: a catalog price is per GAME, so a change applies to that game on
- * every kiosk, not only the device whose id appears in our route.
+ * The API maps these fields to Mothership per the requested `scope`:
+ *   - `DEVICE` (default) → the per-device override endpoint on the device in the route.
+ *   - `GAME_CATALOG`     → the game's catalog metadata endpoint, which reaches every kiosk.
+ *     The client must send this explicitly, after telling the operator what it does.
  *
  * `replay_price` stays optional so an operator can change only the first-play price; the
  * upstream call omits the key entirely when undefined rather than sending null.
@@ -85,28 +88,53 @@ export const SetDeviceGamePriceSchema = z.object({
     .min(0, "Replay price cannot be negative")
     .max(100000, "Replay price looks implausible")
     .optional(),
+  scope: z.enum(['DEVICE', 'GAME_CATALOG']).optional().default('DEVICE'),
 });
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
+export type PriceWriteScope = SetDeviceGamePriceInput['scope'];
 
-/**
- * Result of a price write, as reported only AFTER Mothership confirms it.
- *
- * The values here are re-read from Mothership, not echoed from the request: the price
- * endpoint used to answer 200 while doing nothing, so an unverified echo is not evidence.
- */
+/** Result returned after Mothership confirms a device-scoped override reset. */
+export const ResetDevicePricesResultSchema = z.object({
+  deviceId: z.string(),
+  gamesReset: z.number().int().nonnegative(),
+  scope: z.literal('DEVICE_OVERRIDES'),
+});
+
+export type ResetDevicePricesResult = z.infer<typeof ResetDevicePricesResultSchema>;
+
+/** Result returned only after verifying the requested override and unchanged other devices. */
 export const SetDeviceGamePriceResultSchema = z.object({
   deviceId: z.string(),
   gameId: z.string(),
   displayName: z.string(),
-  /** Price Mothership reports after the write, i.e. the confirmed value. */
   price: z.number(),
-  replayPrice: z.number().nullable(),
-  /** Mothership keeps one price per game, so the write covers every kiosk. */
-  scope: z.literal('GAME_CATALOG'),
+  replayPrice: z.number(),
+  /** What was actually written, so the caller can state the reach of the change honestly. */
+  scope: z.enum(['DEVICE_GAME_OVERRIDE', 'GAME_CATALOG']),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
+
+/**
+ * One game catalog entry as Mothership returns it from `GET /api/v1/games`.
+ *
+ * This is the pricing every kiosk offering the game charges, and the value a
+ * `GAME_CATALOG` write is verified against.
+ */
+const UpstreamCatalogGameSchema = z.object({
+  game_id: z.string(),
+  display_name: z.string(),
+  price: z.number(),
+  replay_price: z.number(),
+});
+
+export const GameCatalogResponseSchema = z.object({
+  games: z.array(UpstreamCatalogGameSchema),
+});
+
+/** One upstream catalog entry (`GET /api/v1/games`), as parsed by the schema above. */
+export type UpstreamCatalogGame = z.infer<typeof UpstreamCatalogGameSchema>;
 
 /** A device as this API returns it (normalised, camelCase). */
 export const DeviceViewSchema = z.object({

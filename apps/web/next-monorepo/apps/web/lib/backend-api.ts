@@ -178,6 +178,7 @@ export type KioskOrder = {
   parentOrg: OrgRef;
   childOrg: OrgRef;
   quantity: number;
+  requestedModel: string | null;
   depositPerMachine: number;
   nonRefundablePerMachine: number;
   totalDeposit: number;
@@ -232,14 +233,30 @@ export async function rejectOrder(orderId: string): Promise<KioskOrder> {
   return (await handleRes<{ order: KioskOrder }>(res)).order;
 }
 
-export type CreateOrderInput = 
-  | { type: 'REQUEST'; quantity: number }
-  | { type: 'ALLOCATION'; targetOrgId: string; quantity: number };
+export type RequestModelAvailability = {
+  supplier: OrgRef;
+  models: Array<{ model: string; availableQuantity: number }>;
+};
+
+export async function fetchRequestModelAvailability(): Promise<RequestModelAvailability> {
+  const res = await apiFetch('/api/orders/request-models', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  return handleRes<RequestModelAvailability>(res);
+}
+
+export type CreateOrderInput =
+  | { type: 'REQUEST'; quantity: number; model: string }
+  | { type: 'ALLOCATION'; targetOrgId: string; quantity: number; model?: string };
 export type CreatedOrder = Omit<KioskOrder, 'parentOrg' | 'childOrg'>;
 
 export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder> {
   if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 50) {
     throw new Error('Enter a whole number from 1 to 50.');
+  }
+  if ('model' in input && input.type === 'REQUEST' && !input.model.trim()) {
+    throw new Error('Select an available kiosk model.');
   }
   const res = await apiFetch('/api/orders/create', {
     method: 'POST',
@@ -574,6 +591,34 @@ export type DeductionRates = {
 export async function fetchMachineRevenue(): Promise<MachineRevenue[]> {
   const res = await apiFetch('/api/revenue/machine-wise', { credentials: 'include' });
   return (await handleRes<{ kiosks: MachineRevenue[] }>(res)).kiosks;
+}
+
+export type MothershipPayment = {
+  txnid: string;
+  device_id: string;
+  game_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider: string | null;
+  qr_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MothershipPaymentsFeed = {
+  total: number;
+  payments: MothershipPayment[];
+  fetchedAt: string;
+};
+
+/** Read the current payment feed without importing or mutating revenue records. */
+export async function fetchMothershipPayments(): Promise<MothershipPaymentsFeed> {
+  const res = await apiFetch('/api/revenue/payments', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  return handleRes<MothershipPaymentsFeed>(res);
 }
 
 /** Windows offered by the dashboard revenue trend; each also sets its granularity. */

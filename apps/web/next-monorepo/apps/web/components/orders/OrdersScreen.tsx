@@ -47,7 +47,7 @@ export default function OrdersScreen() {
         <div className="flex flex-wrap gap-2">
           {canRequest && organizationId && orgType && <CreateOrderDialog key={organizationId} organizationId={organizationId} orgType={orgType} disabled={orderActionsDisabled} onCreated={order => {
             setSearch(""); setStatus(""); setDirection("")
-            setCreatedMessage(`Request ${order.orderNumber} submitted for supplier approval.`)
+            setCreatedMessage(`Request ${order.orderNumber} for ${order.quantity} ${order.requestedModel ?? "kiosk"} kiosk(s) submitted for supplier approval.`)
           }} />}
           <button type="button" onClick={() => orders.refetch()} disabled={!organizationId || orders.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"><RefreshCw size={16} className={orders.isFetching ? "animate-spin" : ""} /> Refresh</button>
         </div>

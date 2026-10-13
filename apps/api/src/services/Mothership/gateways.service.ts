@@ -26,12 +26,12 @@ import type {
  *   - `POST /api/v1/admin/gateways/toggle`  enable/disable one provider
  *   - `DELETE /api/v1/admin/gateways`       remove one provider override
  *
- * Known open issue (2026-10-12): `/reorder` is forwarded as `{ order: [...] }` and
- * returns upstream HTTP 500 (we surface 502). The same body posted directly to
- * Mothership answers 200, so the real contract is not yet established. The forwarded
- * shape was deliberately left unchanged: guessing further would mean more writes to a
- * live payment endpoint. The error body is now surfaced so the cause can be read from
- * the response instead of being a bare failure.
+ * Known open issue (2026-10-13): `/reorder` had returned HTTP 500 with the earlier
+ * `{ order: string[] }` body shape — that shape was never correct.  The confirmed
+ * contract is `{ gateways: [{ provider, priority }, ...] }`, which returns HTTP 200
+ * `{ status: "success", message: "Priorities updated." }`.  After a successful POST
+ * this client reads the gateway list back and rejects/logs a mismatch instead of
+ * reporting a false success. It never retries the live mutation automatically.
  */
 
 const REQUEST_TIMEOUT_MS = 15000;
@@ -178,7 +178,63 @@ export async function upsertGateway(input: UpsertGatewayInput): Promise<unknown>
 }
 
 export async function reorderGateways(input: ReorderGatewaysInput): Promise<unknown> {
-  return callMothership('/api/v1/admin/gateways/reorder', { method: 'POST', body: input });
+  const result = await callMothership('/api/v1/admin/gateways/reorder', {
+    method: 'POST',
+    body: input,
+  });
+
+  // Verify Mothership applied the change by reading the live list back and comparing
+  // the *relative routing order* (which provider is first, second, etc.).
+  //
+  // Mothership may normalise the exact priority numbers it stores — e.g. it might
+  // keep razorpay=1/payu=2 internally and just swap which one comes first — so
+  // comparing exact numeric values always mismatches even on a successful write.
+  // Relative order is all that matters for payment routing.
+  let current: { gateways: Gateway[] };
+  try {
+    current = await listGateways();
+  } catch (error) {
+    console.error('[mothership-admin] could not verify gateway reorder', {
+      requestedGateways: input.gateways,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new ApiError(
+      502,
+      'Mothership accepted the reorder request, but the resulting priority could not be verified',
+      {
+        requestedGateways: input.gateways,
+        verificationError: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+
+  // Build the requested provider sequence (sorted by the priority values we sent).
+  const requestedOrder = [...input.gateways]
+    .sort((a, b) => a.priority - b.priority)
+    .map((g) => g.provider);
+
+  // Build the live provider sequence (sorted by whatever Mothership returned).
+  const liveOrder = [...current.gateways]
+    .sort((a, b) => a.priority - b.priority)
+    .map((g) => g.provider);
+
+  const orderMismatch =
+    requestedOrder.length !== liveOrder.length ||
+    requestedOrder.some((provider, i) => provider !== liveOrder[i]);
+
+  if (orderMismatch) {
+    console.error('[mothership-admin] gateway reorder was not applied', {
+      requestedOrder,
+      liveOrder,
+    });
+    throw new ApiError(
+      502,
+      'Mothership accepted the reorder request but did not apply the requested gateway priority order',
+      { requestedOrder, liveOrder },
+    );
+  }
+
+  return result;
 }
 
 export async function toggleGateway(input: ToggleGatewayInput): Promise<unknown> {

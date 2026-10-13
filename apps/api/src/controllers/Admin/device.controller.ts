@@ -5,11 +5,14 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import {
   DeviceGameParamsSchema,
   DeviceParamsSchema,
+  ResetDevicePricesResultSchema,
   SetDeviceGamePriceSchema,
+  SetDeviceGamePriceResultSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
 import {
   getDevicePrices,
   listDevices,
+  resetDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
 
@@ -17,14 +20,12 @@ import {
  * Device fleet and per-device game pricing.
  *
  * Reads are open to any signed-in member of the organization, because they describe
- * hardware the fleet operator already owns. The price WRITE is the sensitive one: it
- * changes what live kiosks charge players, so its route additionally requires the Company's
- * OWNER/ADMIN (`routes/Admin/device.routes.ts`).
- *
- * Note the scope of that write: Mothership stores one price per GAME, so a change made from
- * a device's page applies to that game on every kiosk, and the response says so
- * (`scope: 'GAME_CATALOG'`). The value returned is re-read from Mothership after the write
- * and the request fails if the change did not take effect.
+ * hardware the fleet operator already owns. Price writes are reserved for Company
+ * OWNER/ADMIN. The body's `scope` decides the reach: `DEVICE` (default) writes a
+ * device-only override and is only successful when readback confirms the selected device
+ * changed without changing catalog or fleet prices; `GAME_CATALOG`, only when the caller
+ * asks for it explicitly, updates the game's catalog price and is confirmed against the
+ * catalog readback. Neither scope substitutes for the other.
  *
  * Params and body are validated here before anything is forwarded, so a malformed
  * request fails with a specific 400 instead of an opaque upstream error.
@@ -53,6 +54,26 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
     .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games }, 'Prices fetched successfully'));
 });
 
+export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {
+  const params = DeviceParamsSchema.safeParse(req.params);
+  if (!params.success) throw new ApiError(400, 'Invalid device id', params.error.issues);
+
+  const result = ResetDevicePricesResultSchema.parse(
+    await resetDevicePrices(params.data.deviceId),
+  );
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        result,
+        result.gamesReset > 0
+          ? 'Device price overrides reset successfully'
+          : 'No device price overrides to reset',
+      ),
+    );
+});
+
 export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {
   const params = DeviceGameParamsSchema.safeParse(req.params);
   if (!params.success) throw new ApiError(400, 'Invalid device or game id', params.error.issues);
@@ -60,14 +81,20 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   const body = SetDeviceGamePriceSchema.safeParse(req.body);
   if (!body.success) throw new ApiError(400, 'Invalid price payload', body.error.issues);
 
-  const result = await setDeviceGamePrice(
+  const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(
     params.data.deviceId,
     params.data.gameId,
     body.data,
-  );
-  // The message states the scope because the stored price is per game: the same change
-  // reaches every kiosk offering it, not only the device named in the path.
+  ));
   res
     .status(200)
-    .json(new ApiResponse(200, result, 'Game price updated on every kiosk'));
+    .json(
+      new ApiResponse(
+        200,
+        result,
+        result.scope === 'GAME_CATALOG'
+          ? 'Game catalog price applied to all kiosks and verified'
+          : 'Device game price updated and verified',
+      ),
+    );
 });

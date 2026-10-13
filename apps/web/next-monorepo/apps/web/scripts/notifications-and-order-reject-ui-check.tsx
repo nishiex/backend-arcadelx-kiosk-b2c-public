@@ -47,7 +47,7 @@ const evidence: { check: string; pass: boolean }[] = []
 
 const order = (id: string, status: string, paymentStatus: string, parentOrgId: string) => ({
   id, orderNumber: `ORD-${id}`, type: 'REQUEST' as const, status: status as never, paymentStatus: paymentStatus as never,
-  parentOrgId, childOrgId: other.id, parentOrg: company, childOrg: other, quantity: 1,
+  parentOrgId, childOrgId: other.id, parentOrg: company, childOrg: other, quantity: 1, requestedModel: null,
   depositPerMachine: 10000, nonRefundablePerMachine: 2000, totalDeposit: 10000, totalNonRefundable: 2000,
   taxAmount: 360, grandTotal: 12360,
   createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',

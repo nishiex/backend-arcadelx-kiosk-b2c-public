@@ -8,6 +8,7 @@ import {
 import {
   getDevices,
   getPricesForDevice,
+  resetPricesForDevice,
   updateDeviceGamePrice,
 } from '../../controllers/Admin/device.controller';
 
@@ -17,11 +18,10 @@ import {
  * Reads require an authenticated member of a COMPANY, DISTRIBUTOR or PARTNER org, matching
  * the revenue endpoints: the device fleet is operational data the network already sees.
  *
- * The price WRITE is narrower — Company OWNER/ADMIN only. It changes what physically
- * deployed kiosks charge, so it is treated like the revenue rate editing and the gateway
- * admin surface rather than as ordinary operational data. Note its scope: Mothership stores
- * one price per GAME, so the write reaches every kiosk offering that game, not just the
- * device named in the path (which is used to read the change back and confirm it).
+ * Price writes are reserved for Company OWNER/ADMIN, and the body's `scope` states their
+ * reach: `DEVICE` (default) writes and verifies a device-only override, while an explicit
+ * `GAME_CATALOG` updates the game's catalog price for every kiosk. Neither is ever chosen
+ * on the caller's behalf; the service verifies the resulting prices before reporting success.
  *
  * Note the path prefix is `/api/devices`, not Mothership's `/api/v1/devices`: this is our
  * own surface, and keeping our versioning out of the path avoids implying we mirror
@@ -47,8 +47,17 @@ router.get(
   getPricesForDevice,
 );
 
-// Set one game's price. This writes to live hardware, and because Mothership stores one
-// price per game it applies to every kiosk offering that game.
+// Reset price overrides for this device only. It does not change catalog prices or other
+// devices, and is restricted to the same Company OWNER/ADMIN roles as price writes.
+router.post(
+  '/:deviceId/prices/reset',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  resetPricesForDevice,
+);
+
+// Price writes are gated to Company OWNER/ADMIN. `scope: 'GAME_CATALOG'` in the body updates
+// the game's catalog price for every kiosk; a device write never falls back to it.
 router.post(
   '/:deviceId/games/:gameId/price',
   requireOrgType('COMPANY'),

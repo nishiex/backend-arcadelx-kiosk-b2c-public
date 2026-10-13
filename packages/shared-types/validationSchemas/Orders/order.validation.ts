@@ -16,18 +16,20 @@ export const DeliverOrderSchema = z.object({
     .max(200, "Delivery location must be 200 characters or fewer"),
 });
 
-// For REQUEST orders the Company supplier is always resolved automatically
-// server-side — the client only needs to specify quantity.
+// For REQUEST orders the immediate supplier is resolved server-side and the
+// requested model is checked against that supplier's reservable inventory.
 // For ALLOCATION orders the caller must specify the target child org.
 export const CreateOrderSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("REQUEST"),
     quantity: z.number().int().min(1).max(50),
+    model: z.string().trim().min(1).max(100),
   }),
   z.object({
     type: z.literal("ALLOCATION"),
     targetOrgId: z.string().uuid(), // child org to push kiosks to
     quantity: z.number().int().min(1).max(50),
+    model: z.string().trim().min(1).max(100).optional(),
   }),
 ]);
 

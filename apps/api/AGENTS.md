@@ -42,7 +42,7 @@ Both public feeds are configured in the ignored root `.env` (and documented in
 | Key | Endpoint | Purpose |
 | --- | --- | --- |
 | `MOTHERSHIP_DEVICE_API_URL` | `/api/v1/devices` | Registers/freshens kiosks and their `externalDeviceId` |
-| `MOTHERSHIP_TRANSACTION_API_URL` | `/api/v1/payments` | Imports completed payments |
+| `MOTHERSHIP_TRANSACTION_API_URL` | `/api/v1/payments` | Reads the payment feed; scheduled sync imports completed payments |
 
 `externalDeviceId` is documented in `internal.controller.ts` as "Mothership's UUID (The
 Link)", and the payment sync resolves a kiosk by it (then by `machineCode`), so the device
@@ -109,10 +109,10 @@ fixing it means moving the ALLOCATION branch above the guard.
 
 ## Live payment feed (2026-10-07)
 
-The revenue source is now configured locally: ignored root `.env` sets
-`MOTHERSHIP_TRANSACTION_API_URL=https://main.arcadelx.games/api/v1/payments`
-(the key `.env.example` already documents and `syncRevenueData` already reads). The
-endpoint is public -- it answers 200 without credentials, which is why the existing
+The read-only revenue feed uses
+`https://main.arcadelx.games/api/v1/payments` by default. Set
+`MOTHERSHIP_TRANSACTION_API_URL` in the ignored root `.env` only to override it.
+The endpoint is public -- it answers 200 without credentials, which is why the
 service fetches it unauthenticated -- so the URL is configuration, not a secret.
 
 `syncRevenueData` previously required a bare JSON array. This feed returns an
@@ -125,8 +125,10 @@ is validated, `device_id` is mapped to a kiosk via `externalDeviceId` then
 and every attempt is recorded in `RevenueSyncRunLog`.
 
 Nightly and monthly jobs remain **disabled**: `REVENUE_JOBS_ENABLED` and
-`REDIS_URL` are still unset, so `startRevenueJobs` never runs. Importing on demand
-is deliberate for now; enabling the schedulers is a separate step.
+`REDIS_URL` are still unset, so `startRevenueJobs` never runs. The authenticated
+`GET /api/revenue/payments` route exposes the live upstream feed read-only to Company
+Owners/Admins; it does not import records or mutate the revenue ledger. `syncRevenueData`
+remains the separate importer used by the scheduled pipeline when enabled.
 
 `audits/revenue-trend/fetch-live-payments.ts` runs the existing service against the
 configured source (local database only) and records the feed summary, device
@@ -359,6 +361,31 @@ Order rejection: supplier COMPANY/DISTRIBUTOR OWNER/ADMIN, PATCH
 history/reservations qualifies. It never releases approved stock or alters money.
 Order create/approve/reject check workflow schema availability and return 503
 while unavailable. GET `/api/workflows` exposes readiness to active members.
+
+### Model-specific Distributor/Partner requests (2026-10-13)
+
+`GET /api/orders/request-models` resolves exactly one ACTIVE immediate-supplier
+agreement (Partner → Distributor, Distributor → Company) and reports installed,
+unreserved model stock less pending requests already claiming that model. Request
+creation requires a model and validates that quantity under a supplier row lock.
+Approval reserves only the order's persisted `requestedModel` and conflicts if
+that model is no longer available; the guarded update repeats the model predicate.
+Legacy requests with `requestedModel = NULL` retain their prior any-model approval
+behavior.
+
+The additive migration `20261013140000_add_order_requested_model` is required
+before deployment and has not been applied by this code change. API typecheck and
+mocked Distributor/Partner UI checks do not replace a database-backed lifecycle
+test or migration rehearsal.
+
+### Mothership gateway reorder verification (2026-10-13)
+
+The gateway screen POSTs the requested provider order through the authenticated local
+proxy. Mothership has returned both HTTP 500 and HTTP 200 without changing priorities.
+After a 2xx reorder response, the service reads the gateway list and confirms its
+priority order before reporting success; mismatch or failed verification is logged
+and returned as 502. The live write is never automatically retried. The upstream
+request contract still needs confirmation from Mothership.
 
 The independent `20260930070000_request_rejections` enum migration was applied
 to Supabase on 30 September after a local upgrade/Prisma-registration rehearsal;

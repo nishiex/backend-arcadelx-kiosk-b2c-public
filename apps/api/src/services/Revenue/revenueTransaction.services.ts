@@ -2,6 +2,56 @@ import { prisma } from "../../utils/db";
 import { z } from "zod";
 import { ensureAssignmentCovering } from "../kiosk-ownership";
 
+const paymentFeedSchema = z.object({
+  txnid: z.string().min(1),
+  device_id: z.string().min(1),
+  game_id: z.union([z.string(), z.number()]).transform(String),
+  amount: z
+    .union([z.string(), z.number()])
+    .transform(Number)
+    .pipe(z.number().finite().nonnegative()),
+  currency: z.string().min(1),
+  status: z.string().min(1),
+  provider: z.string().nullish(),
+  qr_id: z.string().nullish(),
+  created_at: z.coerce.date().transform((date) => date.toISOString()),
+  updated_at: z.coerce.date().transform((date) => date.toISOString()),
+});
+
+export type MothershipPayment = z.infer<typeof paymentFeedSchema>;
+
+async function fetchPaymentRecords(): Promise<unknown[]> {
+  const url =
+    process.env.MOTHERSHIP_TRANSACTION_API_URL ||
+    "https://main.arcadelx.games/api/v1/payments";
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error("Transaction source returned HTTP " + response.status);
+  const payload: unknown = await response.json();
+  const records: unknown = Array.isArray(payload)
+    ? payload
+    : (payload as { data?: unknown } | null)?.data ?? null;
+  if (!Array.isArray(records)) throw new Error("Expected a transaction array");
+  return records;
+}
+
+/** Read and validate the current upstream payment feed without importing or mutating data. */
+export async function getMothershipPayments(): Promise<{
+  total: number;
+  payments: MothershipPayment[];
+  fetchedAt: string;
+}> {
+  const records = await fetchPaymentRecords();
+  const parsed = z.array(paymentFeedSchema).safeParse(records);
+  if (!parsed.success) {
+    throw new Error(`Payment source returned invalid records (${parsed.error.issues.length})`);
+  }
+  return {
+    total: parsed.data.length,
+    payments: parsed.data,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 const recordSchema = z.object({
   txnid: z.string().min(1),
   device_id: z.string().min(1),
@@ -20,20 +70,7 @@ export async function syncRevenueData() {
     invalidCount = 0;
   let failure: string | null = null;
   try {
-    const url = process.env.MOTHERSHIP_TRANSACTION_API_URL;
-    if (!url) throw new Error("Transaction source is not configured");
-    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    if (!response.ok)
-      throw new Error("Transaction source returned HTTP " + response.status);
-    const payload: unknown = await response.json();
-    // Accept both a bare array and a `{ data: [...] }` envelope: the configured
-    // payment feed wraps its rows alongside status/total. Anything else is still
-    // rejected rather than silently treated as no records.
-    const records: unknown = Array.isArray(payload)
-      ? payload
-      : (payload as { data?: unknown } | null)?.data ?? null;
-    if (!Array.isArray(records))
-      throw new Error("Expected a transaction array");
+    const records = await fetchPaymentRecords();
     totalRecordsFetched = records.length;
     const kiosks = await prisma.kiosk.findMany({
       select: { id: true, machineCode: true, externalDeviceId: true, currentOrgId: true },
@@ -49,7 +86,7 @@ export async function syncRevenueData() {
         invalidCount++;
         continue;
       }
-      if (input.status !== "completed") continue;
+      if (!("status" in input) || input.status !== "completed") continue;
       const parsed = recordSchema.safeParse(input);
       if (!parsed.success) {
         invalidCount++;

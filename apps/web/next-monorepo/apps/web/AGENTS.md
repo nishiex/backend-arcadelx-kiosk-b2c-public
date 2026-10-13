@@ -329,6 +329,10 @@ in Company, Distributor and Partner organizations. `useMe().canViewRevenue`
 matches the backend role gate. RevenueScreen uses the authenticated fetch wrapper
 and user/organization/role-scoped React Query keys with 60-second freshness.
 Company OWNER/ADMIN can edit rates; other authorized roles have read-only access.
+Company OWNER/ADMIN can also fetch and view the live Mothership payment feed from
+`/revenue`; this calls the authenticated read-only `GET /api/revenue/payments` route.
+The feed is displayed separately from ledger totals (including pending statuses) and
+is not imported into the ledger.
 Keep gross revenue separate from statement payouts; no statement download API
 is currently exposed. `scripts/revenue-ui-check.tsx` verifies rendering, navigation
 cache, permissions, rate validation/saving and errors using mocked HTTP. See
@@ -368,26 +372,25 @@ mocked HTTP (jsdom installed under the temp `arcadelx-ui-tests` folder). It is n
 a connected-browser visual test. Keep permission gates and safe org-scoped
 query keys when changing these screens.
 
-## Distributor kiosk requests (2026-10-01)
+## Model-specific distributor and partner orders (2026-10-13)
 
-Frontend update (2026-10-05): the action is now labeled Request Containers,
-with Number of containers (1–50) and Model type (draft). Model entry is transient
-form state only: it is explicitly not saved or sent to the Company, and resets
-when the form reopens. The existing quantity-only payload, authorization and
-workflow-readiness gates are unchanged. Targeted lint passed; full typecheck
-still reports the pre-existing dashboard/ui.tsx KioskStatus mismatch. Updated
-component assertions have not been rerun because the test helper is blocked by
-the sandbox and the approval service failed in this session.
+Active Distributor/Partner OWNER/ADMIN members request only from their immediate
+supplier (Distributor → Company; Partner → Distributor). The dialog fetches live
+installed, unreserved model counts from `GET /api/orders/request-models`; it
+requires a model, disables models with no available stock, and blocks quantities
+above the selected model's count. The request sends `type: REQUEST`, `quantity`,
+and `model`. The API independently validates stock and accounts for outstanding
+requests, so bypassing the UI cannot request unavailable models.
 
-Orders exposes Request Kiosks to active Distributor Owners/Admins. The dialog
-resolves eligible Companies across every page of active agreements and network
-connections, checks the current Distributor is the child/receiver, and submits
-`POST /api/orders/create` with `type: REQUEST`, `targetOrgId` and integer quantity
-1–50. Workflow readiness must allow `orderDecisions`; unknown/error/unavailable
-readiness blocks creation. The deployed lifecycle migration is still required
-before this control can enable. Success clears filters and refreshes scoped orders.
+Approval rechecks and reserves only the persisted requested model. It must fail
+with a conflict if that model's stock is no longer sufficient; it cannot silently
+substitute a different model. Existing orders with no `requestedModel` retain
+legacy any-model approval behavior. The additive migration
+`20261013140000_add_order_requested_model` must be applied before deploying this
+code; do not claim the feature is deployed while it remains unapplied.
 
-`scripts/order-request-ui-check.tsx` exercises the real components with mocked HTTP
-and the same temporary jsdom installation as the decision checks. It covers
-relationship pagination, permissions, validation, readiness, failures, duplicate
-submits and successful list refresh without writing to a live API or database.
+`scripts/order-model-availability-check.tsx` tests model availability, required
+selection, quantity limits, request payloads for Distributor and Partner contexts,
+and stale-stock rejection using mocked HTTP. `scripts/order-request-ui-check.tsx`
+also covers role gates, supplier identity, and model-bearing request submissions.
+Both checks are local-only and do not write to a live API or database.

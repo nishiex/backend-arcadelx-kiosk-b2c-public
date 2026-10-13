@@ -26,6 +26,7 @@ const reserveKiosks = async (
   orgId: string,
   quantity: number,
   orderId: string,
+  model?: string,
 ) => {
   // Only INSTALLED kiosks may be reserved.
   //
@@ -44,23 +45,33 @@ const reserveKiosks = async (
   // FOR UPDATE SKIP LOCKED makes the availability check atomic: two concurrent orders
   // cannot select the same row, and the guarded updateMany below re-checks the same
   // predicate so a row that changed between SELECT and UPDATE cannot slip through.
-  const kiosks = await tx.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL
-    ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
+  const kiosks = model
+    ? await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL AND model=${model}
+        ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`
+    : await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL
+        ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
   if (kiosks.length !== quantity) {
-    // Distinguish "none installed yet" from "installed but already committed", so the
-    // operator knows whether to pair hardware or wait for stock to free up.
-    const [installedTotal] = await tx.$queryRaw<{ n: bigint }[]>`
-      SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED'`;
+    // Distinguish missing model stock from stock that is already committed.
+    const [installedTotal] = model
+      ? await tx.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND model=${model}`
+      : await tx.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED'`;
     if (Number(installedTotal?.n ?? 0) === 0) {
       throw new ApiError(
         409,
-        "No installed kiosks are available to reserve. A kiosk becomes reservable only after its hardware is paired (status INSTALLED).",
+        model
+          ? `No installed kiosks of model "${model}" are available from this supplier.`
+          : "No installed kiosks are available to reserve. A kiosk becomes reservable only after its hardware is paired (status INSTALLED).",
       );
     }
     throw new ApiError(
       409,
-      "Insufficient installed, unreserved inventory; retry if another allocation is in progress",
+      model
+        ? `Insufficient installed, unreserved kiosks of model "${model}"; retry if another allocation is in progress.`
+        : "Insufficient installed, unreserved inventory; retry if another allocation is in progress",
     );
   }
   const ids = kiosks.map((k) => k.id);
@@ -70,6 +81,7 @@ const reserveKiosks = async (
       currentOrgId: orgId,
       status: "INSTALLED",
       reservedOrderId: null,
+      ...(model ? { model } : {}),
     },
     data: { status: "RESERVED", reservedOrderId: orderId },
   });
@@ -79,6 +91,142 @@ const reserveKiosks = async (
     data: ids.map((kioskId) => ({ orderId, kioskId })),
   });
 };
+
+const getRequestSupplier = async (
+  tx: Prisma.TransactionClient,
+  childOrgId: string,
+  childOrgType: string,
+) => {
+  const parentType =
+    childOrgType === "PARTNER"
+      ? "DISTRIBUTOR"
+      : childOrgType === "DISTRIBUTOR"
+        ? "COMPANY"
+        : null;
+  if (!parentType) {
+    throw new ApiError(403, "Only Partners and Distributors can request kiosks");
+  }
+  const agreements = await tx.agreement.findMany({
+    where: {
+      childOrgId,
+      status: "ACTIVE",
+      parentOrg: { is: { type: parentType } },
+    },
+    include: { parentOrg: { select: { id: true, name: true, type: true } } },
+  });
+  if (agreements.length === 0) {
+    throw new ApiError(
+      403,
+      "Cannot create request: No active agreement with the required immediate supplier found",
+    );
+  }
+  if (agreements.length > 1) {
+    throw new ApiError(
+      409,
+      "Multiple active supplier agreements found; contact support before requesting kiosks",
+    );
+  }
+  return agreements[0]!;
+};
+
+const assertRequestModelAvailable = async (
+  tx: Prisma.TransactionClient,
+  supplierOrgId: string,
+  model: string,
+  quantity: number,
+) => {
+  // Serialize requests and approvals for one supplier so multiple requests cannot
+  // independently claim the same unreserved model inventory.
+  await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${supplierOrgId} FOR UPDATE`;
+  const available = await tx.kiosk.count({
+    where: {
+      currentOrgId: supplierOrgId,
+      status: "INSTALLED",
+      reservedOrderId: null,
+      model,
+    },
+  });
+  const pending = await tx.order.aggregate({
+    where: {
+      parentOrgId: supplierOrgId,
+      type: "REQUEST",
+      status: "UNDER_REVIEW",
+      requestedModel: model,
+    },
+    _sum: { quantity: true },
+  });
+  const remaining = Math.max(0, available - (pending._sum.quantity ?? 0));
+  if (remaining < quantity) {
+    throw new ApiError(
+      409,
+      `Only ${remaining} unreserved installed kiosk(s) of model "${model}" are available from this supplier; requested ${quantity}.`,
+      { model, available, pendingRequests: pending._sum.quantity ?? 0 },
+    );
+  }
+};
+
+export const getRequestModelAvailability = asyncHandler(async (req, res) => {
+  await requireWorkflow("orderDecisions");
+  const requesterOrgId = req.membership!.organizationId;
+  const requesterOrgType = req.membership!.type;
+  const result = await prisma.$transaction(async (tx) => {
+    const agreement = await getRequestSupplier(
+      tx,
+      requesterOrgId,
+      requesterOrgType,
+    );
+    const [inventory, pending] = await Promise.all([
+      tx.kiosk.groupBy({
+        by: ["model"],
+        where: {
+          currentOrgId: agreement.parentOrgId,
+          status: "INSTALLED",
+          reservedOrderId: null,
+        },
+        _count: { _all: true },
+      }),
+      tx.order.groupBy({
+        by: ["requestedModel"],
+        where: {
+          parentOrgId: agreement.parentOrgId,
+          type: "REQUEST",
+          status: "UNDER_REVIEW",
+          requestedModel: { not: null },
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+    const pendingByModel = new Map(
+      pending.map((row) => [
+        row.requestedModel!,
+        row._sum.quantity ?? 0,
+      ]),
+    );
+    return {
+      supplier: agreement.parentOrg,
+      models: inventory
+        .flatMap((row) =>
+          row.model === null
+            ? []
+            : [{
+                model: row.model,
+                availableQuantity: Math.max(
+                  0,
+                  row._count._all - (pendingByModel.get(row.model) ?? 0),
+                ),
+              }],
+        )
+        .sort((a, b) => a.model.localeCompare(b.model)),
+    };
+  });
+  res.json(
+    new ApiResponse(
+      200,
+      result,
+      "Request model availability fetched successfully",
+    ),
+  );
+});
 
 async function lockedOrder(
   tx: Prisma.TransactionClient,
@@ -165,21 +313,15 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   let parentOrgId: string;
   let childOrgId: string;
+  let requestSupplierId: string | null = null;
 
   if (parsed.type === 'REQUEST') {
-    // Supplier is looked up via the active agreement.
-    // The client does not supply a targetOrgId for REQUEST orders.
     childOrgId = currentOrgId;
-    const supplierAgreement = await prisma.agreement.findFirst({
-      where: { childOrgId, status: 'ACTIVE' },
-      include: { parentOrg: { select: { id: true, type: true } } },
-    });
-    if (!supplierAgreement)
-      throw new ApiError(
-        403,
-        'Cannot create request: No active agreement with a supplier found',
-      );
+    const supplierAgreement = await prisma.$transaction((tx) =>
+      getRequestSupplier(tx, childOrgId, currentOrgType),
+    );
     parentOrgId = supplierAgreement.parentOrg.id;
+    requestSupplierId = parentOrgId;
   } else {
     // ALLOCATION: Company or Distributor pushes kiosks down to a child org.
     parentOrgId = currentOrgId;
@@ -206,6 +348,14 @@ export const createOrder = asyncHandler(async (req, res) => {
     });
     if (agreement.status !== 'ACTIVE')
       throw new ApiError(403, 'Agreement is no longer active');
+    if (parsed.type === "REQUEST") {
+      await assertRequestModelAvailable(
+        tx,
+        requestSupplierId!,
+        parsed.model,
+        parsed.quantity,
+      );
+    }
     const year = new Date().getFullYear();
     const sequence = await tx.$queryRaw<
       [{ value: number }]
@@ -231,6 +381,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         childOrgId,
         agreementId: agreement.id,
         quantity: parsed.quantity,
+        requestedModel: parsed.type === "REQUEST" ? parsed.model : parsed.model ?? null,
         depositPerMachine,
         nonRefundablePerMachine,
         totalDeposit,
@@ -240,7 +391,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       },
     });
     if (parsed.type === 'ALLOCATION') {
-      await reserveKiosks(tx, parentOrgId, parsed.quantity, row.id);
+      await reserveKiosks(tx, parentOrgId, parsed.quantity, row.id, parsed.model);
       await queueInvoice(tx, parentOrgId, row.id);
     }
     return row;
@@ -279,7 +430,8 @@ export const approveOrder = asyncHandler(async (req, res) => {
         400,
         `Cannot approve an order that is currently ${order.status}`,
       );
-    await reserveKiosks(tx, order.parentOrgId, order.quantity, id);
+    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${order.parentOrgId} FOR UPDATE`;
+    await reserveKiosks(tx, order.parentOrgId, order.quantity, id, order.requestedModel ?? undefined);
     await tx.order.update({
       where: { id },
       data: { status: "APPROVED", paymentStatus: "PENDING" },

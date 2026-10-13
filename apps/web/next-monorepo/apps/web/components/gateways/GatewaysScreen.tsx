@@ -64,10 +64,17 @@ export default function GatewaysScreen() {
   })
 
   const reorder = useMutation({
-    mutationFn: (order: string[]) => reorderGateways(order),
+    mutationFn: (gateways: { provider: string; priority: number }[]) =>
+      reorderGateways(gateways),
     onSuccess: () => {
       toast.success("Gateway priority updated")
       void invalidate()
+    },
+    onError: (error, requestedGateways) => {
+      console.error("[gateways] priority reorder failed", {
+        requestedGateways,
+        error: error.message,
+      })
     },
   })
 
@@ -85,7 +92,9 @@ export default function GatewaysScreen() {
     if (!a || !b) return
     next[index] = b
     next[target] = a
-    reorder.mutate(next.map((g) => g.provider))
+    // Assign sequential priorities (1-based) from the new array positions so
+    // Mothership receives an unambiguous { gateways: [{ provider, priority }] }.
+    reorder.mutate(next.map((g, i) => ({ provider: g.provider, priority: i + 1 })))
   }
 
   if (isLoading) {

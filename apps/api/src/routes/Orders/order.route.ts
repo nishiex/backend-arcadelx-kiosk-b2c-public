@@ -17,6 +17,7 @@ import {
   dispatchOrder,
   deliverOrder,
   retryOrderInvoice,
+  getRequestModelAvailability,
 } from "../../controllers/Orders/orders.controller";
 
 const router = Router();
@@ -25,6 +26,12 @@ router.use(requireAuth, loadMembership);
 
 // Get orders / requests for current organization
 router.get("/", getOrderRequests);
+router.get(
+  "/request-models",
+  requireOrgType("DISTRIBUTOR", "PARTNER"),
+  requireRole("OWNER", "ADMIN"),
+  getRequestModelAvailability,
+);
 router.get("/:orderId", getOrderDetails);
 
 //create Orders

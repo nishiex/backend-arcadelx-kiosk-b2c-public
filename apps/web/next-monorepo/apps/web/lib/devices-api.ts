@@ -37,6 +37,44 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return ok ? fetch(input, opts) : res
 }
 
+function describeDevicePriceVerification(errors: unknown): string | null {
+  if (typeof errors !== "object" || errors === null) return null
+  const details = errors as {
+    requested?: { price?: unknown; replayPrice?: unknown }
+    observed?: {
+      price?: unknown
+      replayPrice?: unknown
+      hasOverride?: unknown
+      overridePrice?: unknown
+      overrideReplayPrice?: unknown
+      basePrice?: unknown
+      baseReplayPrice?: unknown
+    } | null
+    changedDevices?: unknown
+    fleetChanged?: unknown
+    targetVerified?: unknown
+  }
+  if (!details.requested || !("observed" in details)) return null
+
+  const requested = `requested ${String(details.requested.price)} / replay ${String(details.requested.replayPrice)}`
+  const observed = details.observed
+    ? `read back ${String(details.observed.price)} / replay ${String(details.observed.replayPrice)}, override=${String(details.observed.hasOverride)}, override price=${String(details.observed.overridePrice)}, override replay=${String(details.observed.overrideReplayPrice)}, catalog=${String(details.observed.basePrice)} / replay ${String(details.observed.baseReplayPrice)}`
+    : "the requested game was missing from the selected device readback"
+  const changedDevices = Array.isArray(details.changedDevices)
+    ? details.changedDevices.map(String).join(", ") || "none"
+    : "not available"
+  const fleetState = details.fleetChanged === true ? "device list changed" : "device list unchanged"
+
+  // A failed device write (the per-device endpoint persists nothing today) should point the
+  // operator at the explicit fleet-wide action while never taking it on their behalf.
+  const nextStep =
+    details.targetVerified === false
+      ? ' To set this price on every kiosk instead, use "Apply to all kiosks".'
+      : ""
+
+  return `Verification details: ${requested}; ${observed}; other devices changed: ${changedDevices}; ${fleetState}.${nextStep}`
+}
+
 async function handleRes<T>(res: Response): Promise<T> {
   let body: unknown = null
   try {
@@ -51,7 +89,8 @@ async function handleRes<T>(res: Response): Promise<T> {
       (res.status === 401
         ? "Your session has expired. Please log in again."
         : `Request failed (HTTP ${res.status})`)
-    throw new Error(message)
+    const details = describeDevicePriceVerification(envelope?.errors)
+    throw new Error(details ? `${message} ${details}` : message)
   }
   return envelope?.data as T
 }
@@ -104,49 +143,49 @@ export async function fetchDevicePrices(
   return handleRes<{ deviceId: string; games: GamePriceView[] }>(res)
 }
 
-/**
- * One game's price as Mothership reports it AFTER a write.
- *
- * `scope` is always `GAME_CATALOG`: Mothership's per-device price endpoint answers 200 and
- * persists nothing, so this write goes to the catalog entry instead, which means the change
- * covers that game on every kiosk. The values are re-read from Mothership by the API, so
- * they are what the fleet now charges rather than what was requested.
- */
+export type ResetDevicePricesResult = {
+  deviceId: string
+  gamesReset: number
+  scope: "DEVICE_OVERRIDES"
+}
+
 export type SetDeviceGamePriceResult = {
   deviceId: string
   gameId: string
   displayName: string
   price: number
-  replayPrice: number | null
-  scope: "GAME_CATALOG"
+  replayPrice: number
+  scope: "DEVICE_GAME_OVERRIDE" | "GAME_CATALOG"
 }
 
 /**
- * Set one game's price.
+ * Set and verify one game's price in the requested scope.
  *
- * This writes to live hardware, so the caller must confirm first. The stored price is per
- * GAME, so the change applies to every kiosk offering that game, not only the device whose
- * page the operator is on. `replay_price` is only sent when supplied, so an untouched replay
- * price cannot be read as "set it to zero".
- *
- * The API fails rather than reporting a change that did not land, so a resolved promise here
- * means Mothership confirmed the new value.
+ * `DEVICE` (the default) writes a device-only override; `GAME_CATALOG` updates the game's
+ * catalog price for every kiosk and is sent only when the operator explicitly chooses the
+ * "Apply to all kiosks" action. The API never substitutes one scope for the other.
  */
 export async function setDeviceGamePrice(
   deviceId: string,
   gameId: string,
-  price: number,
-  replayPrice?: number
+  input: { price: number; replay_price: number; scope?: "DEVICE" | "GAME_CATALOG" }
 ): Promise<SetDeviceGamePriceResult> {
   const res = await apiFetch(
     `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        replayPrice === undefined ? { price } : { price, replay_price: replayPrice }
-      ),
+      body: JSON.stringify(input),
     }
   )
   return handleRes<SetDeviceGamePriceResult>(res)
+}
+
+/** Reset only this device's overrides; the API confirms all prices returned to catalog values. */
+export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePricesResult> {
+  const res = await apiFetch(
+    `/api/devices/${encodeURIComponent(deviceId)}/prices/reset`,
+    { method: "POST" }
+  )
+  return handleRes<ResetDevicePricesResult>(res)
 }

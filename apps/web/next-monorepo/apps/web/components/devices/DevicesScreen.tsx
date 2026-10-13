@@ -8,6 +8,7 @@ import { useMe } from "@/hooks/useMe"
 import {
   fetchDevicePrices,
   fetchDevices,
+  resetDevicePrices,
   setDeviceGamePrice,
   type DeviceView,
   type GamePriceView,
@@ -26,6 +27,16 @@ const inr = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 })
 
+function gameHasOverride(game: GamePriceView): boolean {
+  return (
+    game.hasOverride ||
+    game.overridePrice !== null ||
+    game.overrideReplayPrice !== null ||
+    Math.abs(game.effectivePrice - game.basePrice) >= 0.001 ||
+    Math.abs(game.effectiveReplayPrice - game.baseReplayPrice) >= 0.001
+  )
+}
+
 const TABS = [
   { id: "fleet", label: "Fleet" },
   { id: "pricing", label: "Game pricing" },
@@ -38,15 +49,15 @@ type TabId = (typeof TABS)[number]["id"]
  *
  * Two tabs rather than one screen: "Fleet" reports hardware state (Mothership's view of
  * what exists), while "Game pricing" reports prices per device. They answer different
- * questions about the same device, and mixing them made the table unreadable. Reads are per
- * device; the write behind the price dialog is per game, which the dialog states.
+ * questions about the same device, and mixing them made the table unreadable. Reads are
+ * per device, and the default price action writes a device-only override that is read
+ * back and checked against the catalog and every other device. A separate, explicitly
+ * confirmed "Apply to all kiosks" action updates the game's catalog price for the whole
+ * fleet instead; nothing ever falls back to it automatically.
  *
- * Prices are owned by Mothership, so nothing here is optimistic: every write refetches, and
- * the API only reports success after re-reading the value it wrote. Mothership stores one
- * price per GAME, so a change made from a device's page applies to that game on every kiosk;
- * the dialog says so, because an operator would otherwise read it as one machine changing.
- * A price change alters what a deployed kiosk charges a player, so it is confirmed first
- * and the edit control is shown only to COMPANY OWNER/ADMIN, matching the API route.
+ * Prices are owned by Mothership, so nothing here is optimistic: reset refetches after the
+ * API confirms the result. Resetting overrides is device-scoped and shown only to COMPANY
+ * OWNER/ADMIN, matching the API route.
  */
 export default function DevicesScreen() {
   const { me, isLoading, canViewDevices, canManageDevicePrices } = useMe()
@@ -334,16 +345,105 @@ function GamePriceTable({
   canWrite: boolean
   onSaved: () => Promise<void>
 }) {
-  const overrides = games.filter(game => game.hasOverride).length
-  const [editing, setEditing] = React.useState<GamePriceView | null>(null)
+  const overrides = games.filter(gameHasOverride).length
+  const [confirmingReset, setConfirmingReset] = React.useState(false)
+  const [editingGame, setEditingGame] = React.useState<GamePriceView | null>(null)
+  const resetMutation = useMutation({
+    mutationFn: () => resetDevicePrices(deviceId),
+    onSuccess: async result => {
+      toast.success(
+        result.gamesReset > 0
+          ? `Reset overrides for ${result.gamesReset} games on ${deviceId}`
+          : `No price overrides to reset on ${deviceId}`
+      )
+      setConfirmingReset(false)
+      await onSaved()
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Couldn't reset device prices"),
+  })
 
   return (
     <div className="space-y-4">
-      <p role="status" className="text-sm text-muted-foreground">
-        {games.length} game{games.length === 1 ? "" : "s"} on{" "}
-        <span className="font-mono text-xs">{deviceId}</span>
-        {overrides > 0 && ` · ${overrides} with a price override`}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p role="status" className="text-sm text-muted-foreground">
+          {games.length} game{games.length === 1 ? "" : "s"} on{" "}
+          <span className="font-mono text-xs">{deviceId}</span>
+          {overrides > 0 && ` · ${overrides} with a price override`}
+        </p>
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() => setConfirmingReset(true)}
+            disabled={resetMutation.isPending || overrides === 0}
+            title={overrides === 0 ? "This device has no price overrides" : undefined}
+            className={buttonClass}
+          >
+            Reset device overrides
+          </button>
+        )}
+      </div>
+      {canWrite && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Price changes apply only to the selected device by default, and each save is read
+          back and checked against the catalog and every other device. &quot;Apply to all
+          kiosks&quot; is a separate, explicitly confirmed action that updates the
+          game&apos;s catalog price for the whole fleet.
+        </p>
+      )}
+      {canWrite && editingGame && (
+        <DeviceGamePriceEditor
+          deviceId={deviceId}
+          game={editingGame}
+          onCancel={() => setEditingGame(null)}
+          onSaved={async () => {
+            setEditingGame(null)
+            await onSaved()
+          }}
+        />
+      )}
+      {confirmingReset && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={`Reset price overrides on ${deviceId}`}
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+        >
+          <p className="text-sm">
+            Reset all {overrides} game price override{overrides === 1 ? "" : "s"} on{" "}
+            <span className="font-mono text-xs">{deviceId}</span> to their catalog prices?
+            Other devices and catalog prices will not be changed.
+          </p>
+          {resetMutation.isError && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {resetMutation.error instanceof Error
+                ? resetMutation.error.message
+                : "Couldn't reset device prices"}
+            </p>
+          )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingReset(false)
+                resetMutation.reset()
+              }}
+              disabled={resetMutation.isPending}
+              className={buttonClass}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => resetMutation.mutate()}
+              disabled={resetMutation.isPending}
+              className="rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50"
+            >
+              {resetMutation.isPending ? "Resetting…" : "Confirm reset"}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -367,7 +467,7 @@ function GamePriceTable({
                   {inr.format(game.effectiveReplayPrice)}
                 </td>
                 <td className="px-4 py-3">
-                  {game.hasOverride ? (
+                  {gameHasOverride(game) ? (
                     <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                       Override
                     </span>
@@ -379,9 +479,10 @@ function GamePriceTable({
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
-                      aria-label={`Change price for ${game.displayName} on ${deviceId}`}
-                      onClick={() => setEditing(game)}
-                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                      aria-label={`Change ${game.displayName} price on ${deviceId}`}
+                      onClick={() => setEditingGame(game)}
+                      disabled={resetMutation.isPending}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                     >
                       Change price
                     </button>
@@ -392,160 +493,193 @@ function GamePriceTable({
           </tbody>
         </table>
       </div>
-      {editing && (
-        <PriceDialog
-          deviceId={deviceId}
-          game={editing}
-          onClose={() => setEditing(null)}
-          onSaved={onSaved}
-        />
-      )}
     </div>
   )
 }
 
-/**
- * Price editor for one game on one device.
- *
- * The change is confirmed explicitly because it alters what a physically deployed kiosk
- * charges. The entered numbers are echoed back in the confirmation so the operator
- * confirms actual values rather than "the form".
- */
-function PriceDialog({
+function DeviceGamePriceEditor({
   deviceId,
   game,
-  onClose,
+  onCancel,
   onSaved,
 }: {
   deviceId: string
   game: GamePriceView
-  onClose: () => void
+  onCancel: () => void
   onSaved: () => Promise<void>
 }) {
   const [price, setPrice] = React.useState(String(game.effectivePrice))
-  const [replay, setReplay] = React.useState(String(game.effectiveReplayPrice))
-  const [confirming, setConfirming] = React.useState(false)
+  const [replayPrice, setReplayPrice] = React.useState(String(game.effectiveReplayPrice))
+  const [confirmingCatalog, setConfirmingCatalog] = React.useState(false)
 
-  const priceValue = Number(price)
-  const replayValue = Number(replay)
-  const priceValid = price.trim() !== "" && Number.isFinite(priceValue) && priceValue >= 0
-  const replayValid = replay.trim() !== "" && Number.isFinite(replayValue) && replayValue >= 0
+  const priceValid =
+    price.trim() !== "" &&
+    replayPrice.trim() !== "" &&
+    Number.isFinite(Number(price)) &&
+    Number.isFinite(Number(replayPrice)) &&
+    Number(price) >= 0 &&
+    Number(replayPrice) >= 0 &&
+    Number(price) <= 100000 &&
+    Number(replayPrice) <= 100000
 
-  const mutation = useMutation({
+  // Device scope is the default: it changes only this kiosk and is verified against the
+  // catalog and every other device. The catalog scope is a separate action, sent only when
+  // the operator confirms it; the form never switches between the two on its own.
+  const deviceMutation = useMutation({
     mutationFn: () =>
-      setDeviceGamePrice(deviceId, game.gameId, priceValue, replayValid ? replayValue : undefined),
+      setDeviceGamePrice(deviceId, game.gameId, {
+        price: Number(price),
+        replay_price: Number(replayPrice),
+        scope: "DEVICE",
+      }),
     onSuccess: async result => {
-      toast.success(`${result.displayName} is now ${inr.format(result.price)} on every kiosk`)
+      toast.success(
+        `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+      )
       await onSaved()
-      onClose()
     },
     onError: (error: unknown) =>
-      toast.error(error instanceof Error ? error.message : "Couldn't update the price"),
+      toast.error(error instanceof Error ? error.message : "Couldn't update device price"),
+  })
+  const catalogMutation = useMutation({
+    mutationFn: () =>
+      setDeviceGamePrice(deviceId, game.gameId, {
+        price: Number(price),
+        replay_price: Number(replayPrice),
+        scope: "GAME_CATALOG",
+      }),
+    onSuccess: async result => {
+      toast.success(
+        `${result.displayName} applied to all kiosks through the catalog: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+      )
+      await onSaved()
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Couldn't update the catalog price"),
   })
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Change price for ${game.displayName}`}
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl"
-      >
-        <h2 className="text-lg font-semibold">Change price?</h2>
-        <p className="mt-1 font-mono text-xs text-muted-foreground">
-          {deviceId} · {game.gameId}
-        </p>
-        <p className="mt-3 text-sm text-muted-foreground">
-          This sets the price for <span className="font-medium">{game.displayName}</span> on live
-          hardware. Mothership keeps one price per game, so it applies to{" "}
-          <span className="font-medium">every kiosk</span> offering it — not only{" "}
-          <span className="font-mono text-xs">{deviceId}</span>.
-        </p>
+  const pending = deviceMutation.isPending || catalogMutation.isPending
+  const activeError = catalogMutation.error ?? deviceMutation.error
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="price" className="mb-1.5 block text-sm font-medium">
-              Price (₹)
-            </label>
-            <input
-              id="price"
-              type="number"
-              min={0}
-              step="0.01"
-              className={inputClass}
-              value={price}
-              disabled={mutation.isPending}
-              onChange={event => setPrice(event.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="replay" className="mb-1.5 block text-sm font-medium">
-              Replay price (₹)
-            </label>
-            <input
-              id="replay"
-              type="number"
-              min={0}
-              step="0.01"
-              className={inputClass}
-              value={replay}
-              disabled={mutation.isPending}
-              onChange={event => setReplay(event.target.value)}
-            />
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Change ${game.displayName} price on ${deviceId}`}
+      className="rounded-xl border border-primary/30 bg-muted/30 p-4"
+    >
+      <div className="mb-3">
+        <h3 className="font-medium">Change game price</h3>
+        <p className="text-sm text-muted-foreground">
+          Only <span className="font-mono text-xs">{deviceId}</span> will be updated. Other
+          devices and the catalog will be checked and must remain unchanged.
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use &quot;Apply to all kiosks&quot; to change the game&apos;s catalog price for
+          every kiosk instead.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1.5 text-sm">
+          <span>Price (INR)</span>
+          <input
+            type="number"
+            min="0"
+            max="100000"
+            step="any"
+            required
+            className={inputClass}
+            value={price}
+            onChange={event => setPrice(event.target.value)}
+          />
+        </label>
+        <label className="space-y-1.5 text-sm">
+          <span>Replay price (INR)</span>
+          <input
+            type="number"
+            min="0"
+            max="100000"
+            step="any"
+            required
+            className={inputClass}
+            value={replayPrice}
+            onChange={event => setReplayPrice(event.target.value)}
+          />
+        </label>
+      </div>
+      {(catalogMutation.isError || deviceMutation.isError) && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {activeError instanceof Error
+            ? activeError.message
+            : "Couldn't verify the price update"}
+        </p>
+      )}
+      {confirmingCatalog ? (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={`Apply ${game.displayName} to all kiosks`}
+          className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+        >
+          <p className="text-sm">
+            Apply {game.displayName} to all kiosks? This sets the game&apos;s catalog price to{" "}
+            {inr.format(Number(price))} first play / {inr.format(Number(replayPrice))} replay,
+            and every kiosk offering it picks that up. It cannot be limited to{" "}
+            <span className="font-mono text-xs">{deviceId}</span>.
+          </p>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingCatalog(false)
+                catalogMutation.reset()
+              }}
+              disabled={pending}
+              className={buttonClass}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              onClick={() => catalogMutation.mutate()}
+              disabled={pending || !priceValid}
+            >
+              {catalogMutation.isPending ? "Applying…" : "Apply to all kiosks"}
+            </button>
           </div>
         </div>
-
-        {confirming && (
-          <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-            Confirm: set <span className="font-medium">{game.displayName}</span> to{" "}
-            <span className="font-semibold">{inr.format(priceValue)}</span>
-            {replayValid && (
-              <>
-                {" "}
-                and replay to <span className="font-semibold">{inr.format(replayValue)}</span>
-              </>
-            )}{" "}
-            on <span className="font-medium">every kiosk</span> (Mothership stores one price per
-            game).
-          </p>
-        )}
-
-        {mutation.isError && (
-          <p role="alert" className="mt-4 text-sm text-destructive">
-            {(mutation.error as Error).message}
-          </p>
-        )}
-
-        <div className="mt-6 flex justify-end gap-3">
+      ) : (
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
-            disabled={mutation.isPending}
-            className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
+            className={buttonClass}
+            onClick={onCancel}
+            disabled={pending}
           >
             Cancel
           </button>
-          {!confirming ? (
-            <button
-              type="button"
-              disabled={!priceValid || !replayValid}
-              onClick={() => setConfirming(true)}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              Review change
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={mutation.isPending || !priceValid || !replayValid}
-              onClick={() => mutation.mutate()}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              {mutation.isPending ? "Saving…" : "Confirm change"}
-            </button>
-          )}
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => {
+              deviceMutation.reset()
+              setConfirmingCatalog(true)
+            }}
+            disabled={pending || !priceValid}
+          >
+            Apply to all kiosks
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            onClick={() => deviceMutation.mutate()}
+            disabled={pending || !priceValid}
+          >
+            {deviceMutation.isPending ? "Verifying…" : "Save device price"}
+          </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }

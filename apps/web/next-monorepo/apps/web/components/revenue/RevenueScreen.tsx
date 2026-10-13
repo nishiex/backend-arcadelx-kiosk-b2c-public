@@ -2,12 +2,13 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { RefreshCw } from "lucide-react"
+import { Download, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
   fetchDeductionRates,
   fetchMachineRevenue,
+  fetchMothershipPayments,
   updateDeductionRates,
   type DeductionRates,
 } from "@/lib/backend-api"
@@ -161,6 +162,13 @@ export default function RevenueScreen() {
   })
   const canEdit =
     canViewRevenue && isCompany && (role === "OWNER" || role === "ADMIN")
+  const payments = useQuery({
+    queryKey: ["mothership-payments", ...scope],
+    queryFn: fetchMothershipPayments,
+    enabled: canEdit,
+    staleTime: 30_000,
+    retry: 1,
+  })
   if (isLoading)
     return (
       <div aria-label="Loading revenue" className="space-y-4">
@@ -182,7 +190,8 @@ export default function RevenueScreen() {
       (value) => value.toLowerCase().includes(search.trim().toLowerCase())
     )
   )
-  const refreshing = revenue.isFetching || rates.isFetching
+  const refreshing =
+    revenue.isFetching || rates.isFetching || payments.isFetching
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -193,19 +202,34 @@ export default function RevenueScreen() {
             follow India Standard Time.
           </p>
         </div>
-        <button
-          className={buttonClass}
-          disabled={refreshing || editing}
-          onClick={() => {
-            void revenue.refetch()
-            void rates.refetch()
-          }}
-        >
-          <span className="flex items-center gap-2">
-            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canEdit && (
+            <button
+              className={buttonClass}
+              disabled={refreshing || editing}
+              onClick={() => void payments.refetch()}
+            >
+              <span className="flex items-center gap-2">
+                <Download size={16} className={payments.isFetching ? "animate-pulse" : ""} />
+                {payments.isFetching ? "Fetching payments…" : "Fetch latest payments"}
+              </span>
+            </button>
+          )}
+          <button
+            className={buttonClass}
+            disabled={refreshing || editing}
+            onClick={() => {
+              void revenue.refetch()
+              void rates.refetch()
+              if (canEdit) void payments.refetch()
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </span>
+          </button>
+        </div>
       </header>
       {revenue.isPending ? (
         <Skeleton className="h-64 w-full" />
@@ -318,6 +342,75 @@ export default function RevenueScreen() {
             )}
           </Panel>
         </>
+      )}
+      {canEdit && (
+        <Panel
+          title="Mothership payments"
+          subtitle="Live payment feed. These records are shown as received and are not imported into revenue totals."
+        >
+          {payments.isPending ? (
+            <Skeleton className="h-16 w-full" />
+          ) : payments.isError ? (
+            <ErrorState
+              message={payments.error.message}
+              onRetry={() => void payments.refetch()}
+            />
+          ) : !payments.data.payments.length ? (
+            <EmptyState message="No payments were returned by Mothership." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm whitespace-nowrap">
+                <caption className="sr-only">
+                  Mothership payment records. Payment statuses are not revenue totals.
+                </caption>
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    {["Date", "Transaction", "Device", "Game", "Amount", "Status", "Provider"].map(
+                      (label) => (
+                        <th scope="col" key={label} className="px-3 py-3 font-medium">
+                          {label}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.data.payments.map((payment) => (
+                    <tr
+                      key={payment.txnid}
+                      className="border-b border-border/60 last:border-0"
+                    >
+                      <td className="px-3 py-3">
+                        {new Date(payment.created_at).toLocaleString("en-IN", {
+                          timeZone: "Asia/Kolkata",
+                        })}
+                      </td>
+                      <th scope="row" className="px-3 py-3 text-left font-medium">
+                        {payment.txnid}
+                      </th>
+                      <td className="px-3 py-3">{payment.device_id}</td>
+                      <td className="px-3 py-3">{payment.game_id}</td>
+                      <td className="px-3 py-3 tabular-nums">
+                        {new Intl.NumberFormat("en-IN", {
+                          style: "currency",
+                          currency: payment.currency,
+                        }).format(payment.amount)}
+                      </td>
+                      <td className="px-3 py-3">{payment.status}</td>
+                      <td className="px-3 py-3">{payment.provider ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {payments.data.total} payments · fetched{" "}
+                {new Date(payments.data.fetchedAt).toLocaleString("en-IN", {
+                  timeZone: "Asia/Kolkata",
+                })}
+              </p>
+            </div>
+          )}
+        </Panel>
       )}
       <Panel
         title="Deduction rates"

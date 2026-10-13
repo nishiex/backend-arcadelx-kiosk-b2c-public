@@ -44,21 +44,32 @@ export const UpsertGatewaySchema = z
 export type UpsertGatewayInput = z.infer<typeof UpsertGatewaySchema>;
 
 /** `POST /gateways/reorder` — set the routing priority order. */
+export const ReorderGatewayItemSchema = z.object({
+  provider: z.string().min(1).max(64),
+  /** Desired priority value (1-based; lower wins). */
+  priority: z.number().int().positive(),
+});
+
 export const ReorderGatewaysSchema = z
   .object({
     /**
-     * Providers in the desired order. Each must appear exactly once: a permutation
-     * with a duplicate or a missing provider would otherwise leave priority
-     * ambiguous, and priority decides which gateway takes a live payment.
+     * Mothership's confirmed contract (probed 2026-10-13): the body must be
+     * `{ gateways: [{ provider, priority }, ...] }`.  An earlier `{ order: string[] }`
+     * assumption always returned HTTP 500 from Mothership.  Each provider must appear
+     * exactly once; duplicates would make the resulting order ambiguous.
      */
-    order: z
-      .array(z.string().min(1).max(64))
+    gateways: z
+      .array(ReorderGatewayItemSchema)
       .min(1)
       .max(50)
-      .refine((list) => new Set(list).size === list.length, 'Providers must be unique'),
+      .refine(
+        (list) => new Set(list.map((g) => g.provider)).size === list.length,
+        'Providers must be unique',
+      ),
   })
   .strict();
 
+export type ReorderGatewayItem = z.infer<typeof ReorderGatewayItemSchema>;
 export type ReorderGatewaysInput = z.infer<typeof ReorderGatewaysSchema>;
 
 /** `POST /gateways/toggle` — enable or disable one provider. */

@@ -45,9 +45,10 @@ export default function OrderDetailsDialog({ order, organizationId }: { order: K
                   <div><p className="font-medium">{orderPerspective(data, organizationId).counterparty.name}</p><p className="mt-1 text-sm text-muted-foreground">{orderPerspective(data, organizationId).flow}</p></div>
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[data.status]}`}>{ORDER_STATUS_LABELS[data.status]}</span>
                 </div>
-                <dl className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/20 p-4 text-sm sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/20 p-4 text-sm sm:grid-cols-5">
                   <div><dt className="text-muted-foreground">Type</dt><dd className="mt-1 font-medium">{data.type === "REQUEST" ? "Machine request" : "Machine allocation"}</dd></div>
                   <div><dt className="text-muted-foreground">Quantity</dt><dd className="mt-1 font-medium">{data.quantity}</dd></div>
+                  <div><dt className="text-muted-foreground">Requested model</dt><dd className="mt-1 font-medium">{data.requestedModel ?? "Any model"}</dd></div>
                   <div><dt className="text-muted-foreground">Payment</dt><dd className="mt-1 font-medium">{data.paymentStatus.charAt(0) + data.paymentStatus.slice(1).toLowerCase()}</dd></div>
                   <div><dt className="text-muted-foreground">Created</dt><dd className="mt-1 font-medium">{orderDate(data.createdAt)}</dd></div>
                 </dl>

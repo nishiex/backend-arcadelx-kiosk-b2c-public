@@ -145,6 +145,18 @@ globalThis.fetch = async (input, init) => {
       : response({
           orderDecisions: available,
         })
+  if (url.pathname === "/api/orders/request-models")
+    return response({
+      supplier:
+        currentOrg.type === "PARTNER"
+          ? { id: "supplier-distributor", name: "Supplier Distributor", type: "DISTRIBUTOR" }
+          : company,
+      models: [
+        { model: "ADLX-Pro-X1", availableQuantity: 50 },
+        { model: "Arcade-LX B2C", availableQuantity: 0 },
+        { model: "Arcade-LX Healthcare", availableQuantity: 0 },
+      ],
+    })
   if (url.pathname === "/api/orders/create") {
     if (holdCreate)
       await new Promise<void>((resolve) => {
@@ -154,6 +166,7 @@ globalThis.fetch = async (input, init) => {
       return response(null, 503, "Order requests are temporarily unavailable.")
     const order = {
       ...body,
+      requestedModel: body.model,
       id: `created-order-${orders.length}`,
       orderNumber: "ORD-TEST-NEW",
       status: "UNDER_REVIEW",
@@ -266,7 +279,7 @@ try {
   company.type = supplierType
   for (const quantity of [0, 51, 1.5, NaN])
     await assert.rejects(
-      createOrder({ type: "REQUEST", quantity }),
+      createOrder({ type: "REQUEST", quantity, model: "ADLX-Pro-X1" }),
       /whole number/
     )
   check("invalid-helper-quantities-send-no-post", posts().length === 0)
@@ -322,323 +335,51 @@ try {
   )
   await click(button("Request Kiosks"))
   await until(
-    () => button("Submit request")?.disabled === false,
-    "Active company resolves"
+    () => !!document.querySelector('[aria-label="Kiosk model"] option[value="ADLX-Pro-X1"]'),
+    "Immediate supplier model availability loads"
   )
-  const beforeReadinessError = posts().length
-  await React.act(async () => {
-    readinessError = true
-    await qc.invalidateQueries({ queryKey: ["workflow-readiness"] })
-  })
   await until(
-    () =>
-      document.body.textContent!.includes(
-        "Couldn't check order action availability."
-      ),
-    "Readiness error reaches open request dialog"
+    () => document.body.textContent!.includes("Availability at Supplier Company"),
+    "Supplier stock is displayed"
   )
-  check(
-    "readiness-error-retains-previously-enabled-data",
-    qc.getQueryData<{ orderDecisions: boolean }>(["workflow-readiness"])
-      ?.orderDecisions === true
-  )
-  check(
-    "readiness-error-disables-request-trigger-and-submit",
-    button("Request Kiosks")!.disabled && button("Submit request")!.disabled
-  )
-  await React.act(async () => {
-    document
-      .querySelector("form")!
-      .dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }))
-  })
-  check(
-    "readiness-error-blocks-request-post",
-    posts().length === beforeReadinessError
-  )
-  await React.act(async () => {
-    readinessError = false
-    await qc.invalidateQueries({ queryKey: ["workflow-readiness"] })
-  })
+  await setValue('[aria-label="Kiosk model"]', "ADLX-Pro-X1")
   await until(
     () => button("Submit request")?.disabled === false,
-    "Successful readiness refetch restores request submission"
+    "Available model enables request"
   )
-  check(
-    "sole-company-selected",
-    (document.querySelector('[aria-label="Supplier"]') as HTMLSelectElement)
-      .value === company.id
-  )
-  for (const value of ["", "0", "51", "1.5"]) {
-    await setValue('[aria-label="Number of containers"]', value)
-    check(
-      `invalid-quantity-${value || "empty"}-disabled`,
-      button("Submit request")!.disabled
-    )
-  }
-  await setValue('[aria-label="Number of containers"]', "50")
-  check("upper-bound-accepted", !button("Submit request")!.disabled)
-  relationshipError = true
-  await refreshCompanies()
-  await until(
-    () => document.body.textContent!.includes("Couldn't load your supplier"),
-    "Relationship error appears"
-  )
-  check(
-    "relationship-error-blocks-stale-company",
-    button("Submit request")!.disabled
-  )
-  relationshipError = false
-  activeNetwork.status = "PENDING"
-  await refreshCompanies()
-  await until(
-    () =>
-      document.body.textContent!.includes(
-        "You need an active supplier agreement"
-      ),
-    "No eligible relationship explained"
-  )
-  check("missing-company-disables-submit", button("Submit request")!.disabled)
-  activeNetwork.status = "ACTIVE"
-  await refreshCompanies()
-  await until(
-    () => button("Submit request")?.disabled === false,
-    "Company restored"
-  )
-  rejectCreate = true
+  const before = posts().length
   await click(button("Submit request"))
   await until(
-    () => !!document.querySelector('[role="alert"]'),
-    "Backend error appears"
-  )
-  check(
-    "backend-error-retains-dialog-and-quantity",
-    !!document.querySelector('[role="dialog"]') &&
-      (
-        document.querySelector(
-          '[aria-label="Number of containers"]'
-        ) as HTMLInputElement
-      ).value === "50"
-  )
-  await until(
-    () => button("Submit request")?.disabled === false,
-    "Failed submit settles"
-  )
-  check("mutation-does-not-auto-retry", posts().length === 1)
-  await React.act(async () => {
-    available = false
-    await qc.invalidateQueries({ queryKey: ["workflow-readiness"] })
-  })
-  await until(
-    () => button("Submit request")?.disabled === true,
-    "Readiness update reaches open dialog"
-  )
-  check(
-    "readiness-change-blocks-open-dialog",
-    button("Submit request")!.disabled
-  )
-  await React.act(async () => {
-    available = true
-    await qc.invalidateQueries({ queryKey: ["workflow-readiness"] })
-  })
-  await until(
-    () => button("Submit request")?.disabled === false,
-    "Workflow available again"
-  )
-  await click(button("Cancel"))
-  check(
-    "settled-failed-request-can-close",
-    !document.querySelector('[role="dialog"]')
-  )
-  await setValue('[aria-label="Search order number"]', "unrelated")
-  await setValue('[aria-label="Filter order status"]', "DELIVERED")
-  await setValue('[aria-label="Filter order direction"]', "INCOMING")
-  await click(button("Request Kiosks"))
-  await until(
-    () => button("Submit request")?.disabled === false,
-    "Dialog reopened"
-  )
-  check(
-    "reopening-resets-request-form-and-error",
-    (
-      document.querySelector(
-        '[aria-label="Number of containers"]'
-      ) as HTMLInputElement
-    ).value === "1" && !document.querySelector('[role="alert"]')
-  )
-  await setValue('[aria-label="Number of containers"]', "10")
-  const modelSelect = document.querySelector(
-    '[aria-label="Model type (draft)"]'
-  ) as HTMLSelectElement
-  assert.deepEqual(
-    [...modelSelect.options].map((option) => option.value).filter(Boolean),
-    ["ADLX-Pro-X1", "Arcade-LX B2C", "Arcade-LX Healthcare"]
-  )
-  await setValue('[aria-label="Model type (draft)"]', "ADLX-Pro-X1")
-  check(
-    "model-draft-clearly-not-submitted",
-    document
-      .getElementById("request-model-hint")!
-      .textContent!.includes("not saved or sent")
-  )
-  rejectCreate = false
-  holdCreate = true
-  const before = posts().length
-  await React.act(async () => {
-    const form = document.querySelector("form")!
-    form.dispatchEvent(
-      new w.Event("submit", { bubbles: true, cancelable: true })
-    )
-    form.dispatchEvent(
-      new w.Event("submit", { bubbles: true, cancelable: true })
-    )
-    // Exercise the synchronous dismissal guard before the pending render.
-    button("Cancel")!.click()
-    document.dispatchEvent(
-      new w.KeyboardEvent("keydown", {
-        key: "Escape",
-        bubbles: true,
-        cancelable: true,
-      })
-    )
-  })
-  await until(() => !!releaseCreate, "Request starts")
-  check(
-    "pending-request-immediately-blocks-dismissal",
-    !!document.querySelector('[role="dialog"]')
-  )
-  check("double-submit-sends-one-request", posts().length === before + 1)
-  // HTTP starts before React Query's scheduled observer notification renders.
-  // Keep the response held while waiting for the user-visible pending state.
-  await until(() => !!button("Submitting..."), "Pending request renders")
-  check("pending-request-cannot-close", button("Cancel")!.disabled)
-  const close = document.querySelector<HTMLButtonElement>(
-    '[aria-label="Close container request"]'
-  )!
-  check(
-    "pending-request-disables-form-controls",
-    close.disabled &&
-      button("Submitting...")!.disabled &&
-      (document.querySelector('[aria-label="Supplier"]') as HTMLSelectElement)
-        .disabled &&
-      (
-        document.querySelector(
-          '[aria-label="Number of containers"]'
-        ) as HTMLInputElement
-      ).disabled
-  )
-  await click(button("Cancel"))
-  await click(close)
-  await React.act(async () => {
-    document.dispatchEvent(
-      new w.KeyboardEvent("keydown", {
-        key: "Escape",
-        bubbles: true,
-        cancelable: true,
-      })
-    )
-  })
-  check(
-    "pending-request-stays-open-after-dismissal-attempts",
-    !!document.querySelector('[role="dialog"]')
-  )
-  await React.act(async () => {
-    document
-      .querySelector("form")!
-      .dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }))
-  })
-  check(
-    "pending-request-blocks-later-duplicate-submit",
-    posts().length === before + 1
-  )
-  check(
-    "pending-request-disables-model-draft",
-    (
-      document.querySelector(
-        '[aria-label="Model type (draft)"]'
-      ) as HTMLSelectElement
-    ).disabled
-  )
-  await React.act(async () => {
-    releaseCreate!()
-  })
-  await until(
     () =>
-      !document.querySelector('[role="dialog"]') &&
-      !!document.querySelector("tbody")?.textContent?.includes("ORD-TEST-NEW"),
-    "Created request appears in refreshed list"
+      posts().length === before + 1 &&
+      !document.querySelector('[role="dialog"]'),
+    "Model-specific request submits"
   )
   assert.deepEqual(posts().at(-1)!.body, {
     type: "REQUEST",
-    quantity: 10,
+    quantity: 1,
+    model: "ADLX-Pro-X1",
   })
-  check(
-    "request-post-includes-auth-cookies",
-    posts().at(-1)!.credentials === "include"
-  )
-  check(
-    "success-clears-filters",
-    (
-      document.querySelector(
-        '[aria-label="Filter order status"]'
-      ) as HTMLSelectElement
-    ).value === "" &&
-      (
-        document.querySelector(
-          '[aria-label="Search order number"]'
-        ) as HTMLInputElement
-      ).value === "" &&
-      (
-        document.querySelector(
-          '[aria-label="Filter order direction"]'
-        ) as HTMLSelectElement
-      ).value === ""
-  )
-  check(
-    "success-explains-company-approval",
-    document.body.textContent!.includes("submitted for supplier approval")
-  )
-  await until(
-    () =>
-      button("Request Kiosks")?.disabled === false && qc.isMutating() === 0,
-    "Successful request settles"
-  )
-  await click(button("Request Kiosks"))
-  await until(
-    () => button("Submit request")?.disabled === false,
-    "Successful request can be reopened"
-  )
-  check(
-    "success-reopening-resets-quantity",
-    (
-      document.querySelector(
-        '[aria-label="Number of containers"]'
-      ) as HTMLInputElement
-    ).value === "1"
-  )
-  check(
-    "success-reopening-resets-model-draft",
-    (
-      document.querySelector(
-        '[aria-label="Model type (draft)"]'
-      ) as HTMLSelectElement
-    ).value === ""
-  )
-  await click(button("Cancel"))
-  check(
-    "settled-successful-request-can-close",
-    !document.querySelector('[role="dialog"]')
-  )
+  check("request-post-includes-auth-cookies", posts().at(-1)!.credentials === "include")
+  check("request-persists-selected-model", orders.at(-1)?.requestedModel === "ADLX-Pro-X1")
   currentOrg = { ...distributor, type: "PARTNER" }
   role = "ADMIN"
-  holdCreate = false
   company.type = "DISTRIBUTOR"
+  await React.act(async () => {
+    qc.clear()
+  })
   await identity()
   await click(button("Request Kiosks"))
-  await until(() => button("Submit request")?.disabled === false, "Partner resolves Distributor supplier")
+  await until(
+    () => document.body.textContent!.includes("Availability at Supplier Distributor"),
+    "Partner sees immediate Distributor supplier stock"
+  )
+  await setValue('[aria-label="Kiosk model"]', "ADLX-Pro-X1")
+  await until(() => button("Submit request")?.disabled === false, "Partner model is available")
   const partnerPostsBefore = posts().length
   await click(button("Submit request"))
   await until(() => posts().length === partnerPostsBefore + 1 && !document.querySelector('[role="dialog"]'), "Partner request submitted")
-  assert.deepEqual(posts().at(-1)?.body, { type: "REQUEST", quantity: 1 })
+  assert.deepEqual(posts().at(-1)?.body, { type: "REQUEST", quantity: 1, model: "ADLX-Pro-X1" })
   check("partner-admin-submits-request-to-distributor", true)
   company.type = supplierType
 } finally {

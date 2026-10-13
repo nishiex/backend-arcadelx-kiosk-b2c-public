@@ -16,6 +16,11 @@ frontend. The branch was not merged or reset. Existing uncommitted work remains.
 - Completed Mothership transactions map by external device ID, with machine-code
   fallback. The unique transaction ID makes replay/concurrent imports idempotent.
   Invalid records produce a failed sync log; unmatched devices are counted.
+- Company Owners/Admins can read the live Mothership payment feed through
+  `GET /api/revenue/payments` from `/revenue`. This read-only route displays all
+  returned statuses separately from ledger totals and does not import or mutate
+  transactions. The separate `syncRevenueData` importer is reserved for the scheduled
+  pipeline when enabled.
 - Monthly statements use Indian calendar boundaries, assignment history and
   agreements effective at each transaction. Money uses Decimal arithmetic, with
   transaction-level rounding to paise. Existing source GST/fee/share formulas are
@@ -83,26 +88,28 @@ database.
 
 ## Frontend
 
-`/revenue` now uses the three revenue endpoints with the existing authenticated
+`/revenue` now uses the revenue endpoints with the existing authenticated
 fetch wrapper and React Query. Active Company/Distributor/Partner Owners, Admins
 and Managers see the sidebar entry, gross totals and searchable machine table.
-Only Company Owners/Admins can edit deduction rates. It does not call the older
-unimplemented reports/settlements endpoints or expose statement actions without
-an API. Values are INR; day/month boundaries come from the API's IST calculation.
+Only Company Owners/Admins can edit deduction rates or view the fleet-wide live
+Mothership payment feed. The feed includes all upstream statuses and is kept
+separate from ledger totals; it is never imported by the page. It does not call
+the older unimplemented reports/settlements endpoints or expose statement actions
+without an API. Ledger values are INR; day/month boundaries come from the API's
+IST calculation.
 
 Queries are scoped by user, organization and role, with one minute of freshness
-to preserve results across navigation. Refresh is explicit; window focus also
-refreshes stale data. Permission loss hides the data and editor immediately.
+to preserve ledger results across navigation. The payment feed has a 30-second
+freshness window. Refresh is explicit; window focus also refreshes stale data.
+Permission loss hides the data and editor immediately.
 Rate saves update the cache and invalidate other rate queries. Loading, empty,
-error/retry, validation and duplicate-submit states are covered by:
+error/retry, payment-feed access, direct fetching, validation and duplicate-submit
+states are covered by:
 
 ```powershell
 node -r ./audits/auth-registration/runtime-loader.cjs apps/web/next-monorepo/apps/web/scripts/revenue-ui-check.tsx
 ```
 
-All component checks passed using mocked HTTP, without changing live rates.
-Targeted revenue lint passed and the local `/revenue` route returned HTTP 200.
-Full frontend typechecking remains blocked by the existing KioskStatus mismatch
-in `components/dashboard/ui.tsx:130`; no revenue implementation errors were
-reported. Browser visual verification was unavailable because automatic approval
-review for browser access failed with HTTP 404 from its service.
+The mocked component checks, targeted revenue lint, API typecheck and frontend
+typecheck pass. The payment-feed UI checks use mocked HTTP and do not send live
+requests or modify rates/ledger data.

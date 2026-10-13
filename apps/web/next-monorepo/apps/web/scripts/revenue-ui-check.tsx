@@ -27,6 +27,18 @@ let role = 'OWNER', type = 'COMPANY', status = 'ACTIVE', orgId = 'company'
 const me = () => ({ id: 'test-user', name: 'Test', membership: { status, role, organizationId: orgId, organization: { id: orgId, type, name: 'Test Org' } } })
 const rows = [{ machineCode: 'K-001', location: 'Pune', distributor: 'Distributor A', partner: 'Partner B', deployedPartner: 'Partner B', today: 12.34, thisMonth: 200, totalRevenue: 300 }]
 let settings = { gstPercentage: '18', pgFeePercentage: '2.50', tdsPercentage: '2' }
+const paymentRows = [{
+  txnid: 'txn-001',
+  device_id: 'device-001',
+  game_id: 'game-001',
+  amount: 180,
+  currency: 'INR',
+  status: 'pending',
+  provider: 'test-provider',
+  qr_id: null,
+  created_at: '2026-10-07T10:00:00.000Z',
+  updated_at: '2026-10-07T10:00:00.000Z',
+}]
 const calls: { route: string; method: string; body: unknown }[] = []
 let failPatch = false, failRevenue = false, empty = false
 let release: (() => void) | undefined
@@ -40,6 +52,12 @@ globalThis.fetch = async (input, init) => {
   if (route === '/api/revenue/machine-wise') {
     if (gate) await gate
     return failRevenue ? Response.json({ message: 'Revenue temporarily unavailable' }, { status: 503 }) : Response.json({ data: { kiosks: empty ? [] : rows } })
+  }
+  if (route === '/api/revenue/payments') {
+    assert.equal(method, 'GET')
+    return Response.json({
+      data: { total: paymentRows.length, payments: paymentRows, fetchedAt: '2026-10-07T10:01:00.000Z' },
+    })
   }
   if (route === '/api/revenue/deduction-rates') {
     if (method === 'PATCH') {
@@ -76,7 +94,7 @@ try {
   await identity()
   gate = new Promise(resolve => { release = resolve })
   await render()
-  assert.ok(!document.querySelector('table'), 'Loading does not show fake zero data')
+  assert.ok(!text().includes('Machine revenue'), 'Loading does not show fake ledger data')
   await React.act(async () => release!()); gate = undefined; await flush()
   assert.ok(text().includes('₹12.34')); assert.ok(text().includes('₹200.00')); assert.ok(text().includes('K-001'))
   assert.equal(document.querySelector('a[href="/revenue"]')?.getAttribute('aria-current'), 'page')
@@ -84,6 +102,14 @@ try {
   await render(false); await render(true)
   assert.equal(count('machine-wise'), 1, 'Navigating back reuses fresh revenue cache')
   assert.equal(count('deduction-rates'), 1)
+  assert.ok(button('Fetch latest payments'), 'Company owner can fetch the payment feed')
+  assert.ok(text().includes('txn-001'))
+  assert.ok(text().includes('pending'))
+  assert.ok(text().includes('not imported into revenue totals'))
+  await click(button('Fetch latest payments'))
+  assert.equal(count('payments'), 2, 'Button performs an explicit read-only GET')
+  assert.equal(count('sync', 'POST'), 0, 'Payment feed is not imported')
+  assert.equal(count('machine-wise'), 1, 'Fetching payments leaves ledger totals unchanged')
   await fill('revenue-search', 'missing'); assert.ok(text().includes('No machines match'))
   await fill('revenue-search', 'partner b'); assert.ok(document.querySelector('tbody')?.textContent?.includes('K-001'))
   await fill('revenue-search', '')
@@ -108,9 +134,10 @@ try {
     type = org; orgId = org.toLowerCase()
     for (const memberRole of ['OWNER', 'ADMIN', 'MANAGER', 'STAFF']) {
       role = memberRole; await identity()
-      assert.equal(!!document.querySelector('a[href="/revenue"]'), role !== 'STAFF')
-      assert.equal(!!document.querySelector('table'), role !== 'STAFF')
-      assert.equal(!!button('Edit rates'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role))
+      assert.equal(!!document.querySelector('a[href="/revenue"]'), role !== 'STAFF', `${type} ${role} revenue navigation`)
+      assert.equal(!!document.querySelector('table'), role !== 'STAFF', `${type} ${role} revenue table`)
+      assert.equal(!!button('Edit rates'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} edit-rate access`)
+      assert.equal(!!button('Fetch latest payments'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} payment-feed access`)
     }
   }
   const requestsBefore = calls.length
@@ -125,7 +152,7 @@ try {
 
   role = 'OWNER'; await identity(); await render(false); await render(true)
   failRevenue = true; await click(button('Refresh')); await flush()
-  assert.ok(text().includes('Revenue temporarily unavailable')); assert.ok(!document.querySelector('table'))
+  assert.ok(text().includes('Revenue temporarily unavailable')); assert.ok(!text().includes('K-001'))
   failRevenue = false; empty = true; await click(button('Try again'))
   assert.ok(text().includes('No machine revenue to show yet.'))
   console.log('PASS failed refresh, retry and empty state')

@@ -336,6 +336,7 @@ model Order {
   agreementId String
 
   quantity                Int
+  requestedModel          String?
   depositPerMachine       Float
   nonRefundablePerMachine Float
 
