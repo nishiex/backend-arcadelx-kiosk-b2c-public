@@ -58,7 +58,7 @@ function tidyBody(text: string): string {
  */
 function adminBaseUrl(): string {
   const explicit = process.env.MOTHERSHIP_ADMIN_API_URL;
-  if (explicit) return explicit.replace(/\/+$/, '');
+  if (explicit) return new URL(explicit).origin;
   // `MOTHERSHIP_TRANSACTION_URL` (no `_API_`) is accepted as a fallback because a live
   // deployment config uses that spelling. Without it the origin cannot be resolved and
   // every gateway route answers 503, which is exactly what happened. The documented name
@@ -70,8 +70,8 @@ function adminBaseUrl(): string {
   if (!source) {
     throw new ApiError(503, 'Mothership admin API is not configured');
   }
-  // The configured sources are full resource URLs on the shared origin
-  // (e.g. https://host/api/v1/payments), so the origin is what we need.
+  // Configured sources may be full resource URLs (including the reorder endpoint),
+  // but the routes below are absolute Mothership API paths.
   return new URL(source).origin;
 }
 
