@@ -6,7 +6,9 @@ import { z } from "zod";
  * Shapes below were established by reading the live host on 2026-10-12 and 2026-10-13 with
  * **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                       → 9 devices
- *   - `GET  /api/v1/devices/{device_id}/prices`               → 30 rows (15 games × 2)
+ *   - `GET  /api/v1/devices/{device_id}/prices`               → per-device prices; some
+ *     responses include only `base_price` and `base_replay_price`, which are the returned
+ *     device prices when effective/override fields are omitted
  *   - `GET  /api/v1/games`                                    → 16 catalog entries with price
  *
  * Prices are read per device. A write is requested in an explicit scope, because the two
@@ -51,18 +53,28 @@ export const DeviceListResponseSchema = z.object({
   total_kiosks: z.number(),
 });
 
-/** One raw pricing row. `has_override` arrives as 0/1, so accept number or boolean. */
+/** Normalize complete rows and sparse rows whose base fields carry the device prices. */
 const UpstreamPriceSchema = z.object({
   base_price: z.number(),
   base_replay_price: z.number(),
   display_name: z.string(),
-  effective_price: z.number(),
-  effective_replay_price: z.number(),
+  effective_price: z.number().optional(),
+  effective_replay_price: z.number().optional(),
   game_id: z.string(),
-  has_override: z.union([z.number(), z.boolean()]),
-  override_price: z.number().nullable(),
-  override_replay_price: z.number().nullable(),
-});
+  has_override: z.union([z.number(), z.boolean()]).optional(),
+  override_price: z.number().nullable().optional(),
+  override_replay_price: z.number().nullable().optional(),
+}).transform((row) => ({
+  ...row,
+  effective_price: row.effective_price ?? row.override_price ?? row.base_price,
+  effective_replay_price:
+    row.effective_replay_price ?? row.override_replay_price ?? row.base_replay_price,
+  has_override:
+    row.has_override ??
+    (row.override_price != null || row.override_replay_price != null ? 1 : 0),
+  override_price: row.override_price ?? null,
+  override_replay_price: row.override_replay_price ?? null,
+}));
 
 export const DevicePricesResponseSchema = z.object({
   device_id: z.string(),

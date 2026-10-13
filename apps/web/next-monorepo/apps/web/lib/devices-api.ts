@@ -49,6 +49,8 @@ function describeDevicePriceVerification(errors: unknown): string | null {
       overrideReplayPrice?: unknown
       basePrice?: unknown
       baseReplayPrice?: unknown
+      catalogPrice?: unknown
+      catalogReplayPrice?: unknown
     } | null
     changedDevices?: unknown
     fleetChanged?: unknown
@@ -58,7 +60,7 @@ function describeDevicePriceVerification(errors: unknown): string | null {
 
   const requested = `requested ${String(details.requested.price)} / replay ${String(details.requested.replayPrice)}`
   const observed = details.observed
-    ? `read back ${String(details.observed.price)} / replay ${String(details.observed.replayPrice)}, override=${String(details.observed.hasOverride)}, override price=${String(details.observed.overridePrice)}, override replay=${String(details.observed.overrideReplayPrice)}, catalog=${String(details.observed.basePrice)} / replay ${String(details.observed.baseReplayPrice)}`
+    ? `device read back ${String(details.observed.price)} / replay ${String(details.observed.replayPrice)}, catalog=${String(details.observed.catalogPrice ?? details.observed.basePrice)} / replay ${String(details.observed.catalogReplayPrice ?? details.observed.baseReplayPrice)}, override=${String(details.observed.hasOverride)}`
     : "the requested game was missing from the selected device readback"
   const changedDevices = Array.isArray(details.changedDevices)
     ? details.changedDevices.map(String).join(", ") || "none"
@@ -72,7 +74,7 @@ function describeDevicePriceVerification(errors: unknown): string | null {
       ? ' To set this price on every kiosk instead, use "Apply to all kiosks".'
       : ""
 
-  return `Verification details: ${requested}; ${observed}; other devices changed: ${changedDevices}; ${fleetState}.${nextStep}`
+  return `Price verification details: ${requested}; ${observed}; other devices changed: ${changedDevices}; ${fleetState}.${nextStep}`
 }
 
 async function handleRes<T>(res: Response): Promise<T> {

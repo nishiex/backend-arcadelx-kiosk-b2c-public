@@ -19,7 +19,8 @@ import {
  *
  * The read endpoints were confirmed live on 2026-10-12 with **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                          → 9 devices
- *   - `GET  /api/v1/devices/{device_id}/prices`                  → 16 rows per device
+ *   - `GET  /api/v1/devices/{device_id}/prices`                  → 16 rows per device; some
+ *     responses expose the device's current prices only as `base_price`/`base_replay_price`
  *
  * The per-device write contract was confirmed live on 2026-10-13, on one offline device:
  * `POST /api/v1/devices/{device_id}/games/{game_id}/price` persists a per-device override
@@ -29,8 +30,9 @@ import {
  * "success" response is never trusted on its own.
  *
  * Price writes and resets use Mothership's device-scoped endpoints by default. A device
- * write is confirmed by re-reading the selected device and checking that all other devices
- * remain unchanged, so a silently-ignored write is caught instead of reported as success.
+ * write is confirmed by re-reading the selected device and checking that the global catalog
+ * and all other devices remain unchanged, so a silently-ignored write is caught instead of
+ * reported as success.
  * A caller may instead request the explicit `GAME_CATALOG` scope, which updates the game's
  * catalog price (every kiosk offering the game) and is confirmed against
  * `GET /api/v1/games`. A device-scoped request never falls back to the catalog endpoint.
@@ -204,7 +206,10 @@ function mergeGamePrices(
   }));
 }
 
-export async function getDevicePrices(deviceId: string): Promise<GamePriceView[]> {
+export async function getDevicePrices(
+  deviceId: string,
+  catalogSnapshot?: UpstreamCatalogGame[],
+): Promise<GamePriceView[]> {
   const payload = await callMothership(
     `/api/v1/devices/${encodeURIComponent(deviceId)}/prices`,
     { method: 'GET' },
@@ -213,7 +218,25 @@ export async function getDevicePrices(deviceId: string): Promise<GamePriceView[]
   if (!parsed.success) {
     throw new ApiError(502, 'Mothership device API returned an unexpected pricing payload');
   }
-  return mergeGamePrices(parsed.data.pricing);
+  const catalog = catalogSnapshot ?? (await getGameCatalog());
+  return mergeGamePrices(parsed.data.pricing).map((game) => {
+    const catalogGame = findCatalogGame(catalog, game);
+    if (!catalogGame) return game;
+
+    const differsFromCatalog =
+      !samePrice(game.effectivePrice, catalogGame.price) ||
+      !samePrice(game.effectiveReplayPrice, catalogGame.replay_price);
+    return {
+      ...game,
+      basePrice: catalogGame.price,
+      baseReplayPrice: catalogGame.replay_price,
+      hasOverride: game.hasOverride || differsFromCatalog,
+      overridePrice: game.overridePrice ?? (differsFromCatalog ? game.effectivePrice : null),
+      overrideReplayPrice:
+        game.overrideReplayPrice ??
+        (differsFromCatalog ? game.effectiveReplayPrice : null),
+    };
+  });
 }
 
 /** Prices survive as floats; compare with a tolerance far below one paisa. */
@@ -292,6 +315,25 @@ async function getGameCatalog(): Promise<UpstreamCatalogGame[]> {
   return parsed.data.games;
 }
 
+/** Compare only catalog prices; metadata such as downloads is irrelevant to price scope. */
+function sameCatalogPrices(
+  before: UpstreamCatalogGame[],
+  after: UpstreamCatalogGame[],
+): boolean {
+  if (before.length !== after.length) return false;
+  const sortedBefore = [...before].sort((a, b) => a.game_id.localeCompare(b.game_id));
+  const sortedAfter = [...after].sort((a, b) => a.game_id.localeCompare(b.game_id));
+  return sortedBefore.every((game, index) => {
+    const observed = sortedAfter[index];
+    return (
+      observed !== undefined &&
+      game.game_id === observed.game_id &&
+      samePrice(game.price, observed.price) &&
+      samePrice(game.replay_price, observed.replay_price)
+    );
+  });
+}
+
 /**
  * Reset all price overrides on one device.
  *
@@ -300,7 +342,7 @@ async function getGameCatalog(): Promise<UpstreamCatalogGame[]> {
  * returned to catalog prices and all other devices remained unchanged.
  */
 export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePricesResult> {
-  const { devices } = await listDevices();
+  const [{ devices }, catalogBefore] = await Promise.all([listDevices(), getGameCatalog()]);
   const deviceIds = [...new Set(devices.map((device) => device.deviceId))];
   if (!deviceIds.includes(deviceId)) {
     throw new ApiError(404, 'Mothership device was not found', { deviceId });
@@ -308,7 +350,7 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
 
   const before = new Map(
     await Promise.all(
-      deviceIds.map(async (id) => [id, await getDevicePrices(id)] as const),
+      deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogBefore)] as const),
     ),
   );
   const targetBefore = before.get(deviceId);
@@ -327,9 +369,13 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
     { method: 'POST' },
   );
 
+  const catalogAfter = await getGameCatalog();
+  if (!sameCatalogPrices(catalogBefore, catalogAfter)) {
+    throw new ApiError(502, 'Reset changed catalog prices', { deviceId });
+  }
   const after = new Map(
     await Promise.all(
-      deviceIds.map(async (id) => [id, await getDevicePrices(id)] as const),
+      deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogAfter)] as const),
     ),
   );
   const targetAfter = after.get(deviceId);
@@ -467,7 +513,7 @@ export async function setDeviceGamePrice(
     return setGameCatalogPrice(deviceId, gameId, input);
   }
 
-  const { devices } = await listDevices();
+  const [{ devices }, catalogBefore] = await Promise.all([listDevices(), getGameCatalog()]);
   const deviceIds = [...new Set(devices.map((device) => device.deviceId))];
   if (!deviceIds.includes(deviceId)) {
     throw new ApiError(404, 'Mothership device was not found', { deviceId });
@@ -475,7 +521,7 @@ export async function setDeviceGamePrice(
 
   const before = new Map(
     await Promise.all(
-      deviceIds.map(async (id) => [id, await getDevicePrices(id)] as const),
+      deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogBefore)] as const),
     ),
   );
   const targetBefore = before.get(deviceId);
@@ -486,6 +532,14 @@ export async function setDeviceGamePrice(
   const gameBefore = findGameOnDevice(targetBefore, gameId);
   if (!gameBefore) {
     throw new ApiError(404, 'Game was not found on the selected device', { deviceId, gameId });
+  }
+  const catalogGameBefore = findCatalogGame(catalogBefore, gameBefore);
+  if (!catalogGameBefore) {
+    throw new ApiError(404, "Game was not found in Mothership's catalog", {
+      deviceId,
+      gameId: gameBefore.gameId,
+      displayName: gameBefore.displayName,
+    });
   }
 
   // Confirmed live 2026-10-13: this endpoint reads `price` / `replay_price`. The
@@ -504,11 +558,18 @@ export async function setDeviceGamePrice(
     { method: 'POST', body },
   );
 
-  const [devicesAfter, afterRows] = await Promise.all([
+  const [devicesAfter, catalogAfter] = await Promise.all([
     listDevices(),
-    Promise.all(deviceIds.map(async (id) => [id, await getDevicePrices(id)] as const)),
+    getGameCatalog(),
   ]);
+  const afterRows = await Promise.all(
+    deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogAfter)] as const),
+  );
   const after = new Map(afterRows);
+  const catalogUnchanged = sameCatalogPrices(catalogBefore, catalogAfter);
+  const catalogGameAfter = catalogAfter.find(
+    (game) => game.game_id === catalogGameBefore.game_id,
+  );
   const deviceIdsAfter = [...new Set(devicesAfter.devices.map((device) => device.deviceId))].sort();
   const expectedDeviceIds = [...deviceIds].sort();
   const fleetChanged = JSON.stringify(deviceIdsAfter) !== JSON.stringify(expectedDeviceIds);
@@ -519,18 +580,14 @@ export async function setDeviceGamePrice(
 
   const gameAfter = findGameOnDevice(targetAfter, gameId);
   const replayPrice = input.replay_price ?? gameBefore.effectiveReplayPrice;
-  const targetVerified =
+  const targetValuesVerified =
     !!gameAfter &&
-    gameAfter.hasOverride &&
-    gameAfter.overridePrice !== null &&
-    samePrice(gameAfter.overridePrice, input.price) &&
     samePrice(gameAfter.effectivePrice, input.price) &&
-    samePrice(gameAfter.effectiveReplayPrice, replayPrice) &&
-    (input.replay_price === undefined ||
-      (gameAfter.overrideReplayPrice !== null &&
-        samePrice(gameAfter.overrideReplayPrice, input.replay_price))) &&
-    samePrice(gameAfter.basePrice, gameBefore.basePrice) &&
-    samePrice(gameAfter.baseReplayPrice, gameBefore.baseReplayPrice);
+    samePrice(gameAfter.effectiveReplayPrice, replayPrice);
+  // In sparse responses `base_*` is the selected device's writable price, not the
+  // catalog. Verify it through the normalized effective values, then independently
+  // confirm the global catalog and every other device stayed unchanged.
+  const targetVerified = targetValuesVerified && catalogUnchanged;
 
   const changedDevices: string[] = [];
   for (const id of deviceIds) {
@@ -553,15 +610,20 @@ export async function setDeviceGamePrice(
   }
 
   if (!targetVerified || changedDevices.length > 0 || fleetChanged) {
+    const failureMessage = !catalogUnchanged
+      ? 'Mothership changed catalog prices during a device-scoped update'
+      : targetVerified
+        ? 'Mothership changed pricing outside the selected device, so the update was not verified as device-only'
+        : 'Mothership did not confirm the requested device prices in its readback';
     throw new ApiError(
       502,
-      targetVerified
-        ? 'Mothership changed pricing outside the selected device, so the update was not verified as device-only'
-        : 'Mothership did not confirm a device price override: the request was accepted, but re-reading the selected device does not show the requested price as an override, and no price change was verified.',
+      failureMessage,
       {
         deviceId,
         gameId: gameBefore.gameId,
         targetVerified,
+        targetValuesVerified,
+        catalogUnchanged,
         fleetChanged,
         deviceIdsAfter,
         requested: { price: input.price, replayPrice },
@@ -574,6 +636,8 @@ export async function setDeviceGamePrice(
               overrideReplayPrice: gameAfter.overrideReplayPrice,
               basePrice: gameAfter.basePrice,
               baseReplayPrice: gameAfter.baseReplayPrice,
+              catalogPrice: catalogGameAfter?.price ?? null,
+              catalogReplayPrice: catalogGameAfter?.replay_price ?? null,
             }
           : null,
         changedDevices,

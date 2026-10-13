@@ -132,7 +132,7 @@ globalThis.fetch = async (input, init) => {
       {
         success: false,
         message:
-          "Mothership did not confirm a device price override: the request was accepted, but re-reading the selected device does not show the requested price as an override, and no price change was verified.",
+          "Mothership did not confirm the requested device prices in its readback",
         errors: {
           requested: { price: body.price, replayPrice: body.replay_price },
           observed: {
@@ -216,7 +216,7 @@ try {
   await React.act(async () => saveButton.click())
   await until(() => !!document.querySelector('[role="alert"]'))
   const alertText = document.querySelector('[role="alert"]')!.textContent ?? ""
-  assert.ok(alertText.includes("did not confirm a device price override"), "the failure is reported clearly")
+  assert.ok(alertText.includes("did not confirm the requested device prices"), "the failure is reported clearly")
   assert.ok(alertText.includes("Apply to all kiosks"), "the failure points at the explicit fleet-wide action")
   assert.equal(posts.length, 1, "the default action is the only request so far")
   assert.deepEqual(posts[0], {

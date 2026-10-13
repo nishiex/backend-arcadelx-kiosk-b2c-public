@@ -96,7 +96,13 @@ unchanged; `POST /api/v1/devices/{device_id}/prices/reset` removes the overrides
 through that cycle (it refuses to run without `ALLOW_LIVE_MOTHERSHIP_WRITE=1`) and records
 `audits/devices/live-device-price-override.json`. The scope distinction is unchanged: `DEVICE`
 is the default and never falls back to `GAME_CATALOG`, which remains the only fleet-wide
-change. A device that does not confirm the override still reports 502 rather than success.
+change. The per-device prices feed can omit `effective_*` and override metadata; in that
+shape, `base_price` and `base_replay_price` are the selected device's current writable prices,
+not the global catalog. The service reads `/api/v1/games` separately to establish catalog
+prices, confirms the requested per-device readback, and verifies that the catalog and other
+devices stayed unchanged. A device that does not confirm the requested prices still reports
+502 rather than success. `audits/devices/device-price-readback-check.ts` covers the sparse
+response shape with mocked upstream requests and performs no live writes.
 
 ## Reservation ordering and company allocation (2026-10-07)
 
