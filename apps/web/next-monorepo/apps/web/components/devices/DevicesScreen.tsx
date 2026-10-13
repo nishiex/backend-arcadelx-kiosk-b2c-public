@@ -34,13 +34,17 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"]
 
 /**
- * Mothership device fleet and per-device game pricing.
+ * Mothership device fleet and game pricing.
  *
  * Two tabs rather than one screen: "Fleet" reports hardware state (Mothership's view of
- * what exists), while "Game pricing" is per-device configuration. They answer different
- * questions about the same device, and mixing them made the table unreadable.
+ * what exists), while "Game pricing" reports prices per device. They answer different
+ * questions about the same device, and mixing them made the table unreadable. Reads are per
+ * device; the write behind the price dialog is per game, which the dialog states.
  *
- * Prices are owned by Mothership, so nothing here is optimistic: every write refetches.
+ * Prices are owned by Mothership, so nothing here is optimistic: every write refetches, and
+ * the API only reports success after re-reading the value it wrote. Mothership stores one
+ * price per GAME, so a change made from a device's page applies to that game on every kiosk;
+ * the dialog says so, because an operator would otherwise read it as one machine changing.
  * A price change alters what a deployed kiosk charges a player, so it is confirmed first
  * and the edit control is shown only to COMPANY OWNER/ADMIN, matching the API route.
  */
@@ -430,8 +434,8 @@ function PriceDialog({
   const mutation = useMutation({
     mutationFn: () =>
       setDeviceGamePrice(deviceId, game.gameId, priceValue, replayValid ? replayValue : undefined),
-    onSuccess: async () => {
-      toast.success(`${game.displayName} price updated`)
+    onSuccess: async result => {
+      toast.success(`${result.displayName} is now ${inr.format(result.price)} on every kiosk`)
       await onSaved()
       onClose()
     },
@@ -452,8 +456,10 @@ function PriceDialog({
           {deviceId} · {game.gameId}
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          This changes what <span className="font-medium">{game.displayName}</span> charges on live
-          hardware.
+          This sets the price for <span className="font-medium">{game.displayName}</span> on live
+          hardware. Mothership keeps one price per game, so it applies to{" "}
+          <span className="font-medium">every kiosk</span> offering it — not only{" "}
+          <span className="font-mono text-xs">{deviceId}</span>.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -491,16 +497,16 @@ function PriceDialog({
 
         {confirming && (
           <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-            Confirm: set <span className="font-medium">{game.displayName}</span> on{" "}
-            <span className="font-mono text-xs">{deviceId}</span> to{" "}
+            Confirm: set <span className="font-medium">{game.displayName}</span> to{" "}
             <span className="font-semibold">{inr.format(priceValue)}</span>
             {replayValid && (
               <>
                 {" "}
                 and replay to <span className="font-semibold">{inr.format(replayValue)}</span>
               </>
-            )}
-            .
+            )}{" "}
+            on <span className="font-medium">every kiosk</span> (Mothership stores one price per
+            game).
           </p>
         )}
 

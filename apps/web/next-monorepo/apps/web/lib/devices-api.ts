@@ -105,17 +105,39 @@ export async function fetchDevicePrices(
 }
 
 /**
- * Set one game's price on one device.
+ * One game's price as Mothership reports it AFTER a write.
  *
- * This writes to live hardware, so the caller must confirm first. `replay_price` is only
- * sent when supplied, so an untouched replay price cannot be read as "set it to zero".
+ * `scope` is always `GAME_CATALOG`: Mothership's per-device price endpoint answers 200 and
+ * persists nothing, so this write goes to the catalog entry instead, which means the change
+ * covers that game on every kiosk. The values are re-read from Mothership by the API, so
+ * they are what the fleet now charges rather than what was requested.
+ */
+export type SetDeviceGamePriceResult = {
+  deviceId: string
+  gameId: string
+  displayName: string
+  price: number
+  replayPrice: number | null
+  scope: "GAME_CATALOG"
+}
+
+/**
+ * Set one game's price.
+ *
+ * This writes to live hardware, so the caller must confirm first. The stored price is per
+ * GAME, so the change applies to every kiosk offering that game, not only the device whose
+ * page the operator is on. `replay_price` is only sent when supplied, so an untouched replay
+ * price cannot be read as "set it to zero".
+ *
+ * The API fails rather than reporting a change that did not land, so a resolved promise here
+ * means Mothership confirmed the new value.
  */
 export async function setDeviceGamePrice(
   deviceId: string,
   gameId: string,
   price: number,
   replayPrice?: number
-): Promise<void> {
+): Promise<SetDeviceGamePriceResult> {
   const res = await apiFetch(
     `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
     {
@@ -126,5 +148,5 @@ export async function setDeviceGamePrice(
       ),
     }
   )
-  await handleRes<unknown>(res)
+  return handleRes<SetDeviceGamePriceResult>(res)
 }

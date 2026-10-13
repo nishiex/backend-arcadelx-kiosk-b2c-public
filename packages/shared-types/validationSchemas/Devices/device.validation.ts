@@ -7,13 +7,9 @@ import { z } from "zod";
  * **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                       → 9 devices
  *   - `GET  /api/v1/devices/{device_id}/prices`               → 30 rows (15 games × 2)
- *   - `POST /api/v1/devices/{device_id}/games/{game_id}/price`
  *
- * IMPORTANT — the write contract is NOT verified. The POST response echoes
- * `{ price, replay_price }`, so those are the field names used, but no successful
- * write was performed against production to confirm them (deliberately: probing a
- * write endpoint on a live fleet is not worth the risk). Treat the body shape as
- * inferred until a real, intentional write confirms it.
+ * Pricing is read per device but WRITTEN per game: see `SetDeviceGamePriceSchema` below for
+ * which upstream endpoint actually persists a change.
  */
 
 export const DeviceParamsSchema = z.object({
@@ -64,21 +60,20 @@ export const DevicePricesResponseSchema = z.object({
 });
 
 /**
- * Body for setting one game's price on one device.
+ * Body for setting one game's price.
  *
- * The upstream field names are `override_price` / `override_replay_price`, NOT
- * `price` / `replay_price`. Established by probing the live endpoint on 2026-10-12 with
- * no-op values (the numbers sent equalled the values already in place, so no player-facing
- * price could change):
+ * These are OUR field names. The API forwards them to Mothership's CATALOG endpoint
+ * (`POST /api/v1/games/{game_id}/metadata`) as `price` / `replay_price`, which is the
+ * write path that actually persists — confirmed live on 2026-10-13 (Empire Saviour
+ * 100 → 101 → 100, observed on adlx-2026-a005's own pricing read).
  *
- *   POST .../games/{id}/price  {"price":102,"replay_price":51}                      → 500
- *   POST .../games/{id}/price  {"override_price":102,"override_replay_price":51}   → 200
- *   POST .../games/{id}/price  {}                                                    → 200
+ * Why not the per-device endpoint `POST /api/v1/devices/{id}/games/{id}/price`: it answers
+ * 200 `{"status":"success"}` and changes nothing, echoing the unchanged price while
+ * `has_override` stays 0. Probed on 2026-10-13 with every body shape that returns 200;
+ * adding `price` to that body returns 500 instead. See `devices.service.ts` for the detail.
  *
- * The 500 is a generic HTML error page, so the field names were the only signal. Note the
- * earlier `{price, replay_price}` shape was a guess taken from the response echo, and it
- * was wrong — the same names appear in the *response* while the *request* wants the
- * override-prefixed ones.
+ * Consequence for callers: a catalog price is per GAME, so a change applies to that game on
+ * every kiosk, not only the device whose id appears in our route.
  *
  * `replay_price` stays optional so an operator can change only the first-play price; the
  * upstream call omits the key entirely when undefined rather than sending null.
@@ -93,6 +88,25 @@ export const SetDeviceGamePriceSchema = z.object({
 });
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
+
+/**
+ * Result of a price write, as reported only AFTER Mothership confirms it.
+ *
+ * The values here are re-read from Mothership, not echoed from the request: the price
+ * endpoint used to answer 200 while doing nothing, so an unverified echo is not evidence.
+ */
+export const SetDeviceGamePriceResultSchema = z.object({
+  deviceId: z.string(),
+  gameId: z.string(),
+  displayName: z.string(),
+  /** Price Mothership reports after the write, i.e. the confirmed value. */
+  price: z.number(),
+  replayPrice: z.number().nullable(),
+  /** Mothership keeps one price per game, so the write covers every kiosk. */
+  scope: z.literal('GAME_CATALOG'),
+});
+
+export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
 
 /** A device as this API returns it (normalised, camelCase). */
 export const DeviceViewSchema = z.object({

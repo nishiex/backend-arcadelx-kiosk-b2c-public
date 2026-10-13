@@ -18,8 +18,13 @@ import {
  *
  * Reads are open to any signed-in member of the organization, because they describe
  * hardware the fleet operator already owns. The price WRITE is the sensitive one: it
- * changes what a live kiosk charges a player, so its route additionally requires the
- * Company's OWNER/ADMIN (`routes/Device/device.routes.ts`).
+ * changes what live kiosks charge players, so its route additionally requires the Company's
+ * OWNER/ADMIN (`routes/Admin/device.routes.ts`).
+ *
+ * Note the scope of that write: Mothership stores one price per GAME, so a change made from
+ * a device's page applies to that game on every kiosk, and the response says so
+ * (`scope: 'GAME_CATALOG'`). The value returned is re-read from Mothership after the write
+ * and the request fails if the change did not take effect.
  *
  * Params and body are validated here before anything is forwarded, so a malformed
  * request fails with a specific 400 instead of an opaque upstream error.
@@ -60,7 +65,9 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
     params.data.gameId,
     body.data,
   );
+  // The message states the scope because the stored price is per game: the same change
+  // reaches every kiosk offering it, not only the device named in the path.
   res
     .status(200)
-    .json(new ApiResponse(200, result, 'Game price updated successfully'));
+    .json(new ApiResponse(200, result, 'Game price updated on every kiosk'));
 });

@@ -5,6 +5,7 @@ import {
   type DeviceView,
   type GamePriceView,
   type SetDeviceGamePriceInput,
+  type SetDeviceGamePriceResult,
 } from '@shared-types/validationSchemas/Devices/device.validation';
 
 /**
@@ -14,16 +15,12 @@ import {
  * module only proxies. Reads are safe; `setDeviceGamePrice` mutates a live kiosk's price
  * and its route is therefore gated to the Company's OWNER/ADMIN.
  *
- * All three endpoints were confirmed live on 2026-10-12 with **read-only** requests:
+ * The two read endpoints were confirmed live on 2026-10-12 with **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                          → 9 devices
  *   - `GET  /api/v1/devices/{device_id}/prices`                  → 30 rows
- *   - `POST /api/v1/devices/{device_id}/games/{game_id}/price`   → contract inferred
  *
- * The write contract is now VERIFIED for field names: `override_price` /
- * `override_replay_price` are accepted (the response's own `price` / `replay_price` keys are
- * NOT — they provoke a 500). Not yet verified: whether a value differing from the base price
- * persists as an override. Testing that requires writing a genuinely different price to live
- * hardware, which has not been done.
+ * The price WRITE does not go to the per-device endpoint at all: that one answers 200 and
+ * persists nothing (see `setDeviceGamePrice` below). Prices live in the game catalog.
  */
 
 const REQUEST_TIMEOUT_MS = 15000;
@@ -206,32 +203,84 @@ export async function getDevicePrices(deviceId: string): Promise<GamePriceView[]
   return mergeGamePrices(parsed.data.pricing);
 }
 
+/** Prices survive as floats; compare with a tolerance far below one paisa. */
+const PRICE_EPSILON = 0.001;
+
+const samePrice = (a: number, b: number): boolean => Math.abs(a - b) < PRICE_EPSILON;
+
 /**
- * Set one game's price on one device.
+ * Set one game's price.
  *
- * This writes to a live kiosk. The route above it requires Company OWNER/ADMIN, and the
- * caller is expected to have confirmed the change; nothing here is retried automatically,
- * because a retried price write is a second real change to a customer's machine.
+ * The price a kiosk charges for a game is the *catalog* price, and it is written through
+ * Mothership's catalog endpoint. Changing it therefore applies to that game on **every
+ * kiosk**, which is why the response says so explicitly (`scope: 'GAME_CATALOG'`).
  *
- * The upstream body keys are `override_price` / `override_replay_price`. Sending
- * `price` / `replay_price` — the names the *response* uses — makes Mothership answer 500.
- * That was confirmed against the live endpoint with no-op values, never a real price
- * change. `override_replay_price` is omitted rather than sent as null when the operator
- * did not supply one, so an unspecified replay price cannot be read as "set it to zero".
+ *   POST /api/v1/games/{game_id}/metadata   {"price":101,"replay_price":50.5}
+ *     → 200 {"message":"Metadata saved"}, and afterwards both the catalog and the
+ *       per-device read report price 101 / replay 50.5. Verified live on 2026-10-13
+ *       against the non-playable Empire Saviour and then restored to 100 / 50.
+ *
+ * The per-device endpoint this used to call
+ * (`POST /api/v1/devices/{id}/games/{id}/price`) answers 200 with `status: "success"`
+ * while changing nothing: it echoes the *unchanged* price, and the device keeps reporting
+ * `has_override: 0` with the old `effective_price`. Reproduced on 2026-10-13 on
+ * ADLX-2026-A002 and ADLX-2026-A005 with a genuinely different value, for every body shape
+ * that returns 200 (`override_price`, `{}`, query parameters); adding `price` to the body
+ * makes it answer 500 instead. That endpoint is an unfinished upstream stub rather than a
+ * contract this proxy got wrong — Mothership's own dashboard has no per-device price
+ * editor and never sends `override_price`, it edits the catalog through the metadata
+ * endpoint above — so no further request shape is worth guessing at.
+ *
+ * Because the stub reported success while persisting nothing, the write is CONFIRMED by
+ * re-reading the device afterwards: here a 200 from the price endpoint has already proven
+ * to mean nothing on its own, and an operator must never be told a live price changed when
+ * it did not. Nothing is retried automatically — a retried write is a second real change
+ * to a customer's machine.
+ *
+ * `replay_price` is omitted rather than sent as null when the operator did not supply one,
+ * so an unspecified replay price cannot be read as "set it to zero".
  */
 export async function setDeviceGamePrice(
   deviceId: string,
   gameId: string,
   input: SetDeviceGamePriceInput,
-): Promise<unknown> {
-  return callMothership(
-    `/api/v1/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
-    {
-      method: 'POST',
-      body:
-        input.replay_price === undefined
-          ? { override_price: input.price }
-          : { override_price: input.price, override_replay_price: input.replay_price },
-    },
-  );
+): Promise<SetDeviceGamePriceResult> {
+  const body: { price: number; replay_price?: number } = { price: input.price };
+  if (input.replay_price !== undefined) body.replay_price = input.replay_price;
+
+  await callMothership(`/api/v1/games/${encodeURIComponent(gameId)}/metadata`, {
+    method: 'POST',
+    body,
+  });
+
+  const games = await getDevicePrices(deviceId);
+  // The merged view is keyed on the display name, so match on either: the id that carries
+  // the price is the one written, while an operator-facing row is identified by its name.
+  const confirmed =
+    games.find((game) => game.gameId === gameId) ??
+    games.find((game) => game.displayName === gameId);
+
+  const priceApplied = confirmed !== undefined && samePrice(confirmed.effectivePrice, input.price);
+  const replayApplied =
+    input.replay_price === undefined ||
+    (confirmed !== undefined && samePrice(confirmed.effectiveReplayPrice, input.replay_price));
+
+  if (!confirmed || !priceApplied || !replayApplied) {
+    throw new ApiError(502, 'Mothership did not apply the price change', {
+      deviceId,
+      requested: { price: input.price, replay_price: input.replay_price ?? null },
+      observed: confirmed
+        ? { price: confirmed.effectivePrice, replay_price: confirmed.effectiveReplayPrice }
+        : null,
+    });
+  }
+
+  return {
+    deviceId,
+    gameId: confirmed.gameId,
+    displayName: confirmed.displayName,
+    price: confirmed.effectivePrice,
+    replayPrice: confirmed.effectiveReplayPrice,
+    scope: 'GAME_CATALOG',
+  };
 }
