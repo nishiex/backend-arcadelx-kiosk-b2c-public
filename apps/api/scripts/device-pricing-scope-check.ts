@@ -18,8 +18,10 @@ delete process.env.MOTHERSHIP_TRANSACTION_API_URL;
 type Call = { url: string; method: string; body?: string };
 const calls: Call[] = [];
 
-// Mock Mothership state. The live per-device price endpoint accepts writes but persists
-// nothing; `deviceOverridePersists = false` reproduces that, `true` simulates a fixed one.
+// Mock Mothership state. The live per-device price endpoint persists an override when the
+// body uses `{ price, replay_price }` (confirmed 2026-10-13). `deviceOverridePersists =
+// false` reproduces the regression this service must still catch -- a write that is accepted
+// and persisted by nobody -- while `true` mirrors the confirmed live contract.
 let deviceOverridePersists = false;
 let catalogWriteApplies = false;
 
@@ -120,10 +122,10 @@ globalThis.fetch = async (input, init) => {
     if (deviceWrite) {
       const game = deviceState(deviceWrite[1] as DeviceId).get(GAME_ID);
       assert.ok(game, "mock game state is missing");
-      const body = JSON.parse(bodyText ?? "{}") as { override_price?: number; override_replay_price?: number };
+      const body = JSON.parse(bodyText ?? "{}") as { price?: number; replay_price?: number };
       if (deviceOverridePersists) {
-        if (typeof body.override_price === "number") game.overridePrice = body.override_price;
-        if (typeof body.override_replay_price === "number") game.overrideReplayPrice = body.override_replay_price;
+        if (typeof body.price === "number") game.overridePrice = body.price;
+        if (typeof body.replay_price === "number") game.overrideReplayPrice = body.replay_price;
       }
       return Response.json({ status: "success" });
     }
@@ -143,8 +145,8 @@ globalThis.fetch = async (input, init) => {
 };
 
 try {
-  // Case 1 — DEVICE scope against the live upstream behaviour: the write is accepted but
-  // persists nothing, so the request must fail clearly and must not fall back to the catalog.
+  // Case 1 -- DEVICE scope when the upstream accepts the write and persists nothing: the
+  // request must fail clearly and must not fall back to the catalog.
   resetState();
   deviceOverridePersists = false;
   catalogWriteApplies = false;
@@ -156,23 +158,23 @@ try {
   }
   assert.ok(deviceFailure instanceof ApiError, "a no-persist device write must reject");
   assert.equal(deviceFailure.statusCode, 502);
-  assert.match(deviceFailure.message, /did not save a device price override/);
-  assert.match(deviceFailure.message, /not currently supported/);
+  assert.match(deviceFailure.message, /did not confirm a device price override/);
+  assert.match(deviceFailure.message, /no price change was verified/);
   assert.equal((deviceFailure.errors as { targetVerified?: boolean } | null)?.targetVerified, false);
   const deviceWrites = calls.filter((call) => call.method === "POST" && call.url.includes("/devices/"));
   assert.equal(deviceWrites.length, 1, "the device override endpoint is attempted exactly once");
   assert.deepEqual(JSON.parse(deviceWrites[0]?.body ?? "{}"), {
-    override_price: 150,
-    override_replay_price: 60,
+    price: 150,
+    replay_price: 60,
   });
   assert.equal(
     calls.filter((call) => call.url.includes("/api/v1/games")).length,
     0,
     "device scope must not touch the catalog",
   );
-  console.log("PASS device scope: no-persist write fails clearly, reports not-supported, and never touches the catalog");
+  console.log("PASS device scope: an unpersisted write fails clearly and never touches the catalog");
 
-  // Case 2 — DEVICE scope with a simulated working per-device endpoint: the override is
+  // Case 2 -- DEVICE scope with the endpoint behaving as confirmed live: the override is
   // verified through the read-back, still without reading or writing the catalog.
   resetState();
   deviceOverridePersists = true;

@@ -127,12 +127,12 @@ globalThis.fetch = async (input, init) => {
         },
       })
     }
-    // Mirrors the live API reply for a device override that Mothership does not persist.
+    // Mirrors the live API reply for a device override the read-back does not confirm.
     return Response.json(
       {
         success: false,
         message:
-          "Mothership did not save a device price override: the per-device price endpoint accepted the request but persisted nothing, and no price was changed. Per-device overrides are not currently supported by Mothership; a fleet-wide change must be requested explicitly.",
+          "Mothership did not confirm a device price override: the request was accepted, but re-reading the selected device does not show the requested price as an override, and no price change was verified.",
         errors: {
           requested: { price: body.price, replayPrice: body.replay_price },
           observed: {
@@ -209,14 +209,14 @@ try {
   await setInputValue(numberInputs()[0]!, "150")
   await setInputValue(numberInputs()[1]!, "60")
 
-  // Default action: a device-scoped write. The mocked upstream persists nothing, so the
-  // clear "not saved" report must surface and point at the explicit fleet-wide action.
+  // Default action: a device-scoped write. The mocked upstream does not confirm it, so the
+  // clear "not confirmed" report must surface and point at the explicit fleet-wide action.
   const saveButton = button("Save device price")
   assert.ok(saveButton, "the default device save action must be offered")
   await React.act(async () => saveButton.click())
   await until(() => !!document.querySelector('[role="alert"]'))
   const alertText = document.querySelector('[role="alert"]')!.textContent ?? ""
-  assert.ok(alertText.includes("did not save a device price override"), "the failure is reported clearly")
+  assert.ok(alertText.includes("did not confirm a device price override"), "the failure is reported clearly")
   assert.ok(alertText.includes("Apply to all kiosks"), "the failure points at the explicit fleet-wide action")
   assert.equal(posts.length, 1, "the default action is the only request so far")
   assert.deepEqual(posts[0], {

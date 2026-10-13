@@ -79,6 +79,25 @@ node -r ./audits/auth-registration/runtime-loader.cjs audits/revenue-trend/fetch
 It runs the same two services the worker runs, twice each to prove idempotency, and records
 the result in `audits/revenue-trend/live-devices-and-payments.json`.
 
+## Per-device price overrides (2026-10-13)
+
+Device-scoped pricing was broken by our own request body, not by Mothership. The device price
+endpoint persists an override only when the body is `{ price, replay_price }`; sending
+`{ override_price, override_replay_price }` answers HTTP 200 `{"status":"success"}` while
+echoing the *existing* price and saving nothing. That silent no-op is what made every
+device-only change look like an unsupported upstream feature, and only the service's read-back
+caught it -- an upstream "success" body cannot be trusted on its own.
+
+Confirmed live on one offline device and reverted: `POST
+/api/v1/devices/{device_id}/games/{game_id}/price` with `{ price, replay_price }` sets
+`has_override=1` with the override price and leaves the catalog and every other device
+unchanged; `POST /api/v1/devices/{device_id}/prices/reset` removes the overrides and reports
+`removed_overrides`. `audits/devices/verify-device-price-override.ts` drives the real service
+through that cycle (it refuses to run without `ALLOW_LIVE_MOTHERSHIP_WRITE=1`) and records
+`audits/devices/live-device-price-override.json`. The scope distinction is unchanged: `DEVICE`
+is the default and never falls back to `GAME_CATALOG`, which remains the only fleet-wide
+change. A device that does not confirm the override still reports 502 rather than success.
+
 ## Reservation ordering and company allocation (2026-10-07)
 
 `reserveKiosks` used to select stock with `ORDER BY "createdAt", id LIMIT n`. Since

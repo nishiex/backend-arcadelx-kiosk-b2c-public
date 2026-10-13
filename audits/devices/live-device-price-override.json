@@ -1,0 +1,54 @@
+{
+  "startedAt": "2026-10-13T11:17:18.409Z",
+  "deviceId": "0dcb12aa-2298-11ea-af01-d5b8d5c63200",
+  "gameId": "Bennys Sweet Jump",
+  "requested": {
+    "price": 137,
+    "replayPrice": 41
+  },
+  "before": {
+    "price": 10,
+    "replayPrice": 57.5,
+    "basePrice": 10,
+    "baseReplayPrice": 57.5,
+    "hasOverride": false,
+    "overridePrice": null,
+    "overrideReplayPrice": null
+  },
+  "result": {
+    "deviceId": "0dcb12aa-2298-11ea-af01-d5b8d5c63200",
+    "gameId": "Bennys Sweet Jump",
+    "displayName": "Bennys Sweet Jump",
+    "price": 137,
+    "replayPrice": 41,
+    "scope": "DEVICE_GAME_OVERRIDE"
+  },
+  "after": {
+    "price": 137,
+    "replayPrice": 41,
+    "basePrice": 10,
+    "baseReplayPrice": 57.5,
+    "hasOverride": true,
+    "overridePrice": 137,
+    "overrideReplayPrice": 41
+  },
+  "changedOtherDevices": [],
+  "verified": true,
+  "reset": {
+    "deviceId": "0dcb12aa-2298-11ea-af01-d5b8d5c63200",
+    "gamesReset": 1,
+    "scope": "DEVICE_OVERRIDES"
+  },
+  "afterReset": {
+    "price": 10,
+    "replayPrice": 57.5,
+    "basePrice": 10,
+    "baseReplayPrice": 57.5,
+    "hasOverride": false,
+    "overridePrice": null,
+    "overrideReplayPrice": null
+  },
+  "changedOtherDevicesAfterReset": [],
+  "reverted": true,
+  "finishedAt": "2026-10-13T11:17:19.047Z"
+}

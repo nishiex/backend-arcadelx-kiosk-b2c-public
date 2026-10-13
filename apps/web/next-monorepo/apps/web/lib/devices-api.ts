@@ -65,8 +65,8 @@ function describeDevicePriceVerification(errors: unknown): string | null {
     : "not available"
   const fleetState = details.fleetChanged === true ? "device list changed" : "device list unchanged"
 
-  // A failed device write (the per-device endpoint persists nothing today) should point the
-  // operator at the explicit fleet-wide action while never taking it on their behalf.
+  // A device write the upstream does not confirm should point the operator at the explicit
+  // fleet-wide action while never taking it on their behalf.
   const nextStep =
     details.targetVerified === false
       ? ' To set this price on every kiosk instead, use "Apply to all kiosks".'

@@ -17,17 +17,23 @@ import {
  * This API stores no pricing of its own — pricing lives entirely in Mothership — so this
  * module only proxies. Price mutations are gated to Company OWNER/ADMIN.
  *
- * The two read endpoints were confirmed live on 2026-10-12 with **read-only** requests:
+ * The read endpoints were confirmed live on 2026-10-12 with **read-only** requests:
  *   - `GET  /api/v1/kiosks/device-ids`                          → 9 devices
- *   - `GET  /api/v1/devices/{device_id}/prices`                  → 30 rows
+ *   - `GET  /api/v1/devices/{device_id}/prices`                  → 16 rows per device
+ *
+ * The per-device write contract was confirmed live on 2026-10-13, on one offline device:
+ * `POST /api/v1/devices/{device_id}/games/{game_id}/price` persists a per-device override
+ * only when the body uses `{ price, replay_price }`. The same request carrying
+ * `{ override_price, override_replay_price }` answers 200 `{"status":"success"}` while
+ * echoing the *existing* price and saving nothing — the keys were the whole defect, so a
+ * "success" response is never trusted on its own.
  *
  * Price writes and resets use Mothership's device-scoped endpoints by default. A device
  * write is confirmed by re-reading the selected device and checking that all other devices
- * remain unchanged; the per-device price endpoint currently persists nothing, so such a
- * write can legitimately fail and says so clearly. A caller may instead request the
- * explicit `GAME_CATALOG` scope, which updates the game's catalog price (every kiosk
- * offering the game) and is confirmed against `GET /api/v1/games`. A device-scoped request
- * never falls back to the catalog endpoint.
+ * remain unchanged, so a silently-ignored write is caught instead of reported as success.
+ * A caller may instead request the explicit `GAME_CATALOG` scope, which updates the game's
+ * catalog price (every kiosk offering the game) and is confirmed against
+ * `GET /api/v1/games`. A device-scoped request never falls back to the catalog endpoint.
  */
 
 const REQUEST_TIMEOUT_MS = 15000;
@@ -482,11 +488,15 @@ export async function setDeviceGamePrice(
     throw new ApiError(404, 'Game was not found on the selected device', { deviceId, gameId });
   }
 
-  const body: { override_price: number; override_replay_price?: number } = {
-    override_price: input.price,
+  // Confirmed live 2026-10-13: this endpoint reads `price` / `replay_price`. The
+  // `override_price` / `override_replay_price` keys this used to send are accepted with
+  // 200 "success" and then ignored, which is what made device-scoped pricing look like an
+  // unsupported upstream feature.
+  const body: { price: number; replay_price?: number } = {
+    price: input.price,
   };
   if (input.replay_price !== undefined) {
-    body.override_replay_price = input.replay_price;
+    body.replay_price = input.replay_price;
   }
 
   await callMothership(
@@ -547,7 +557,7 @@ export async function setDeviceGamePrice(
       502,
       targetVerified
         ? 'Mothership changed pricing outside the selected device, so the update was not verified as device-only'
-        : 'Mothership did not save a device price override: the per-device price endpoint accepted the request but persisted nothing, and no price was changed. Per-device overrides are not currently supported by Mothership; a fleet-wide change must be requested explicitly.',
+        : 'Mothership did not confirm a device price override: the request was accepted, but re-reading the selected device does not show the requested price as an override, and no price change was verified.',
       {
         deviceId,
         gameId: gameBefore.gameId,
