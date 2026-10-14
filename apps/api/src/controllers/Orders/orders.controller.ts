@@ -307,7 +307,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   if (currentOrgType === 'PARTNER' && parsed.type !== 'REQUEST') {
     throw new ApiError(403, 'Partners can request kiosks but cannot allocate them');
   }
-  if (currentOrgType === 'COMPANY') {
+  if (currentOrgType === 'COMPANY' && parsed.type === 'REQUEST') {
     throw new ApiError(403, 'Company cannot request kiosks; use ALLOCATION to push kiosks to distributors or partners');
   }
 

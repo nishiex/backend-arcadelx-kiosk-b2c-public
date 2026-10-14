@@ -8,10 +8,27 @@ import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-peri
 import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
 import { getMothershipPayments } from '../../services/Revenue/revenueTransaction.services';
 
-export const getMothershipPaymentsFeed = asyncHandler(async (_req, res) => {
+export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
+  const organizationId = req.membership!.organizationId;
   const result = await getMothershipPayments();
+
+  // The upstream feed is fleet-wide. Restrict it to devices currently owned by
+  // this Company before returning it. Historical assignments are intentionally
+  // excluded: a transferred kiosk must not remain visible in the live feed.
+  const kiosks = await prisma.kiosk.findMany({
+    where: { currentOrgId: organizationId },
+    select: { externalDeviceId: true, machineCode: true },
+  });
+  const allowedDeviceIds = new Set(
+    kiosks.flatMap((kiosk) => [kiosk.externalDeviceId, kiosk.machineCode].filter(Boolean)),
+  );
+  const payments = result.payments.filter((payment) => allowedDeviceIds.has(payment.device_id));
   res.json(
-    new ApiResponse(200, result, 'Mothership payments fetched successfully'),
+    new ApiResponse(
+      200,
+      { ...result, total: payments.length, payments },
+      'Mothership payments fetched successfully',
+    ),
   );
 });
 

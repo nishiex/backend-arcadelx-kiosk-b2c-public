@@ -125,21 +125,30 @@ export async function syncDevices(): Promise<DeviceSyncResult> {
         // A discovered device is operational, so its ownership ledger starts now;
         // otherwise its payments would be stored but never attributed.
         await recordOpeningAssignments(tx, [kiosk], null);
+
+        // Keep the sequence floor update atomic with kiosk creation. If this fails,
+        // the discovered kiosk must not remain committed with an unadvanced counter.
+        const floor = machineCodeCounterFloor(device.device_id, new Date().getUTCFullYear());
+        if (floor > 0) {
+          await tx.$executeRaw`
+            INSERT INTO "MachineSequence" (year, value) VALUES (${new Date().getUTCFullYear()}, ${floor})
+            ON CONFLICT (year) DO UPDATE SET value = GREATEST("MachineSequence".value, ${floor})`;
+        }
       });
       newKiosksCreated++;
       createdMachineCodes.push(device.device_id);
-      // A synced device whose id follows the ADLX-YYYY-A### pattern occupies a slot in the
-      // batch generator's numbering. Keep the counter ahead of it, or the next Add Machine
-      // would try to mint a code that already exists. See machine-code-sequence.ts.
-      const floor = machineCodeCounterFloor(device.device_id, new Date().getUTCFullYear());
-      if (floor > 0) {
-        await prisma.$executeRaw`
-          INSERT INTO "MachineSequence" (year, value) VALUES (${new Date().getUTCFullYear()}, ${floor})
-          ON CONFLICT (year) DO UPDATE SET value = GREATEST("MachineSequence".value, ${floor})`;
+    } catch (error) {
+      // A concurrent sync or a colliding machine code is expected: the other writer
+      // owns the row. All other failures must abort the sync instead of being reported
+      // as rejected feed records.
+      const code = error && typeof error === "object" && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+      if (code === "P2002" || code === "23505") {
+        rejectedRecords++;
+        continue;
       }
-    } catch {
-      // A concurrent sync or a colliding machine code: the device is already represented.
-      rejectedRecords++;
+      throw error;
     }
   }
 

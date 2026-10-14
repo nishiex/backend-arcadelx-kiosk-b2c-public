@@ -381,7 +381,8 @@ model Transaction {
   currency              String   @default("INR")
   externalTransactionId String   @unique // Maps to 'txnid'
 
-  occurredAt            DateTime // Maps to 'updated_at'
+  // Store the upstream instant with its timezone so reports do not depend on the API host timezone.
+  occurredAt            DateTime @db.Timestamptz(3) // Maps to 'updated_at'
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
