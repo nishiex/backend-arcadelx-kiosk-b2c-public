@@ -1,0 +1,222 @@
+{
+  "generatedAt": "2026-10-14T06:08:20.852Z",
+  "target": "postgresql://postgres.vsednsppdlbcensnvwxq:***@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres",
+  "source": "DIRECT_URL",
+  "identity": {
+    "database": "postgres",
+    "usr": "postgres",
+    "version": "PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit"
+  },
+  "publicTables": [
+    "Agreement",
+    "EmailDelivery",
+    "Kiosk",
+    "KioskAssignment",
+    "KioskReturnRequest",
+    "MachineSequence",
+    "Membership",
+    "NetworkConnection",
+    "Order",
+    "OrderKiosk",
+    "OrderSequence",
+    "Organization",
+    "PasswordReset",
+    "RefreshToken",
+    "RevenueStatement",
+    "RevenueSyncRunLog",
+    "SystemSettings",
+    "Transaction",
+    "User",
+    "_prisma_migrations"
+  ],
+  "requiredTables": {
+    "User": true,
+    "Organization": true,
+    "Membership": true,
+    "Kiosk": true,
+    "KioskAssignment": true,
+    "MachineSequence": true,
+    "OrderSequence": true,
+    "EmailDelivery": true,
+    "Order": true,
+    "OrderKiosk": true,
+    "Transaction": true,
+    "RevenueStatement": true,
+    "SystemSettings": true
+  },
+  "missingTables": [],
+  "requiredColumns": {
+    "Organization.phone": {
+      "table_name": "Organization",
+      "column_name": "phone",
+      "is_nullable": "YES",
+      "data_type": "character varying"
+    },
+    "Organization.country": {
+      "table_name": "Organization",
+      "column_name": "country",
+      "is_nullable": "YES",
+      "data_type": "character varying"
+    },
+    "Organization.isActive": {
+      "table_name": "Organization",
+      "column_name": "isActive",
+      "is_nullable": "NO",
+      "data_type": "boolean"
+    },
+    "Organization.accessVersion": {
+      "table_name": "Organization",
+      "column_name": "accessVersion",
+      "is_nullable": "NO",
+      "data_type": "integer"
+    },
+    "Organization.inviteCode": {
+      "table_name": "Organization",
+      "column_name": "inviteCode",
+      "is_nullable": "YES",
+      "data_type": "text"
+    },
+    "Organization.inviteCodeExpiresAt": {
+      "table_name": "Organization",
+      "column_name": "inviteCodeExpiresAt",
+      "is_nullable": "YES",
+      "data_type": "timestamp without time zone"
+    },
+    "User.contact": {
+      "table_name": "User",
+      "column_name": "contact",
+      "is_nullable": "NO",
+      "data_type": "text"
+    }
+  },
+  "missingColumns": [],
+  "counts": {
+    "User": 3,
+    "Organization": 3,
+    "Membership": 3,
+    "Kiosk": 10,
+    "KioskAssignment": 10,
+    "Order": 1,
+    "OrderKiosk": 0,
+    "Transaction": 0
+  },
+  "activeOwners": [
+    {
+      "email": "nileegames@gmail.com",
+      "name": "Anand Jha",
+      "organization": "NileeGames test",
+      "type": "COMPANY",
+      "role": "OWNER",
+      "status": "ACTIVE"
+    },
+    {
+      "email": "nishitcode@gmail.com",
+      "name": "code.nishit",
+      "organization": "TEST Distributor Pvt Ltd",
+      "type": "DISTRIBUTOR",
+      "role": "OWNER",
+      "status": "ACTIVE"
+    },
+    {
+      "email": "pnishit921@gmail.com",
+      "name": "nishi patel",
+      "organization": "expertwise",
+      "type": "DISTRIBUTOR",
+      "role": "OWNER",
+      "status": "ACTIVE"
+    }
+  ],
+  "migrations": [
+    {
+      "migration_name": "20260909095919_add_user_organization_membership_refresh_tokens",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260914132819_implement_agreement_and_network_connection_schemas",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260916124637_implement_kiosk_and_kioskassignment",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260917091838_add_password_reset",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260917132138_add_kiosk_location_and_assignment_model",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260918132130_modify_agreement_schema_with_deposit_amount_and_nonrefundable_amount",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260921095532_implement_order_and_order_kiosk_schemas",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260922135228_implement_payment_status_in_orders",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260922151453_add_invoice_filename",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260928063729_implement_transactions_schema",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20260928073023_remove_payu_retries",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261005105703_add_revenue_statements_and_system_settings",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261005113632_add_tds_to_revenue_statement",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006125855_add_gst_number_in_organization_and_contact_in_user_schema",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006134929_change_contact_dtype_from_big_int_to_string",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261006151505_add_delted_at_in_network_connection_for_soft_deletion",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261007170801_remove_retired_status_from_kiosk_status_enum",
+      "applied": true,
+      "rolled_back": false
+    },
+    {
+      "migration_name": "20261008114321_impl_kiosk_return_request_schema_and_request_return_status_in_kiosk_status_schema",
+      "applied": true,
+      "rolled_back": false
+    }
+  ],
+  "migrationCount": 18
+}

@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-10-14T06:15:38.996Z",
+  "apiPort": 4189,
+  "checks": [
+    {
+      "name": "server starts with the configured database",
+      "ok": true,
+      "detail": "listening on 4189"
+    },
+    {
+      "name": "login as the COMPANY OWNER",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "session cookie captured",
+      "ok": true,
+      "detail": "present"
+    },
+    {
+      "name": "read-only snapshot taken",
+      "ok": true,
+      "detail": "payu=1 | razorpay=2"
+    },
+    {
+      "name": "both providers active with credentials",
+      "ok": true,
+      "detail": "payu: 3 fields, driver=true, active=true | razorpay: 3 fields, driver=true, active=true"
+    }
+  ],
+  "writes": [],
+  "reads": [
+    {
+      "at": "2026-10-14T06:15:46.568Z",
+      "status": 200,
+      "gateways": [
+        {
+          "provider": "payu",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "merchant_key",
+            "merchant_salt",
+            "merchant_vpa"
+          ],
+          "updated_at": "2026-10-14T06:14:29.812117+00:00"
+        },
+        {
+          "provider": "razorpay",
+          "priority": 2,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "key_id",
+            "key_secret",
+            "webhook_secret"
+          ],
+          "updated_at": "2026-10-14T06:14:32.156467+00:00"
+        }
+      ]
+    }
+  ],
+  "mode": "read-only",
+  "serverLogExcerpt": "Server Running on 4189",
+  "failures": []
+}

@@ -1,0 +1,214 @@
+{
+  "generatedAt": "2026-10-14T06:11:14.029Z",
+  "databaseTarget": {
+    "host": "aws-0-ap-southeast-2.pooler.supabase.com:6543",
+    "database": "postgres",
+    "user": "postgres.vsednsppdlbcensnvwxq",
+    "params": "?pgbouncer=true"
+  },
+  "directTarget": {
+    "host": "aws-0-ap-southeast-2.pooler.supabase.com:5432",
+    "database": "postgres",
+    "user": "postgres.vsednsppdlbcensnvwxq",
+    "params": ""
+  },
+  "apiPort": 4188,
+  "checks": [
+    {
+      "name": "server starts with the configured database",
+      "ok": true,
+      "detail": "listening on 4188"
+    },
+    {
+      "name": "GET /health -> 200",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "GET /health/db -> connected",
+      "ok": true,
+      "detail": "{\"statusCode\":200,\"data\":\"Database Connected!\",\"message\":\"Success\",\"success\":true}"
+    },
+    {
+      "name": "POST /api/auth/login -> 200 (COMPANY OWNER on this database)",
+      "ok": true,
+      "detail": "status 200 body {\"statusCode\":200,\"data\":{\"user\":{\"id\":\"d065ee5d-34a5-415a-9a27-a84eb13c5d68\",\"email\":\"nileegames@gmail.com\"}},\"message\":\"Login successful\",\"success\":true}"
+    },
+    {
+      "name": "GET /api/auth/me resolves the COMPANY OWNER gate",
+      "ok": true,
+      "detail": "orgType=COMPANY role=OWNER status=ACTIVE"
+    },
+    {
+      "name": "GET /api/admin/gateways without a session is refused",
+      "ok": true,
+      "detail": "status 401"
+    },
+    {
+      "name": "GET /api/admin/gateways -> 200",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "live order read from Mothership",
+      "ok": true,
+      "detail": "razorpay -> payu"
+    },
+    {
+      "name": "reorder response recorded",
+      "ok": true,
+      "detail": "HTTP 502 :: Mothership accepted the reorder request but did not apply the requested gateway priority order"
+    },
+    {
+      "name": "live routing order unchanged by the attempt (or restored below)",
+      "ok": true,
+      "detail": "before=razorpay -> payu after=razorpay -> payu"
+    },
+    {
+      "name": "provider updated_at values unchanged (nothing was stored)",
+      "ok": true,
+      "detail": "razorpay@2026-10-13T11:42:03.116475+00:00 | payu@2026-10-12T08:04:22.038192+00:00"
+    },
+    {
+      "name": "verification session logged out",
+      "ok": true,
+      "detail": "status 200"
+    }
+  ],
+  "serverLogExcerpt": "Server Running on 4188\n[mothership-admin] gateway reorder was not applied {",
+  "databaseHealth": {
+    "statusCode": 200,
+    "data": "Database Connected!",
+    "message": "Success",
+    "success": true
+  },
+  "login": {
+    "status": 200,
+    "body": {
+      "statusCode": 200,
+      "data": {
+        "user": {
+          "id": "d065ee5d-34a5-415a-9a27-a84eb13c5d68",
+          "email": "nileegames@gmail.com"
+        }
+      },
+      "message": "Login successful",
+      "success": true
+    },
+    "cookieIssued": true
+  },
+  "account": {
+    "email": "nileegames@gmail.com",
+    "membership": {
+      "organizationId": "95cd0e1d-1ca8-48cc-b227-033a6acf85a7",
+      "status": "ACTIVE",
+      "role": "OWNER",
+      "organization": {
+        "id": "95cd0e1d-1ca8-48cc-b227-033a6acf85a7",
+        "name": "NileeGames test",
+        "type": "COMPANY"
+      }
+    }
+  },
+  "anonymousStatus": 401,
+  "before": {
+    "status": 200,
+    "total": 2,
+    "order": [
+      "razorpay",
+      "payu"
+    ],
+    "gateways": [
+      {
+        "provider": "razorpay",
+        "display_name": "Razorpay UPI",
+        "priority": 1,
+        "is_active": true,
+        "has_driver": true,
+        "credentialFields": [
+          "key_id",
+          "key_secret",
+          "webhook_secret"
+        ],
+        "updated_at": "2026-10-13T11:42:03.116475+00:00"
+      },
+      {
+        "provider": "payu",
+        "display_name": "PayU Payments",
+        "priority": 2,
+        "is_active": true,
+        "has_driver": true,
+        "credentialFields": [
+          "merchant_key",
+          "merchant_salt",
+          "merchant_vpa"
+        ],
+        "updated_at": "2026-10-12T08:04:22.038192+00:00"
+      }
+    ]
+  },
+  "reorderRequest": {
+    "gateways": [
+      {
+        "provider": "payu",
+        "priority": 1
+      },
+      {
+        "provider": "razorpay",
+        "priority": 2
+      }
+    ]
+  },
+  "reorderResponse": {
+    "status": 502,
+    "body": {
+      "success": false,
+      "message": "Mothership accepted the reorder request but did not apply the requested gateway priority order",
+      "errors": {
+        "requestedOrder": [
+          "payu",
+          "razorpay"
+        ],
+        "liveOrder": [
+          "razorpay",
+          "payu"
+        ]
+      }
+    }
+  },
+  "after": {
+    "order": [
+      "razorpay",
+      "payu"
+    ],
+    "gateways": [
+      {
+        "provider": "razorpay",
+        "display_name": "Razorpay UPI",
+        "priority": 1,
+        "is_active": true,
+        "has_driver": true,
+        "credentialFields": [
+          "key_id",
+          "key_secret",
+          "webhook_secret"
+        ],
+        "updated_at": "2026-10-13T11:42:03.116475+00:00"
+      },
+      {
+        "provider": "payu",
+        "display_name": "PayU Payments",
+        "priority": 2,
+        "is_active": true,
+        "has_driver": true,
+        "credentialFields": [
+          "merchant_key",
+          "merchant_salt",
+          "merchant_vpa"
+        ],
+        "updated_at": "2026-10-12T08:04:22.038192+00:00"
+      }
+    ]
+  },
+  "failures": []
+}

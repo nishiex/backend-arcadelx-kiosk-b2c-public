@@ -1,0 +1,211 @@
+{
+  "generatedAt": "2026-10-14T07:26:13.677Z",
+  "apiPort": 4191,
+  "checks": [
+    {
+      "name": "server starts with the configured database",
+      "ok": true,
+      "detail": "listening on 4191"
+    },
+    {
+      "name": "login as the COMPANY OWNER",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "live state is the expected razorpay=1 / payu=2",
+      "ok": true,
+      "detail": "razorpay=1 | payu=2"
+    },
+    {
+      "name": "POST /api/admin/gateways/reorder (move payu up) -> 200",
+      "ok": true,
+      "detail": "status 200 :: {\"statusCode\":200,\"data\":{\"status\":\"success\",\"message\":\"Priorities updated.\",\"requestedOrder\":[\"payu\",\"razorpay\"],\"appliedWrites\":[{\"provider\":\"payu\",\"priority\":1},{\"provider\":\"razorpay\",\"priority\":2}"
+    },
+    {
+      "name": "upstream order really changed",
+      "ok": true,
+      "detail": "payu=1 | razorpay=2"
+    },
+    {
+      "name": "response reports the verified order",
+      "ok": true,
+      "detail": "[\"payu\",\"razorpay\"]"
+    },
+    {
+      "name": "response reports what it wrote",
+      "ok": true,
+      "detail": "[{\"provider\":\"payu\",\"priority\":1},{\"provider\":\"razorpay\",\"priority\":2}]"
+    },
+    {
+      "name": "POST /api/admin/gateways/reorder (move razorpay back up) -> 200",
+      "ok": true,
+      "detail": "status 200 :: {\"statusCode\":200,\"data\":{\"status\":\"success\",\"message\":\"Priorities updated.\",\"requestedOrder\":[\"razorpay\",\"payu\"],\"appliedWrites\":[{\"provider\":\"razorpay\",\"priority\":1},{\"provider\":\"payu\",\"priority\":2}"
+    },
+    {
+      "name": "live routing restored to razorpay=1 / payu=2",
+      "ok": true,
+      "detail": "razorpay=1 | payu=2"
+    },
+    {
+      "name": "re-requesting the current order is a no-op that still verifies",
+      "ok": true,
+      "detail": "status 200 appliedWrites=[]"
+    },
+    {
+      "name": "both providers still active with their credentials",
+      "ok": true,
+      "detail": "payu:3 fields,active=true,driver=true | razorpay:3 fields,active=true,driver=true -> payu:3 fields,active=true,driver=true | razorpay:3 fields,active=true,driver=true"
+    },
+    {
+      "name": "verification session logged out",
+      "ok": true,
+      "detail": "status 200"
+    }
+  ],
+  "steps": [
+    {
+      "at": "2026-10-14T07:26:22.708Z",
+      "request": {
+        "gateways": [
+          {
+            "provider": "payu",
+            "priority": 1
+          },
+          {
+            "provider": "razorpay",
+            "priority": 2
+          }
+        ]
+      },
+      "status": 200,
+      "body": {
+        "statusCode": 200,
+        "data": {
+          "status": "success",
+          "message": "Priorities updated.",
+          "requestedOrder": [
+            "payu",
+            "razorpay"
+          ],
+          "appliedWrites": [
+            {
+              "provider": "payu",
+              "priority": 1
+            },
+            {
+              "provider": "razorpay",
+              "priority": 2
+            }
+          ],
+          "liveOrder": [
+            "payu",
+            "razorpay"
+          ]
+        },
+        "message": "Gateway priority updated successfully",
+        "success": true
+      }
+    },
+    {
+      "at": "2026-10-14T07:26:25.153Z",
+      "request": {
+        "gateways": [
+          {
+            "provider": "razorpay",
+            "priority": 1
+          },
+          {
+            "provider": "payu",
+            "priority": 2
+          }
+        ]
+      },
+      "status": 200,
+      "body": {
+        "statusCode": 200,
+        "data": {
+          "status": "success",
+          "message": "Priorities updated.",
+          "requestedOrder": [
+            "razorpay",
+            "payu"
+          ],
+          "appliedWrites": [
+            {
+              "provider": "razorpay",
+              "priority": 1
+            },
+            {
+              "provider": "payu",
+              "priority": 2
+            }
+          ],
+          "liveOrder": [
+            "razorpay",
+            "payu"
+          ]
+        },
+        "message": "Gateway priority updated successfully",
+        "success": true
+      }
+    },
+    {
+      "at": "2026-10-14T07:26:27.554Z",
+      "request": {
+        "gateways": [
+          {
+            "provider": "razorpay",
+            "priority": 1
+          },
+          {
+            "provider": "payu",
+            "priority": 2
+          }
+        ]
+      },
+      "status": 200,
+      "body": {
+        "statusCode": 200,
+        "data": {
+          "status": "success",
+          "message": "Priorities updated.",
+          "requestedOrder": [
+            "razorpay",
+            "payu"
+          ],
+          "appliedWrites": [],
+          "liveOrder": [
+            "razorpay",
+            "payu"
+          ]
+        },
+        "message": "Gateway priority updated successfully",
+        "success": true
+      }
+    }
+  ],
+  "before": {
+    "order": [
+      "razorpay=1",
+      "payu=2"
+    ],
+    "providers": "payu:3 fields,active=true,driver=true | razorpay:3 fields,active=true,driver=true"
+  },
+  "afterUp": {
+    "order": [
+      "payu=1",
+      "razorpay=2"
+    ],
+    "providers": "payu:3 fields,active=true,driver=true | razorpay:3 fields,active=true,driver=true"
+  },
+  "afterBack": {
+    "order": [
+      "razorpay=1",
+      "payu=2"
+    ],
+    "providers": "payu:3 fields,active=true,driver=true | razorpay:3 fields,active=true,driver=true"
+  },
+  "serverLogExcerpt": "Server Running on 4191",
+  "failures": []
+}

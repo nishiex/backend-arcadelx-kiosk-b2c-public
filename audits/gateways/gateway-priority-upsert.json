@@ -1,0 +1,218 @@
+{
+  "generatedAt": "2026-10-14T06:14:14.582Z",
+  "apiPort": 4189,
+  "checks": [
+    {
+      "name": "server starts with the configured database",
+      "ok": true,
+      "detail": "listening on 4189"
+    },
+    {
+      "name": "login as the COMPANY OWNER",
+      "ok": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "session cookie captured",
+      "ok": true,
+      "detail": "present"
+    },
+    {
+      "name": "live state is the expected razorpay=1 / payu=2",
+      "ok": true,
+      "detail": "razorpay=1 | payu=2"
+    },
+    {
+      "name": "priority switch persisted through the upsert route",
+      "ok": true,
+      "detail": "payu=1 | razorpay=2"
+    },
+    {
+      "name": "order is stable across two reads",
+      "ok": true,
+      "detail": "payu=1 | razorpay=2"
+    },
+    {
+      "name": "payu stored the new priority (updated_at moved)",
+      "ok": true,
+      "detail": "2026-10-12T08:04:22.038192+00:00 -> 2026-10-14T06:14:29.812117+00:00"
+    },
+    {
+      "name": "razorpay stored the new priority (updated_at moved)",
+      "ok": true,
+      "detail": "2026-10-13T11:42:03.116475+00:00 -> 2026-10-14T06:14:32.156467+00:00"
+    },
+    {
+      "name": "both providers still active with their credentials",
+      "ok": false,
+      "detail": "payu:3 fields | razorpay:3 fields"
+    },
+    {
+      "name": "verification session logged out",
+      "ok": true,
+      "detail": "status 200"
+    }
+  ],
+  "writes": [
+    {
+      "at": "2026-10-14T06:14:24.846Z",
+      "request": {
+        "provider": "payu",
+        "priority": 1
+      },
+      "status": 200,
+      "body": {
+        "statusCode": 200,
+        "data": {
+          "message": "Gateway 'payu' configured.",
+          "status": "success"
+        },
+        "message": "Gateway saved successfully",
+        "success": true
+      }
+    },
+    {
+      "at": "2026-10-14T06:14:27.188Z",
+      "request": {
+        "provider": "razorpay",
+        "priority": 2
+      },
+      "status": 200,
+      "body": {
+        "statusCode": 200,
+        "data": {
+          "message": "Gateway 'razorpay' configured.",
+          "status": "success"
+        },
+        "message": "Gateway saved successfully",
+        "success": true
+      }
+    }
+  ],
+  "reads": [
+    {
+      "at": "2026-10-14T06:14:23.650Z",
+      "status": 200,
+      "gateways": [
+        {
+          "provider": "razorpay",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "key_id",
+            "key_secret",
+            "webhook_secret"
+          ],
+          "updated_at": "2026-10-13T11:42:03.116475+00:00"
+        },
+        {
+          "provider": "payu",
+          "priority": 2,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "merchant_key",
+            "merchant_salt",
+            "merchant_vpa"
+          ],
+          "updated_at": "2026-10-12T08:04:22.038192+00:00"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-14T06:14:26.009Z",
+      "status": 200,
+      "gateways": [
+        {
+          "provider": "payu",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "merchant_key",
+            "merchant_salt",
+            "merchant_vpa"
+          ],
+          "updated_at": "2026-10-14T06:14:29.812117+00:00"
+        },
+        {
+          "provider": "razorpay",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "key_id",
+            "key_secret",
+            "webhook_secret"
+          ],
+          "updated_at": "2026-10-13T11:42:03.116475+00:00"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-14T06:14:28.354Z",
+      "status": 200,
+      "gateways": [
+        {
+          "provider": "payu",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "merchant_key",
+            "merchant_salt",
+            "merchant_vpa"
+          ],
+          "updated_at": "2026-10-14T06:14:29.812117+00:00"
+        },
+        {
+          "provider": "razorpay",
+          "priority": 2,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "key_id",
+            "key_secret",
+            "webhook_secret"
+          ],
+          "updated_at": "2026-10-14T06:14:32.156467+00:00"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-14T06:14:29.519Z",
+      "status": 200,
+      "gateways": [
+        {
+          "provider": "payu",
+          "priority": 1,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "merchant_key",
+            "merchant_salt",
+            "merchant_vpa"
+          ],
+          "updated_at": "2026-10-14T06:14:29.812117+00:00"
+        },
+        {
+          "provider": "razorpay",
+          "priority": 2,
+          "is_active": true,
+          "has_driver": true,
+          "credentialFields": [
+            "key_id",
+            "key_secret",
+            "webhook_secret"
+          ],
+          "updated_at": "2026-10-14T06:14:32.156467+00:00"
+        }
+      ]
+    }
+  ],
+  "serverLogExcerpt": "Server Running on 4189",
+  "failures": [
+    "both providers still active with their credentials"
+  ]
+}

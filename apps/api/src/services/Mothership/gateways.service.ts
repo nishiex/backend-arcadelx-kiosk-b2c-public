@@ -21,17 +21,20 @@ import type {
  * were read-only GET/OPTIONS):
  *   - `GET  /api/v1/admin/gateways`         answers 200 WITHOUT credentials, which is
  *     why every route that exposes it is gated by our own auth.
- *   - `POST /api/v1/admin/gateways`         create or update one provider
- *   - `POST /api/v1/admin/gateways/reorder` set priority order
+ *   - `POST /api/v1/admin/gateways`         create or update one provider. This one does
+ *     store `priority`, so reordering is built on it.
+ *   - `POST /api/v1/admin/gateways/reorder` **not implemented upstream** -- it answers
+ *     HTTP 200 `{ status: "success", message: "Priorities updated." }` for *any* body,
+ *     unparseable input included, and stores nothing (probed 2026-10-13, re-verified
+ *     live 2026-10-14). It is deliberately unused by this client.
  *   - `POST /api/v1/admin/gateways/toggle`  enable/disable one provider
  *   - `DELETE /api/v1/admin/gateways`       remove one provider override
  *
- * Known open issue (2026-10-13): `/reorder` had returned HTTP 500 with the earlier
- * `{ order: string[] }` body shape — that shape was never correct.  The confirmed
- * contract is `{ gateways: [{ provider, priority }, ...] }`, which returns HTTP 200
- * `{ status: "success", message: "Priorities updated." }`.  After a successful POST
- * this client reads the gateway list back and rejects/logs a mismatch instead of
- * reporting a false success. It never retries the live mutation automatically.
+ * Because `/reorder` is a no-op, `reorderGateways` below sets the order through
+ * per-provider upserts and then reads the gateway list back, rejecting and logging a
+ * mismatch instead of reporting a false success. The live mutation is never retried
+ * automatically, and a failure part-way through reports what was already applied.
+ * Live evidence for all of this: audits/gateways/README.md.
  */
 
 const REQUEST_TIMEOUT_MS = 15000;
@@ -177,64 +180,129 @@ export async function upsertGateway(input: UpsertGatewayInput): Promise<unknown>
   return callMothership('/api/v1/admin/gateways', { method: 'POST', body: input });
 }
 
-export async function reorderGateways(input: ReorderGatewaysInput): Promise<unknown> {
-  const result = await callMothership('/api/v1/admin/gateways/reorder', {
-    method: 'POST',
-    body: input,
-  });
+/** Relative routing order: the providers sorted by priority, lowest first. */
+function orderedProviders(gateways: Gateway[]): string[] {
+  return [...gateways].sort((a, b) => a.priority - b.priority).map((gateway) => gateway.provider);
+}
 
-  // Verify Mothership applied the change by reading the live list back and comparing
-  // the *relative routing order* (which provider is first, second, etc.).
-  //
-  // Mothership may normalise the exact priority numbers it stores — e.g. it might
-  // keep razorpay=1/payu=2 internally and just swap which one comes first — so
-  // comparing exact numeric values always mismatches even on a successful write.
-  // Relative order is all that matters for payment routing.
-  let current: { gateways: Gateway[] };
+/**
+ * Set the routing priority order.
+ *
+ * Mothership has no working reorder endpoint (see the header note), so the order is applied
+ * one provider at a time through `POST /api/v1/admin/gateways` -- the same call the provider
+ * form makes -- and then verified by reading the list back. Two properties matter:
+ *
+ *   - Writes go in **ascending target priority**, so the provider that should end up first
+ *     is written first and a provider at priority 1 exists throughout. Writing the demoted
+ *     provider first would briefly leave no provider at priority 1 at all.
+ *   - A provider already at its target priority is **not written at all**, so an order that
+ *     is already in place costs no live write.
+ *
+ * The sequence is not atomic: between two writes the list can hold a duplicate priority (a
+ * tie), which is why the end state is verified and a partial failure is reported as such.
+ */
+export async function reorderGateways(input: ReorderGatewaysInput): Promise<unknown> {
+  const requestedOrder = [...input.gateways]
+    .sort((a, b) => a.priority - b.priority)
+    .map((gateway) => gateway.provider);
+
+  // The current list is both the starting point and the set of providers a reorder may name:
+  // priorities are relative, so a request that invents or omits a provider cannot be honored.
+  const current = await listGateways();
+  const currentByProvider = new Map(current.gateways.map((gateway) => [gateway.provider, gateway]));
+  const currentOrder = orderedProviders(current.gateways);
+
+  const unknownProviders = requestedOrder.filter((provider) => !currentByProvider.has(provider));
+  const missingProviders = currentOrder.filter((provider) => !requestedOrder.includes(provider));
+  if (unknownProviders.length > 0 || missingProviders.length > 0) {
+    throw new ApiError(400, 'Reorder must name exactly the configured gateways', {
+      unknownProviders,
+      missingProviders,
+      configuredProviders: currentOrder,
+    });
+  }
+
+  // Sequential writes are not atomic, so order them (which puts priority 1 first) and skip
+  // every provider that already holds its target priority.
+  const writes = requestedOrder
+    .map((provider, index) => ({ provider, priority: index + 1 }))
+    .filter(({ provider, priority }) => currentByProvider.get(provider)?.priority !== priority);
+
+  const appliedWrites: Array<{ provider: string; priority: number }> = [];
+  for (const write of writes) {
+    try {
+      await upsertGateway(write);
+      appliedWrites.push(write);
+    } catch (error) {
+      // Part-way through, the live order already holds some of the new priorities. Saying so
+      // -- and reporting the order actually in force -- beats implying nothing happened.
+      const liveOrder = await listGateways()
+        .then((list) => orderedProviders(list.gateways))
+        .catch(() => null);
+      console.error('[mothership-admin] gateway reorder failed part-way', {
+        requestedOrder,
+        appliedWrites,
+        failedWrite: write,
+        liveOrder,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new ApiError(
+        502,
+        'Mothership failed during the priority update; some priorities may already be applied',
+        { requestedOrder, appliedWrites, failedWrite: write, liveOrder },
+      );
+    }
+  }
+
+  // Verify the change by reading the live list back and comparing the *relative routing
+  // order* (which provider is first, second, etc.). Mothership may normalise the exact
+  // priority numbers it stores, so comparing numeric values would mismatch even after a
+  // successful write; relative order is all that payment routing uses.
+  let after: { gateways: Gateway[] };
   try {
-    current = await listGateways();
+    after = await listGateways();
   } catch (error) {
     console.error('[mothership-admin] could not verify gateway reorder', {
-      requestedGateways: input.gateways,
+      requestedOrder,
+      appliedWrites,
       error: error instanceof Error ? error.message : String(error),
     });
     throw new ApiError(
       502,
-      'Mothership accepted the reorder request, but the resulting priority could not be verified',
+      'The gateway priority order was written, but the result could not be verified',
       {
-        requestedGateways: input.gateways,
+        requestedOrder,
+        appliedWrites,
         verificationError: error instanceof Error ? error.message : String(error),
       },
     );
   }
 
-  // Build the requested provider sequence (sorted by the priority values we sent).
-  const requestedOrder = [...input.gateways]
-    .sort((a, b) => a.priority - b.priority)
-    .map((g) => g.provider);
-
-  // Build the live provider sequence (sorted by whatever Mothership returned).
-  const liveOrder = [...current.gateways]
-    .sort((a, b) => a.priority - b.priority)
-    .map((g) => g.provider);
-
+  const liveOrder = orderedProviders(after.gateways);
   const orderMismatch =
     requestedOrder.length !== liveOrder.length ||
-    requestedOrder.some((provider, i) => provider !== liveOrder[i]);
+    requestedOrder.some((provider, index) => provider !== liveOrder[index]);
 
   if (orderMismatch) {
     console.error('[mothership-admin] gateway reorder was not applied', {
       requestedOrder,
       liveOrder,
+      appliedWrites,
     });
     throw new ApiError(
       502,
-      'Mothership accepted the reorder request but did not apply the requested gateway priority order',
-      { requestedOrder, liveOrder },
+      'Mothership did not apply the requested gateway priority order',
+      { requestedOrder, liveOrder, appliedWrites },
     );
   }
 
-  return result;
+  return {
+    status: 'success',
+    message: 'Priorities updated.',
+    requestedOrder,
+    appliedWrites,
+    liveOrder,
+  };
 }
 
 export async function toggleGateway(input: ToggleGatewayInput): Promise<unknown> {

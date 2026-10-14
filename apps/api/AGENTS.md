@@ -412,6 +412,42 @@ priority order before reporting success; mismatch or failed verification is logg
 and returned as 502. The live write is never automatically retried. The upstream
 request contract still needs confirmation from Mothership.
 
+Re-verified live 2026-10-14 against the configured online database (Supabase
+`postgres.vsednsppdlbcensnvwxq`, 18 migrations, ACTIVE COMPANY OWNER
+`nileegames@gmail.com`): the dashboard's own body (`{ gateways: [{ provider,
+priority }] }`, payu=1/razorpay=2) returned our 502 with `requestedOrder=[payu,
+razorpay]` against `liveOrder=[razorpay, payu]`, and both providers' `updated_at`
+values were unchanged -- Mothership 2xx'd the call and stored nothing, so the open
+item is upstream, not our code. Live routing stayed razorpay -> payu. Our route
+refuses an anonymous GET with 401, but the upstream list answers 200 without
+credentials and returns `key_id`/`merchant_key`/`merchant_vpa` in clear (the
+secrets themselves are masked). Reproduce with `node
+audits/gateways/verify-gateway-reorder-online.cjs`; evidence and the two side probes
+are in [audits/gateways](../../audits/gateways/README.md). The root `.env` still
+sets `PORT=3000`, which collides with the Next dev server while the frontend proxy
+targets 4000; for local work the API belongs on 4000.
+
+The per-provider upsert (`POST /api/v1/admin/gateways`, the call the provider form itself
+makes) **does** store `priority`: `{provider:'payu',priority:1}` then
+`{provider:'razorpay',priority:2}` moved live routing to payu -> razorpay on 2026-10-14,
+both providers still active with their credentials and only `updated_at` moved. The same
+route (`--restore`) put it back to razorpay -> payu, which is the live order now. So a
+reorder built on upserts is possible, but it is two calls rather than one and passes
+through a visible tie -- write the demoted provider last, so a priority-1 entry always
+exists. `audits/gateways/verify-gateway-priority-upsert.cjs` drives the switch and
+`--read-only` snapshots the current order without writing.
+
+Implemented and live-verified on 2026-10-14: `reorderGateways` now applies the order through
+those per-provider upserts in ascending target priority, writes nothing for a provider already
+at its target priority, and reads the list back before reporting success -- 400 when the
+request names a provider that is not configured, 502 reporting what was already applied when a
+write fails part-way. `audits/gateways/verify-gateway-reorder-live-fix.cjs` proves it end to end
+through `POST /api/admin/gateways/reorder` against the live Mothership (12/12 checks: payu moved
+first and verified, then moved back and left as found; a repeat request costs no write). Caveat
+found while doing this: a test harness must not choose a port from the fetch spec's blocked
+list -- on 4190 undici `fetch` fails with `cause=bad port` even though the server is listening
+and TCP connects, which had made every earlier run of that harness fail at its first check.
+
 The independent `20260930070000_request_rejections` enum migration was applied
 to Supabase on 30 September after a local upgrade/Prisma-registration rehearsal;
 only its two enum additions were applied, then recorded via `prisma migrate resolve`.
