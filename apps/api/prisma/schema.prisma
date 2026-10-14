@@ -47,6 +47,9 @@ model User {
 
   passwordResets PasswordReset[]
 
+  devicePriceRequests   DevicePriceRequest[] @relation("DevicePriceRequestRequester")
+  reviewedPriceRequests DevicePriceRequest[] @relation("DevicePriceRequestReviewer")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -110,7 +113,8 @@ model Organization {
   ordersAsParent   Order[]           @relation("OrderParent")
   ordersAsChild    Order[]           @relation("OrderChild")
   emailDeliveries  EmailDelivery[]
-  revenueStatements RevenueStatement[]
+  revenueStatements   RevenueStatement[]
+  devicePriceRequests DevicePriceRequest[] @relation("DevicePriceRequestOrganization")
 }
 
 model Membership {
@@ -394,6 +398,38 @@ model Transaction {
 enum SyncStatus {
   SUCCESS
   FAILED
+}
+
+enum DevicePriceRequestStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+}
+
+model DevicePriceRequest {
+  id             String                   @id @default(uuid())
+  deviceId       String
+  gameId         String
+  displayName    String
+  price          Decimal                  @db.Decimal(10, 2)
+  replayPrice    Decimal                  @db.Decimal(10, 2)
+  requesterOrgId String
+  requestedById  String
+  status         DevicePriceRequestStatus @default(PENDING)
+  processingAt   DateTime?
+  reviewNote     String?                  @db.Text
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  requesterOrg Organization @relation("DevicePriceRequestOrganization", fields: [requesterOrgId], references: [id])
+  requestedBy  User         @relation("DevicePriceRequestRequester", fields: [requestedById], references: [id])
+  reviewedBy   User?        @relation("DevicePriceRequestReviewer", fields: [reviewedById], references: [id])
+
+  @@index([requesterOrgId, status])
+  @@index([status, createdAt])
 }
 
 model RevenueSyncRunLog {

@@ -35,10 +35,11 @@ export type Permissions = {
   canViewRevenue: boolean
   /** Payment gateway administration is COMPANY + OWNER/ADMIN only. */
   canManageGateways: boolean
-  /** The Mothership device fleet: read scope matches revenue. */
+  /** Devices are visible for the current org; Company fleet visibility is master-admin only. */
   canViewDevices: boolean
-  /** Changing a device's game price writes to live hardware: COMPANY + OWNER/ADMIN only. */
+  /** Company master admins may apply prices; other orgs may submit requests. */
   canManageDevicePrices: boolean
+  canRequestDevicePrices: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
   /** Fine-grained matrix check. OWNER always passes (never locked out). */
@@ -100,13 +101,16 @@ export function useMe(): Permissions {
       !isError &&
       me?.membership?.status === "ACTIVE" &&
       (isOwnerOrAdmin || role === "MANAGER") &&
-      (isCompany || isDistributor || orgType === "PARTNER"),
+      ((isCompany && isOwnerOrAdmin) || isDistributor || orgType === "PARTNER"),
     /**
      * Changing a game's price writes to live hardware (it alters what a deployed kiosk
      * charges), so it is kept as narrow as the gateway admin surface.
      */
     canManageDevicePrices:
       !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
+    canRequestDevicePrices:
+      !isError && me?.membership?.status === "ACTIVE" && !isCompany &&
+      (isOwnerOrAdmin || role === "MANAGER"),
     permissions,
     can,
   }

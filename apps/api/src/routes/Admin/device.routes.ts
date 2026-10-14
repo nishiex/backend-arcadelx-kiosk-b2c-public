@@ -10,6 +10,9 @@ import {
   getPricesForDevice,
   resetPricesForDevice,
   updateDeviceGamePrice,
+  getDevicePriceRequests,
+  approveDevicePriceRequest,
+  rejectDevicePriceRequest,
 } from '../../controllers/Admin/device.controller';
 
 /**
@@ -18,10 +21,9 @@ import {
  * Reads require an authenticated member of a COMPANY, DISTRIBUTOR or PARTNER org, matching
  * the revenue endpoints: the device fleet is operational data the network already sees.
  *
- * Price writes are reserved for Company OWNER/ADMIN, and the body's `scope` states their
- * reach: `DEVICE` (default) writes and verifies a device-only override, while an explicit
- * `GAME_CATALOG` updates the game's catalog price for every kiosk. Neither is ever chosen
- * on the caller's behalf; the service verifies the resulting prices before reporting success.
+ * Company OWNER/ADMIN can apply prices directly. Distributor/Partner members can submit
+ * device-scoped requests for Company approval; only Company master admins can apply a
+ * device price or change the game catalog for every kiosk.
  *
  * Note the path prefix is `/api/devices`, not Mothership's `/api/v1/devices`: this is our
  * own surface, and keeping our versioning out of the path avoids implying we mirror
@@ -30,6 +32,11 @@ import {
 const router = Router();
 
 router.use(requireAuth, loadMembership);
+
+// Company master-admin approval queue for Distributor/Partner price requests.
+router.get('/price-requests', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
+router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
+router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
 
 // The fleet as Mothership reports it (online state, last seen, location).
 router.get(
@@ -60,8 +67,8 @@ router.post(
 // the game's catalog price for every kiosk; a device write never falls back to it.
 router.post(
   '/:deviceId/games/:gameId/price',
-  requireOrgType('COMPANY'),
-  requireRole('OWNER', 'ADMIN'),
+  requireOrgType('COMPANY', 'DISTRIBUTOR', 'PARTNER'),
+  requireRole('OWNER', 'ADMIN', 'MANAGER'),
   updateDeviceGamePrice,
 );
 

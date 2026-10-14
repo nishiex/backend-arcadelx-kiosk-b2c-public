@@ -8,6 +8,11 @@ import { useMe } from "@/hooks/useMe"
 import {
   fetchDevicePrices,
   fetchDevices,
+  fetchDevicePriceRequests,
+  approveDevicePriceRequest,
+  rejectDevicePriceRequest,
+  requestDeviceGamePrice,
+  type DevicePriceRequest,
   resetDevicePrices,
   setDeviceGamePrice,
   type DeviceView,
@@ -60,7 +65,7 @@ type TabId = (typeof TABS)[number]["id"]
  * OWNER/ADMIN, matching the API route.
  */
 export default function DevicesScreen() {
-  const { me, isLoading, canViewDevices, canManageDevicePrices } = useMe()
+  const { me, isLoading, canViewDevices, canManageDevicePrices, canRequestDevicePrices } = useMe()
   const qc = useQueryClient()
   const [tab, setTab] = useState<TabId>("fleet")
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
@@ -79,6 +84,12 @@ export default function DevicesScreen() {
     enabled: !!selectedDevice,
     staleTime: 15_000,
     retry: 1,
+  })
+  const requests = useQuery({
+    queryKey: ["device-price-requests", ...scope],
+    queryFn: fetchDevicePriceRequests,
+    enabled: canManageDevicePrices,
+    staleTime: 15_000,
   })
 
   if (isLoading) return <Skeleton className="h-64" />
@@ -113,6 +124,14 @@ export default function DevicesScreen() {
           Refresh
         </button>
       </header>
+
+      {canManageDevicePrices && (
+        <PriceRequestQueue
+          requests={requests.data?.requests ?? []}
+          loading={requests.isLoading}
+          onChanged={() => requests.refetch()}
+        />
+      )}
 
       <div className="flex flex-wrap gap-2" aria-label="Device view">
         {TABS.map(item => (
@@ -153,6 +172,7 @@ export default function DevicesScreen() {
               onSelectDevice={setSelectedDevice}
               prices={prices}
               canWrite={canManageDevicePrices}
+              canRequest={canRequestDevicePrices}
               onSaved={async () => {
                 await Promise.all([
                   qc.invalidateQueries({ queryKey: ["device-prices"] }),
@@ -164,6 +184,74 @@ export default function DevicesScreen() {
         </Panel>
       )}
     </div>
+  )
+}
+
+function PriceRequestQueue({
+  requests,
+  loading,
+  onChanged,
+}: {
+  requests: DevicePriceRequest[]
+  loading: boolean
+  onChanged: () => Promise<unknown>
+}) {
+  const approve = useMutation({
+    mutationFn: approveDevicePriceRequest,
+    onSuccess: async () => {
+      toast.success("Price request approved and applied")
+      await onChanged()
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't approve request"),
+  })
+  const reject = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectDevicePriceRequest(id, reason),
+    onSuccess: async () => {
+      toast.success("Price request rejected")
+      await onChanged()
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't reject request"),
+  })
+  const pending = requests.filter(request => request.status === "PENDING")
+  if (loading || !pending.length) return null
+  return (
+    <Panel>
+      <div className="space-y-3">
+        <div>
+          <h2 className="font-semibold">Pending price requests</h2>
+          <p className="text-sm text-muted-foreground">Review requests from distributors and partners before they reach a kiosk.</p>
+        </div>
+        <div className="divide-y divide-border">
+          {pending.map(request => (
+            <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="text-sm">
+                <p className="font-medium">{request.displayName} · {request.deviceId}</p>
+                <p className="text-muted-foreground">
+                  {request.requesterOrg?.name ?? "Organization"}: {inr.format(request.price)} / replay {inr.format(request.replayPrice)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                  disabled={approve.isPending || reject.isPending}
+                  onClick={() => approve.mutate(request.id)}
+                >Approve</button>
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={approve.isPending || reject.isPending}
+                  onClick={() => {
+                    const reason = window.prompt("Reason for rejecting this price request:")?.trim()
+                    if (reason) reject.mutate({ id: request.id, reason })
+                  }}
+                >Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Panel>
   )
 }
 
@@ -273,6 +361,7 @@ function PricingTab({
   onSelectDevice,
   prices,
   canWrite,
+  canRequest,
   onSaved,
 }: {
   devices: DeviceView[]
@@ -280,6 +369,7 @@ function PricingTab({
   onSelectDevice: (deviceId: string | null) => void
   prices: ReturnType<typeof useQuery<{ deviceId: string; games: GamePriceView[] }>>
   canWrite: boolean
+  canRequest: boolean
   onSaved: () => Promise<void>
 }) {
   if (!devices.length) {
@@ -327,6 +417,7 @@ function PricingTab({
           deviceId={selectedDevice}
           games={prices.data.games}
           canWrite={canWrite}
+          canRequest={canRequest}
           onSaved={onSaved}
         />
       )}
@@ -338,11 +429,13 @@ function GamePriceTable({
   deviceId,
   games,
   canWrite,
+  canRequest,
   onSaved,
 }: {
   deviceId: string
   games: GamePriceView[]
   canWrite: boolean
+  canRequest: boolean
   onSaved: () => Promise<void>
 }) {
   const overrides = games.filter(gameHasOverride).length
@@ -383,18 +476,18 @@ function GamePriceTable({
           </button>
         )}
       </div>
-      {canWrite && (
+      {(canWrite || canRequest) && (
         <p role="status" className="text-sm text-muted-foreground">
-          Price changes apply only to the selected device by default, and each save is read
-          back and checked against the catalog and every other device. &quot;Apply to all
-          kiosks&quot; is a separate, explicitly confirmed action that updates the
-          game&apos;s catalog price for the whole fleet.
+          {canRequest
+            ? "Price changes are sent to the Company master admin for approval."
+            : "Price changes apply only to the selected device by default, and each save is read back and checked."}
         </p>
       )}
-      {canWrite && editingGame && (
+      {(canWrite || canRequest) && editingGame && (
         <DeviceGamePriceEditor
           deviceId={deviceId}
           game={editingGame}
+          requestOnly={canRequest && !canWrite}
           onCancel={() => setEditingGame(null)}
           onSaved={async () => {
             setEditingGame(null)
@@ -452,7 +545,7 @@ function GamePriceTable({
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Replay price</th>
               <th className="px-4 py-3 font-medium">Source</th>
-              {canWrite && <th className="px-4 py-3 text-right font-medium">Change</th>}
+              {(canWrite || canRequest) && <th className="px-4 py-3 text-right font-medium">Change</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -475,7 +568,7 @@ function GamePriceTable({
                     <span className="text-xs text-muted-foreground">Default</span>
                   )}
                 </td>
-                {canWrite && (
+                {(canWrite || canRequest) && (
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -500,17 +593,30 @@ function GamePriceTable({
 function DeviceGamePriceEditor({
   deviceId,
   game,
+  requestOnly,
   onCancel,
   onSaved,
 }: {
   deviceId: string
   game: GamePriceView
+  requestOnly: boolean
   onCancel: () => void
   onSaved: () => Promise<void>
 }) {
   const [price, setPrice] = React.useState(String(game.effectivePrice))
   const [replayPrice, setReplayPrice] = React.useState(String(game.effectiveReplayPrice))
   const [confirmingCatalog, setConfirmingCatalog] = React.useState(false)
+  const requestMutation = useMutation({
+    mutationFn: () => requestDeviceGamePrice(deviceId, game.gameId, {
+      price: Number(price),
+      replay_price: Number(replayPrice),
+    }),
+    onSuccess: async () => {
+      toast.success("Price change request sent to the Company master admin")
+      await onSaved()
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't send price request"),
+  })
 
   const priceValid =
     price.trim() !== "" &&
@@ -558,8 +664,8 @@ function DeviceGamePriceEditor({
       toast.error(error instanceof Error ? error.message : "Couldn't update the catalog price"),
   })
 
-  const pending = deviceMutation.isPending || catalogMutation.isPending
-  const activeError = catalogMutation.error ?? deviceMutation.error
+  const pending = requestMutation.isPending || deviceMutation.isPending || catalogMutation.isPending
+  const activeError = requestMutation.error ?? catalogMutation.error ?? deviceMutation.error
 
   return (
     <div
@@ -571,12 +677,9 @@ function DeviceGamePriceEditor({
       <div className="mb-3">
         <h3 className="font-medium">Change game price</h3>
         <p className="text-sm text-muted-foreground">
-          Only <span className="font-mono text-xs">{deviceId}</span> will be updated. Other
-          devices and the catalog will be checked and must remain unchanged.
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use &quot;Apply to all kiosks&quot; to change the game&apos;s catalog price for
-          every kiosk instead.
+          {requestOnly
+            ? "Your request will be sent to the Company master admin for approval."
+            : <>Only <span className="font-mono text-xs">{deviceId}</span> will be updated by default.</>}
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -607,14 +710,26 @@ function DeviceGamePriceEditor({
           />
         </label>
       </div>
-      {(catalogMutation.isError || deviceMutation.isError) && (
+      {(requestMutation.isError || catalogMutation.isError || deviceMutation.isError) && (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {activeError instanceof Error
             ? activeError.message
             : "Couldn't verify the price update"}
         </p>
       )}
-      {confirmingCatalog ? (
+      {requestOnly ? (
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" className={buttonClass} onClick={onCancel} disabled={pending}>Cancel</button>
+          <button
+            type="button"
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            onClick={() => requestMutation.mutate()}
+            disabled={pending || !priceValid}
+          >
+            {requestMutation.isPending ? "Sending…" : "Send for approval"}
+          </button>
+        </div>
+      ) : confirmingCatalog ? (
         <div
           role="alertdialog"
           aria-modal="true"

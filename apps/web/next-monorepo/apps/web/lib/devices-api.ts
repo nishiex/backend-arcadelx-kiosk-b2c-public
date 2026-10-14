@@ -160,6 +160,61 @@ export type SetDeviceGamePriceResult = {
   scope: "DEVICE_GAME_OVERRIDE" | "GAME_CATALOG"
 }
 
+export type DevicePriceRequest = {
+  id: string
+  deviceId: string
+  gameId: string
+  displayName: string
+  price: number
+  replayPrice: number
+  requesterOrgId: string
+  requestedById: string
+  status: "PENDING" | "PROCESSING" | "APPROVED" | "REJECTED"
+  reviewNote: string | null
+  reviewedById: string | null
+  reviewedAt: string | null
+  createdAt: string
+  updatedAt: string
+  requesterOrg?: { id: string; name: string; type: string }
+  requestedBy?: { id: string; name: string; email: string }
+  reviewedBy?: { id: string; name: string } | null
+}
+
+export async function requestDeviceGamePrice(
+  deviceId: string,
+  gameId: string,
+  input: { price: number; replay_price: number },
+): Promise<{ request: DevicePriceRequest }> {
+  const res = await apiFetch(
+    `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, scope: "DEVICE" }),
+    }
+  )
+  return handleRes<{ request: DevicePriceRequest }>(res)
+}
+
+export async function fetchDevicePriceRequests(): Promise<{ requests: DevicePriceRequest[] }> {
+  const res = await apiFetch("/api/devices/price-requests", { cache: "no-store" })
+  return handleRes<{ requests: DevicePriceRequest[] }>(res)
+}
+
+export async function approveDevicePriceRequest(requestId: string): Promise<{ request: DevicePriceRequest }> {
+  const res = await apiFetch(`/api/devices/price-requests/${encodeURIComponent(requestId)}/approve`, { method: "PATCH" })
+  return handleRes<{ request: DevicePriceRequest }>(res)
+}
+
+export async function rejectDevicePriceRequest(requestId: string, reason: string): Promise<{ request: DevicePriceRequest }> {
+  const res = await apiFetch(`/api/devices/price-requests/${encodeURIComponent(requestId)}/reject`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  })
+  return handleRes<{ request: DevicePriceRequest }>(res)
+}
+
 /**
  * Set and verify one game's price in the requested scope.
  *
