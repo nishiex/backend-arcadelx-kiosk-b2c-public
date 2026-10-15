@@ -4,6 +4,7 @@ import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, X } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   createAgreement,
@@ -142,19 +143,23 @@ export default function DistributorAgreementDialog({
 
   const connect = useMutation({
     mutationFn: () => initiateConnection(ownerEmail!),
-    onSuccess: refresh,
+    onSuccess: async () => { toast.success("Connection request sent"); await refresh() },
+    onError: (error: Error) => toast.error(error.message),
   })
   const draft = useMutation({
     mutationFn: (terms: Parameters<typeof createAgreement>[0]) => createAgreement(terms),
     onSuccess: async () => {
+      toast.success("Agreement submitted for approval")
       await refresh()
       setDepositAmount("")
       setNonRefundableAmount("")
     },
+    onError: (error: Error) => toast.error(error.message),
   })
   const terminate = useMutation({
     mutationFn: () => terminateAgreement(current!.id),
-    onSuccess: refresh,
+    onSuccess: async () => { toast.success("Agreement terminated"); await refresh() },
+    onError: (error: Error) => toast.error(error.message),
   })
 
   const busy = connect.isPending || draft.isPending || terminate.isPending

@@ -75,12 +75,14 @@ export async function syncRevenueData() {
     const kiosks = await prisma.kiosk.findMany({
       select: { id: true, machineCode: true, externalDeviceId: true, currentOrgId: true },
     });
+    const kiosksById = new Map(kiosks.map((kiosk) => [kiosk.id, kiosk]));
     const devices = new Map(
       kiosks
         .filter((k) => k.externalDeviceId)
         .map((k) => [k.externalDeviceId!, k.id]),
     );
     const codes = new Map(kiosks.map((k) => [k.machineCode, k.id]));
+    const pending: { kioskId: string; record: z.infer<typeof recordSchema> }[] = [];
     for (const input of records) {
       if (!input || typeof input !== "object") {
         invalidCount++;
@@ -99,38 +101,62 @@ export async function syncRevenueData() {
         unattributedCount++;
         continue;
       }
-      try {
-        const inserted = await prisma.$transaction(async tx => {
-          // Revenue is only counted inside an assignment window, so the window has to
-          // cover the payment's own date. Without this, a payment imported for a past
-          // date is stored but never attributed.
-          const kiosk = kiosks.find(k => k.id === kioskId);
+      pending.push({ kioskId, record });
+    }
+
+    if (pending.length) {
+      // Read assignment windows once, then only repair coverage for each kiosk that has
+      // an uncovered payment. The old implementation opened one transaction per payment;
+      // with the live feed's 50 rows that could exceed Vercel's function time limit.
+      const assignmentRows = await prisma.kioskAssignment.findMany({
+        where: { kioskId: { in: [...new Set(pending.map(({ kioskId }) => kioskId))] } },
+        select: { kioskId: true, assignedFrom: true, assignedTo: true },
+      });
+      const assignmentsByKiosk = new Map<string, typeof assignmentRows>();
+      for (const assignment of assignmentRows) {
+        const rows = assignmentsByKiosk.get(assignment.kioskId) ?? [];
+        rows.push(assignment);
+        assignmentsByKiosk.set(assignment.kioskId, rows);
+      }
+      const uncoveredByKiosk = new Map<string, Date>();
+      for (const { kioskId, record } of pending) {
+        const covered = (assignmentsByKiosk.get(kioskId) ?? []).some((assignment) =>
+          assignment.assignedFrom <= record.updated_at &&
+          (assignment.assignedTo === null || assignment.assignedTo > record.updated_at),
+        );
+        if (!covered) {
+          const earliest = uncoveredByKiosk.get(kioskId);
+          if (!earliest || record.updated_at < earliest) uncoveredByKiosk.set(kioskId, record.updated_at);
+        }
+      }
+
+      const inserted = await prisma.$transaction(async (tx) => {
+        for (const [kioskId, occurredAt] of uncoveredByKiosk) {
+          const kiosk = kiosksById.get(kioskId);
           if (kiosk?.currentOrgId) {
+            // Revenue is only counted inside an assignment window, so the window has to
+            // cover the earliest uncovered payment for this kiosk.
             await ensureAssignmentCovering(tx, {
               kioskId,
               organizationId: kiosk.currentOrgId,
               assignedById: null,
-              occurredAt: record.updated_at,
+              occurredAt,
             });
           }
-          return tx.transaction.createMany({
-            data: [
-              {
-                kioskId,
-                gameId: record.game_id,
-                amount: record.amount,
-                currency: record.currency,
-                externalTransactionId: record.txnid,
-                occurredAt: record.updated_at,
-              },
-            ],
-            skipDuplicates: true,
-          });
+        }
+        return tx.transaction.createMany({
+          data: pending.map(({ kioskId, record }) => ({
+            kioskId,
+            gameId: record.game_id,
+            amount: record.amount,
+            currency: record.currency,
+            externalTransactionId: record.txnid,
+            occurredAt: record.updated_at,
+          })),
+          skipDuplicates: true,
         });
-        newRecordsInserted += inserted.count;
-      } catch {
-        invalidCount++;
-      }
+      });
+      newRecordsInserted = inserted.count;
     }
     if (invalidCount) failure = "Rejected transaction records: " + invalidCount;
   } catch (error) {

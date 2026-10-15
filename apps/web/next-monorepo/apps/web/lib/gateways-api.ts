@@ -53,13 +53,18 @@ function refreshSession(): Promise<boolean> {
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const opts: RequestInit = { credentials: "include", ...init }
-  const res = await fetch(input, opts)
-  // Never refresh the auth calls themselves: that would loop or mask bad credentials.
-  if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
-    return res
+  const mutationToast = beginMutationToast(opts)
+  try {
+    const res = await fetch(input, opts)
+    // Never refresh the auth calls themselves: that would loop or mask bad credentials.
+    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
+      return res
+    }
+    const ok = await refreshSession()
+    return ok ? await fetch(input, opts) : res
+  } finally {
+    mutationToast?.finish()
   }
-  const ok = await refreshSession()
-  return ok ? fetch(input, opts) : res
 }
 
 /**
@@ -141,3 +146,5 @@ export async function deleteGateway(provider: string): Promise<unknown> {
   })
   return handleRes<unknown>(res)
 }
+import { beginMutationToast } from "./mutation-toast"
+

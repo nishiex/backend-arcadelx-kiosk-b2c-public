@@ -4,6 +4,7 @@ import React from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, Shield, Trash2, Save, Check } from "lucide-react"
+import { toast } from "sonner"
 import {
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
@@ -115,13 +116,14 @@ export default function RolesScreen() {
   const createMut = useMutation({
     mutationFn: (n: string) => createRole({ name: n }),
     onSuccess: (role) => {
+      toast.success("Role created")
       setCreating(false)
       setNewName("")
       setError(null)
       invalidateRoles()
       setSelectedId(role.id)
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => { toast.error(e.message); setError(e.message) },
   })
 
   const saveMut = useMutation({
@@ -140,28 +142,30 @@ export default function RolesScreen() {
       await saveRoleMatrix(selectedId, entries)
     },
     onSuccess: () => {
+      toast.success("Role permissions saved")
       setError(null)
       qc.invalidateQueries({ queryKey: ["role", selectedId] })
       invalidateRoles()
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => { toast.error(e.message); setError(e.message) },
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteRole(id),
     onSuccess: () => {
+      toast.success("Role deleted")
       setSelectedId(null)
       setError(null)
       invalidateRoles()
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => { toast.error(e.message); setError(e.message) },
   })
 
   const assignMut = useMutation({
     mutationFn: ({ membershipId, roleId }: { membershipId: string; roleId: string | null }) =>
       assignRole(membershipId, roleId),
-    onSuccess: () => invalidateRoles(),
-    onError: (e: Error) => setError(e.message),
+    onSuccess: () => { toast.success("Role assignment updated"); invalidateRoles() },
+    onError: (e: Error) => { toast.error(e.message); setError(e.message) },
   })
 
   const toggleCell = (m: PermissionModule, a: PermissionAction) => {

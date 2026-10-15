@@ -29,12 +29,17 @@ function refreshSession(): Promise<boolean> {
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const opts: RequestInit = { credentials: "include", ...init }
-  const res = await fetch(input, opts)
-  if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
-    return res
+  const mutationToast = beginMutationToast(opts)
+  try {
+    const res = await fetch(input, opts)
+    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
+      return res
+    }
+    const ok = await refreshSession()
+    return ok ? await fetch(input, opts) : res
+  } finally {
+    mutationToast?.finish()
   }
-  const ok = await refreshSession()
-  return ok ? fetch(input, opts) : res
 }
 
 function describeDevicePriceVerification(errors: unknown): string | null {
@@ -246,3 +251,5 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
   )
   return handleRes<ResetDevicePricesResult>(res)
 }
+import { beginMutationToast } from "./mutation-toast"
+

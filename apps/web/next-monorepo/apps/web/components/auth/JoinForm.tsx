@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Loader2, User, Mail, Lock, Ticket, Eye, EyeOff } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { gsap, prefersReducedMotion, EASE } from "@/lib/gsap"
+import { beginMutationToast } from "@/lib/mutation-toast"
 
 type FormValues = {
   name: string
@@ -42,6 +43,7 @@ export default function JoinForm() {
   }, [])
 
   const onSubmit = async (values: FormValues) => {
+    const mutationToast = beginMutationToast({ method: "POST" })
     try {
       const res = await fetch("/api/auth/join", {
         method: "POST",
@@ -58,6 +60,8 @@ export default function JoinForm() {
       router.replace("/")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign up failed")
+    } finally {
+      mutationToast?.finish()
     }
   }
 

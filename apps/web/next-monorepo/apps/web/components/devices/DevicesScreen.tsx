@@ -315,7 +315,7 @@ function FleetTab({
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="px-4 py-3 font-medium">Device</th>
               <th className="px-4 py-3 font-medium">State</th>
-              <th className="px-4 py-3 font-medium">Kiosk no.</th>
+              <th className="px-4 py-3 font-medium">No of kiosks</th>
               <th className="px-4 py-3 font-medium">Location</th>
               <th className="px-4 py-3 font-medium">Last seen</th>
               <th className="px-4 py-3 font-medium">Hardware UUID</th>
@@ -739,7 +739,8 @@ function DeviceGamePriceEditor({
           <p className="text-sm">
             Apply {game.displayName} to all kiosks? This sets the game&apos;s catalog price to{" "}
             {inr.format(Number(price))} first play / {inr.format(Number(replayPrice))} replay,
-            and every kiosk offering it picks that up. It cannot be limited to{" "}
+            and every kiosk offering it picks that up. This will apply to all dispatched kiosks
+            across the fleet, wherever they are operating. It cannot be limited to{" "}
             <span className="font-mono text-xs">{deviceId}</span>.
           </p>
           <div className="mt-3 flex flex-wrap justify-end gap-2">

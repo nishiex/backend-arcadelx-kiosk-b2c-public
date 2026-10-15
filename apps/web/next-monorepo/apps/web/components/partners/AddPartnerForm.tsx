@@ -6,12 +6,15 @@ import * as Dialog from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { cn } from "@workspace/ui/lib/utils"
 import { useMe } from "@/hooks/useMe"
 import { createPartner, retryOrganizationCredentials, type CreatePartnerInput } from "@/lib/backend-api"
+import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
 
 const fields = [
   { name: "orgName", label: "Business name", min: 2, max: 100 },
-  { name: "ownerName", label: "Contact person", min: 2, max: 100 },
+  { name: "ownerName", label: "Contact person name", min: 2, max: 100 },
   { name: "ownerEmail", label: "Email address", min: 1, max: 254, type: "email" },
   { name: "address", label: "Street address", min: 5, max: 300 },
   { name: "state", label: "State", min: 2, max: 100 },
@@ -23,14 +26,22 @@ function PartnerForm({ modal }: { modal: boolean }) {
   const queryClient = useQueryClient()
   const [open, setOpen] = React.useState(false)
   const busy = React.useRef(false)
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreatePartnerInput>()
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CreatePartnerInput>()
+  const selectedState = watch("state")
+  const cityOptions = React.useMemo(() => citiesForState(selectedState), [selectedState])
   const create = useMutation({
     mutationFn: createPartner,
     onSuccess: () => {
+      toast.success("Partner registered")
       void queryClient.invalidateQueries({ queryKey: ["partners"] })
     },
+    onError: (error: Error) => toast.error(error.message),
   })
-  const retry = useMutation({ mutationFn: retryOrganizationCredentials })
+  const retry = useMutation({
+    mutationFn: retryOrganizationCredentials,
+    onSuccess: result => toast.success(result.credentialsEmailSent ? "Credentials email sent" : "Email delivery is still pending"),
+    onError: (error: Error) => toast.error(error.message),
+  })
   const result = create.data
   const sent = result?.credentialsEmailSent || retry.data?.credentialsEmailSent
   const submit = async (values: CreatePartnerInput) => {
@@ -60,17 +71,49 @@ function PartnerForm({ modal }: { modal: boolean }) {
           <fieldset disabled={create.isPending} className="grid gap-4 sm:grid-cols-2">
             {fields.map(field => (
               <div key={field.name}>
-                <label htmlFor={field.name} className="mb-1.5 block text-sm font-medium">{field.label}</label>
-                <input id={field.name} type={"type" in field ? field.type : "text"} maxLength={field.max} aria-invalid={!!errors[field.name]} aria-describedby={errors[field.name] ? `${field.name}-error` : undefined} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register(field.name, {
-                  required: `${field.label} is required`, setValueAs: (value: string) => value.trim(),
-                  minLength: { value: field.min, message: `Enter at least ${field.min} characters` },
-                  maxLength: { value: field.max, message: `Enter at most ${field.max} characters` },
-                })} />
+                <label htmlFor={field.name} className="mb-1.5 block text-sm font-medium">
+                  {field.label}<span className="ml-1 text-destructive" aria-hidden="true">*</span>
+                </label>
+                {field.name === "state" ? (
+                  <select
+                    id="state"
+                    defaultValue=""
+                    aria-invalid={!!errors.state}
+                    aria-describedby={errors.state ? "state-error" : undefined}
+                    className={cn("w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm", !selectedState && "text-muted-foreground")}
+                    {...register("state", {
+                      required: "State is required",
+                      onChange: () => setValue("city", ""),
+                    })}
+                  >
+                    <option value="" disabled>Select state</option>
+                    {STATE_NAMES.map(state => <option key={state} value={state}>{state}</option>)}
+                  </select>
+                ) : field.name === "city" ? (
+                  <select
+                    id="city"
+                    defaultValue=""
+                    disabled={!selectedState}
+                    aria-invalid={!!errors.city}
+                    aria-describedby={errors.city ? "city-error" : undefined}
+                    className={cn("w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm", !selectedState && "cursor-not-allowed opacity-60")}
+                    {...register("city", { required: "City is required" })}
+                  >
+                    <option value="" disabled>{selectedState ? "Select city" : "Select a state first"}</option>
+                    {cityOptions.map(city => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                ) : (
+                  <input id={field.name} type={"type" in field ? field.type : "text"} maxLength={field.max} aria-invalid={!!errors[field.name]} aria-describedby={errors[field.name] ? `${field.name}-error` : undefined} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register(field.name, {
+                    required: `${field.label} is required`, setValueAs: (value: string) => value.trim(),
+                    minLength: { value: field.min, message: `Enter at least ${field.min} characters` },
+                    maxLength: { value: field.max, message: `Enter at most ${field.max} characters` },
+                  })} />
+                )}
                 {errors[field.name] && <p id={`${field.name}-error`} className="mt-1 text-xs text-destructive">{errors[field.name]?.message}</p>}
               </div>
             ))}
             <div>
-              <label htmlFor="ownerContact" className="mb-1.5 block text-sm font-medium">Owner contact number</label>
+              <label htmlFor="ownerContact" className="mb-1.5 block text-sm font-medium">Owner contact number<span className="ml-1 text-destructive" aria-hidden="true">*</span></label>
               <input id="ownerContact" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} aria-invalid={!!errors.ownerContact} aria-describedby={errors.ownerContact ? "ownerContact-error" : undefined}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register("ownerContact", {
                   required: "Owner contact is required", setValueAs: (value: string) => value.trim(),
@@ -79,7 +122,7 @@ function PartnerForm({ modal }: { modal: boolean }) {
               {errors.ownerContact && <p id="ownerContact-error" className="mt-1 text-xs text-destructive">{errors.ownerContact.message}</p>}
             </div>
             <div>
-              <label htmlFor="pincode" className="mb-1.5 block text-sm font-medium">Postal code</label>
+              <label htmlFor="pincode" className="mb-1.5 block text-sm font-medium">Postal code<span className="ml-1 text-destructive" aria-hidden="true">*</span></label>
               <input id="pincode" inputMode="numeric" maxLength={6} aria-invalid={!!errors.pincode} aria-describedby={errors.pincode ? "pincode-error" : undefined} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm" {...register("pincode", {
                 valueAsNumber: true, required: "Postal code is required",
                 validate: value => (Number.isInteger(value) && value >= 100000 && value <= 999999) || "Enter a valid 6-digit PIN code",
@@ -87,9 +130,9 @@ function PartnerForm({ modal }: { modal: boolean }) {
               {errors.pincode && <p id="pincode-error" className="mt-1 text-xs text-destructive">{errors.pincode.message}</p>}
             </div>
             <div>
-              <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number (optional)</label>
+              <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number<span className="ml-1 text-destructive" aria-hidden="true">*</span></label>
               <input id="gstNumber" maxLength={30} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                {...register("gstNumber", { setValueAs: (value: string) => value.trim() || undefined, maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
+                {...register("gstNumber", { required: "GST number is required", setValueAs: (value: string) => value.trim(), maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
               {errors.gstNumber && <p className="mt-1 text-xs text-destructive">{errors.gstNumber.message}</p>}
             </div>
           </fieldset>

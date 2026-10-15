@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { gsap, prefersReducedMotion, EASE } from "@/lib/gsap"
+import { beginMutationToast } from "@/lib/mutation-toast"
 
 type FormValues = { email: string; password: string }
 
@@ -38,6 +39,7 @@ export default function LoginForm() {
   }, [])
 
   const onSubmit = async (values: FormValues) => {
+    const mutationToast = beginMutationToast({ method: "POST" })
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -56,6 +58,8 @@ export default function LoginForm() {
       router.replace(next)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign in failed")
+    } finally {
+      mutationToast?.finish()
     }
   }
 

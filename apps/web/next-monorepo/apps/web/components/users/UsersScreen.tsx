@@ -3,6 +3,7 @@
 import React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { UserCog, Check, X } from "lucide-react"
+import { toast } from "sonner"
 import {
   MANAGEABLE_ROLES,
   fetchPendingMembers,
@@ -48,10 +49,11 @@ export default function UsersScreen() {
     mutationFn: ({ id, action, role }: { id: string; action: "APPROVE" | "REJECT"; role?: ManageableRole }) =>
       handleJoinRequest(id, action, role),
     onSuccess: () => {
+      toast.success("Member request updated")
       setError(null)
       invalidate()
     },
-    onError: (e: Error) => { setError(e.message); invalidate() },
+    onError: (e: Error) => { toast.error(e.message); setError(e.message); invalidate() },
   })
 
   const pending = pendingQ.data?.data ?? []

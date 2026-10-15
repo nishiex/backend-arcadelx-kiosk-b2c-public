@@ -3,6 +3,7 @@
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Loader2, X } from "lucide-react"
 import {
   dispatchOrder,
@@ -103,6 +104,7 @@ export default function OrderStatusDialog({
         ? deliverOrderWithLocation(order.id, location.trim())
         : selected!.run(order.id),
     onSuccess: async updated => {
+      toast.success(`${active.button} completed`)
       onChanged?.(updated)
       setOpen(false)
       setSelected(null)
@@ -114,6 +116,7 @@ export default function OrderStatusDialog({
         queryClient.invalidateQueries({ queryKey: ["revenue-series"] }),
       ])
     },
+    onError: (error: Error) => toast.error(error.message),
   })
 
   if (!actions.length) return null

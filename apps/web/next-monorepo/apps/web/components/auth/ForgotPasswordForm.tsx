@@ -7,18 +7,24 @@ import { toast } from "sonner"
 import { Loader2, Mail, Lock, ShieldCheck, ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { gsap, prefersReducedMotion, EASE } from "@/lib/gsap"
+import { beginMutationToast } from "@/lib/mutation-toast"
 
 type Step = "email" | "otp" | "reset"
 
 async function post(path: string, body: unknown) {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-  const json = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(json?.message || "Something went wrong")
-  return json
+  const mutationToast = beginMutationToast({ method: "POST" })
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.message || "Something went wrong")
+    return json
+  } finally {
+    mutationToast?.finish()
+  }
 }
 
 export default function ForgotPasswordForm() {

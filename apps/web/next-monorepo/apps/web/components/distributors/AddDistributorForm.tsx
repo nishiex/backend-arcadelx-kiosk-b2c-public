@@ -33,15 +33,19 @@ const inputCls =
 function Field({
   label,
   error,
+  required = false,
   children,
 }: {
   label: string
   error?: string
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium">
+        {label}{required && <span className="ml-1 text-destructive" aria-hidden="true">*</span>}
+      </label>
       {children}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
@@ -173,16 +177,16 @@ export default function AddDistributorForm() {
         {/* Distributor Information */}
         <h2 className="mb-4 text-sm font-semibold">Distributor Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Business Name" error={errors.orgName?.message}>
+          <Field label="Business Name" required error={errors.orgName?.message}>
             <input className={inputCls} {...register("orgName", { required: "Business name is required" })} />
           </Field>
           <Field label="GST Number">
             <input className={inputCls} {...register("gstNumber")} />
           </Field>
-          <Field label="Contact Person" error={errors.ownerName?.message}>
+          <Field label="Contact Person" required error={errors.ownerName?.message}>
             <input className={inputCls} {...register("ownerName", { required: "Contact person is required" })} />
           </Field>
-          <Field label="Email Address" error={errors.ownerEmail?.message}>
+          <Field label="Email Address" required error={errors.ownerEmail?.message}>
             <input
               type="email"
               className={inputCls}
@@ -192,7 +196,7 @@ export default function AddDistributorForm() {
               })}
             />
           </Field>
-          <Field label="Owner Contact Number" error={errors.ownerContact?.message}>
+          <Field label="Owner Contact Number" required error={errors.ownerContact?.message}>
             <input aria-label="Owner Contact Number" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} className={inputCls}
               {...register("ownerContact", {
                 required: "Owner contact is required",
@@ -208,11 +212,11 @@ export default function AddDistributorForm() {
         {/* Address Information */}
         <h2 className="mb-4 mt-6 border-t border-border pt-6 text-sm font-semibold">Address Information</h2>
         <div className="space-y-4">
-          <Field label="Street Address" error={errors.address?.message}>
+          <Field label="Street Address" required error={errors.address?.message}>
             <input className={inputCls} {...register("address", { required: "Street address is required" })} />
           </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="State" error={errors.state?.message}>
+            <Field label="State" required error={errors.state?.message}>
               <select
                 className={inputCls}
                 defaultValue=""
@@ -231,7 +235,7 @@ export default function AddDistributorForm() {
                 ))}
               </select>
             </Field>
-            <Field label="City" error={errors.city?.message}>
+            <Field label="City" required error={errors.city?.message}>
               <select
                 className={cn(inputCls, !selectedState && "cursor-not-allowed opacity-60")}
                 defaultValue=""
@@ -248,7 +252,7 @@ export default function AddDistributorForm() {
                 ))}
               </select>
             </Field>
-            <Field label="Postal Code" error={errors.pincode?.message}>
+            <Field label="Postal Code" required error={errors.pincode?.message}>
               <input
                 inputMode="numeric"
                 className={inputCls}

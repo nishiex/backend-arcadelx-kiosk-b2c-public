@@ -3,6 +3,7 @@
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Loader2, Plus, X } from "lucide-react"
 import {
   createOrder,
@@ -43,7 +44,8 @@ export default function CreateOrderDialog({ organizationId, orgType, disabled, o
       model: requestedModel,
     }),
     retry: false,
-    onSuccess: order => { setOpen(false); onCreated(order) },
+    onSuccess: order => { toast.success("Kiosk request submitted"); setOpen(false); onCreated(order) },
+    onError: (error: Error) => toast.error(error.message),
     onSettled: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["orders", organizationId] }),

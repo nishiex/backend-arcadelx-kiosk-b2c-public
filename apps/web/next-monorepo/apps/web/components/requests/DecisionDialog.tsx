@@ -4,6 +4,7 @@ import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, X } from "lucide-react"
+import { toast } from "sonner"
 import { decideRequest } from "@/lib/backend-api"
 
 export default function DecisionDialog({ kind, id, subject, action, disabled = false }: {
@@ -15,7 +16,8 @@ export default function DecisionDialog({ kind, id, subject, action, disabled = f
   const label = action === "reject" ? "Reject" : kind === "network" ? "Accept" : "Approve"
   const mutation = useMutation({
     mutationFn: () => decideRequest(kind, id, action),
-    onSuccess: () => setOpen(false),
+    onSuccess: () => { toast.success(`${label} completed`); setOpen(false) },
+    onError: (error: Error) => toast.error(error.message),
     onSettled: async () => {
       await Promise.all(["review-requests", "networkRequests", "orders", "kiosks", "inventorySummary"].map(key => qc.invalidateQueries({ queryKey: [key] })))
     },

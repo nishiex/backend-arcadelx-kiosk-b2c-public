@@ -1,3 +1,5 @@
+import { beginMutationToast } from "./mutation-toast"
+
 export type ApiResponse<T> = {
   statusCode: number;
   data: T;
@@ -163,11 +165,16 @@ function refreshSession(): Promise<boolean> {
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const opts: RequestInit = { credentials: 'include', ...init };
-  const res = await fetch(input, opts);
-  // Don't try to refresh the auth calls themselves (would loop / mask bad creds).
-  if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) return res;
-  const ok = await refreshSession();
-  return ok ? fetch(input, opts) : res;
+  const mutationToast = beginMutationToast(opts);
+  try {
+    const res = await fetch(input, opts);
+    // Don't try to refresh the auth calls themselves (would loop / mask bad creds).
+    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) return res;
+    const ok = await refreshSession();
+    return ok ? await fetch(input, opts) : res;
+  } finally {
+    mutationToast?.finish();
+  }
 }
 
 export async function fetchInventorySummary(): Promise<InventorySummaryResponse> {

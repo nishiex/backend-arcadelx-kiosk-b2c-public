@@ -8,7 +8,7 @@ const requireTest = createRequire(path.join(os.tmpdir(), 'arcadelx-ui-tests/pack
 const { JSDOM } = requireTest('jsdom')
 const dom = new JSDOM('<html><body><div id="root"></div></body></html>', { url: 'http://localhost/', pretendToBeVisual: true })
 const w = dom.window
-for (const key of ['window', 'self', 'document', 'navigator', 'HTMLElement', 'HTMLInputElement', 'Element', 'Node', 'NodeFilter', 'DocumentFragment', 'MutationObserver', 'Event', 'CustomEvent', 'FocusEvent', 'MouseEvent', 'getComputedStyle']) {
+for (const key of ['window', 'self', 'document', 'navigator', 'HTMLElement', 'HTMLInputElement', 'HTMLSelectElement', 'Element', 'Node', 'NodeFilter', 'DocumentFragment', 'MutationObserver', 'Event', 'CustomEvent', 'FocusEvent', 'MouseEvent', 'getComputedStyle']) {
   Object.defineProperty(globalThis, key, { configurable: true, value: key === 'getComputedStyle' ? w.getComputedStyle.bind(w) : w[key] })
 }
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -46,11 +46,12 @@ async function identity() {
   await React.act(async () => { qc.setQueryData(['me'], me()); await new Promise(resolve => setTimeout(resolve, 20)) })
 }
 async function setValue(id: string, value: string) {
-  const input = document.getElementById(id) as HTMLInputElement
+  const input = document.getElementById(id) as HTMLInputElement | HTMLSelectElement
   assert.ok(input)
   await React.act(async () => {
-    Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value')!.set!.call(input, value)
-    input.dispatchEvent(new w.Event('input', { bubbles: true }))
+    const prototype = input.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new w.Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
   })
 }
 async function submit() {
