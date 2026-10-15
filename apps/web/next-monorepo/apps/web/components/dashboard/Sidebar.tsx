@@ -13,6 +13,7 @@ import {
   Inbox,
   Cpu,
   IndianRupee,
+  Activity,
   CreditCard,
   Settings,
   Menu,
@@ -48,6 +49,7 @@ const NAV: NavItem[] = [
   // itself initiated (the API matches on receiverOrgId).
   { name: "Requests", href: "/requests", icon: Inbox, show: (p) => p.canReviewRequests && !p.isCompany },
   { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue },
+  { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewRevenue },
   { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
   { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canViewPartners },

@@ -39,6 +39,20 @@ app.use('/api/network', networkRoutes);
 app.use('/api/agreements', agreementRoutes);
 app.use('/api/kiosks', kioskRoutes);
 
+// Same-origin proxy for the Mothership analytics feed. Keeping the upstream call
+// server-side avoids browser CORS failures and prevents exposing upstream details.
+app.get('/api/analytics/summary', requireAuth, loadMembership, asyncHandler(async (_req, res) => {
+    const upstream = await fetch('https://main.arcadelx.games/api/v1/analytics/summary', {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!upstream.ok) {
+        throw new ApiError(502, `Analytics upstream returned ${upstream.status}`);
+    }
+    const data = await upstream.json();
+    return res.status(200).json(new ApiResponse(200, data));
+}));
+
 // Crucial: These routes bypass standard JWT auth because they are server-to-server
     app.use('/api/internal', internalRoutes);
 

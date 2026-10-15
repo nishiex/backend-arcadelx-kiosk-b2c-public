@@ -61,6 +61,25 @@ export type InventorySummaryResponse = {
   summary: Record<string, number>;
 }
 
+export type AnalyticsSummaryResponse = {
+  status: string;
+  group_by: string;
+  total_events: number;
+  error_events: number;
+  unique_devices: number;
+  groups: Array<Record<string, unknown>>;
+}
+
+export async function fetchAnalyticsSummary(signal?: AbortSignal): Promise<AnalyticsSummaryResponse> {
+  const res = await apiFetch('/api/analytics/summary', {
+    signal,
+    cache: 'no-store',
+  });
+  const data = await handleRes<AnalyticsSummaryResponse>(res);
+  if (!data || typeof data.total_events !== 'number') throw new Error('Analytics returned an invalid response');
+  return data;
+}
+
 // ---- Auth / identity ----
 export type OrgType = 'COMPANY' | 'DISTRIBUTOR' | 'PARTNER';
 export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF';
