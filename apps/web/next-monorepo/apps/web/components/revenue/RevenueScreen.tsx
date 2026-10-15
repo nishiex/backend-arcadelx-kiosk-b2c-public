@@ -179,7 +179,8 @@ export default function RevenueScreen() {
       setPaymentsPage(1)
       setPaymentsRequested(true)
       void payments.refetch()
-      toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported`)
+      const linked = result.devices?.newKiosksCreated ?? 0
+      toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported${linked ? `; ${linked} device${linked === 1 ? "" : "s"} linked` : ""}`)
     },
   })
   if (isLoading)

@@ -51,7 +51,7 @@ export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
 export const syncMothershipPayments = asyncHandler(async (_req, res) => {
   if (!revenueSyncInFlight) {
     revenueSyncInFlight = (async () => {
-      const devices = process.env.MOTHERSHIP_DEVICE_API_URL ? await syncDevices() : null;
+      const devices = await syncDevices();
       return { devices, transactions: await syncRevenueData() };
     })().finally(() => {
       revenueSyncInFlight = null;

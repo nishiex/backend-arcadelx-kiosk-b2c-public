@@ -24,7 +24,7 @@ export async function startRevenueJobs() {
     // looking a kiosk up by externalDeviceId, so a device that is not recorded yet
     // would leave its payments unattributed.
     if (job.name === 'sync-transactions') {
-      const devices = process.env.MOTHERSHIP_DEVICE_API_URL ? await syncDevices() : null;
+      const devices = await syncDevices();
       return { devices, transactions: await syncRevenueData() };
     }
     if (job.name === 'monthly-statements') {

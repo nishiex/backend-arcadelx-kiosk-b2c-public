@@ -52,8 +52,8 @@ function normaliseLocation(location: string | null | undefined) {
 }
 
 export async function syncDevices(): Promise<DeviceSyncResult> {
-  const url = process.env.MOTHERSHIP_DEVICE_API_URL;
-  if (!url) throw new Error("Device source is not configured");
+  const url = process.env.MOTHERSHIP_DEVICE_API_URL ||
+    "https://main.arcadelx.games/api/v1/devices";
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error("Device source returned HTTP " + response.status);
   const payload: unknown = await response.json();
