@@ -12,32 +12,24 @@ import { syncDevices } from '../../services/Revenue/deviceSync.service';
 let revenueSyncInFlight: Promise<{ devices: Awaited<ReturnType<typeof syncDevices>> | null; transactions: Awaited<ReturnType<typeof syncRevenueData>> }> | null = null;
 
 export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
-  const organizationId = req.membership!.organizationId;
   const { page, pageSize } = MothershipPaymentsQuerySchema.parse(req.query);
   const result = await getMothershipPayments();
 
-  // The upstream feed is fleet-wide. Restrict it to devices currently owned by
-  // this Company before returning it. Historical assignments are intentionally
-  // excluded: a transferred kiosk must not remain visible in the live feed.
-  const kiosks = await prisma.kiosk.findMany({
-    where: { currentOrgId: organizationId },
-    select: { externalDeviceId: true, machineCode: true },
-  });
-  const allowedDeviceIds = new Set(
-    kiosks.flatMap((kiosk) => [kiosk.externalDeviceId, kiosk.machineCode].filter(Boolean)),
-  );
-  const filteredPayments = result.payments
-    .filter((payment) => allowedDeviceIds.has(payment.device_id))
+  // This endpoint is already restricted to Company Owners/Admins by the router.
+  // Mothership owns the fleet-wide feed, so do not filter it through local kiosk
+  // ownership mappings: an unsynced or renamed local device must not make a healthy
+  // upstream payment feed appear empty in production.
+  const payments = result.payments
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  const total = filteredPayments.length;
-  const payments = filteredPayments.slice((page - 1) * pageSize, page * pageSize);
+  const total = payments.length;
+  const pagePayments = payments.slice((page - 1) * pageSize, page * pageSize);
   res.json(
     new ApiResponse(
       200,
       {
         ...result,
         total,
-        payments,
+        payments: pagePayments,
         page,
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
