@@ -125,8 +125,19 @@ export type RegisterKioskInput = {
 };
 
 const handleRes = async <T,>(res: Response): Promise<T> => {
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.message || 'API Error');
+  const text = await res.text();
+  let json: ApiResponse<T> | { message?: string } | null = null;
+  try {
+    json = text ? JSON.parse(text) as ApiResponse<T> | { message?: string } : null;
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'API returned an invalid response'
+        : text || `API request failed (${res.status})`,
+    );
+  }
+  if (!res.ok) throw new Error(json?.message || `API request failed (${res.status})`);
+  if (!json || !('data' in json)) throw new Error('API returned an invalid response');
   return json.data as T;
 }
 

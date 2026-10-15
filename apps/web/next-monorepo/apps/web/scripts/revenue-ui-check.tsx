@@ -59,6 +59,10 @@ globalThis.fetch = async (input, init) => {
       data: { total: paymentRows.length, payments: paymentRows, fetchedAt: '2026-10-07T10:01:00.000Z' },
     })
   }
+  if (route === '/api/revenue/payments/sync') {
+    assert.equal(method, 'POST')
+    return Response.json({ data: { devices: { newKiosksCreated: 1 }, transactions: { totalRecordsFetched: 2, newRecordsInserted: 1, unattributedCount: 0 } } })
+  }
   if (route === '/api/revenue/deduction-rates') {
     if (method === 'PATCH') {
       if (gate) await gate
@@ -102,15 +106,15 @@ try {
   await render(false); await render(true)
   assert.equal(count('machine-wise'), 1, 'Navigating back reuses fresh revenue cache')
   assert.equal(count('deduction-rates'), 1)
-  assert.ok(button('Fetch latest payments'), 'Company owner can fetch the payment feed')
-  assert.ok(text().includes('Select Fetch latest payments'))
-  assert.ok(text().includes('not imported into revenue totals'))
-  await click(button('Fetch latest payments'))
-  assert.equal(count('payments'), 1, 'Button performs one explicit read-only GET')
+  assert.ok(button('Sync latest payments'), 'Company owner can sync the payment feed')
+  assert.ok(text().includes('Select Sync latest payments'))
+  assert.ok(text().includes('imported into the revenue totals'))
+  await click(button('Sync latest payments'))
+  assert.equal(count('sync', 'POST'), 1, 'Button imports the payment feed')
+  assert.equal(count('payments'), 1, 'Sync refreshes the visible payment feed')
   assert.ok(text().includes('txn-001'))
   assert.ok(text().includes('pending'))
-  assert.equal(count('sync', 'POST'), 0, 'Payment feed is not imported')
-  assert.equal(count('machine-wise'), 1, 'Fetching payments leaves ledger totals unchanged')
+  assert.equal(count('machine-wise'), 2, 'Sync refreshes ledger totals')
   await fill('revenue-search', 'missing'); assert.ok(text().includes('No machines match'))
   await fill('revenue-search', 'partner b'); assert.ok(document.querySelector('tbody')?.textContent?.includes('K-001'))
   await fill('revenue-search', '')
@@ -138,7 +142,7 @@ try {
       assert.equal(!!document.querySelector('a[href="/revenue"]'), role !== 'STAFF', `${type} ${role} revenue navigation`)
       assert.equal(!!document.querySelector('table'), role !== 'STAFF', `${type} ${role} revenue table`)
       assert.equal(!!button('Edit rates'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} edit-rate access`)
-      assert.equal(!!button('Fetch latest payments'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} payment-feed access`)
+      assert.equal(!!button('Sync latest payments'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} payment-sync access`)
     }
   }
   const requestsBefore = calls.length
