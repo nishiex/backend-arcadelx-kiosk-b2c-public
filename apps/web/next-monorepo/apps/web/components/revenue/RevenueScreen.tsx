@@ -362,7 +362,7 @@ export default function RevenueScreen() {
       {canEdit && (
         <Panel
           title="Mothership payments"
-          subtitle="Completed payments are imported into the revenue totals when you sync. The table shows the newest 50 records per page."
+          subtitle="Completed payments are imported into revenue totals when you sync. Mothership provides the newest 50 records, shown 10 per page."
         >
           {syncPayments.isError && (
             <p role="alert" className="mb-4 text-sm text-destructive">
