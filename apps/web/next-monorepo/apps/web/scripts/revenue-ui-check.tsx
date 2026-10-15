@@ -53,10 +53,11 @@ globalThis.fetch = async (input, init) => {
     if (gate) await gate
     return failRevenue ? Response.json({ message: 'Revenue temporarily unavailable' }, { status: 503 }) : Response.json({ data: { kiosks: empty ? [] : rows } })
   }
+  if (route === '/api/revenue/series') return Response.json({ data: { range: '30d', granularity: 'Daily', bucket: 'day', currency: 'INR', total: 30, points: [{ key: '2026-10-01', label: '1 Oct', revenue: 30 }] } })
   if (route === '/api/revenue/payments') {
     assert.equal(method, 'GET')
     return Response.json({
-      data: { total: paymentRows.length, payments: paymentRows, fetchedAt: '2026-10-07T10:01:00.000Z' },
+      data: { total: paymentRows.length, payments: paymentRows, fetchedAt: '2026-10-07T10:01:00.000Z', page: 1, pageSize: 50, totalPages: 1 },
     })
   }
   if (route === '/api/revenue/payments/sync') {
@@ -107,18 +108,19 @@ try {
   assert.equal(count('machine-wise'), 1, 'Navigating back reuses fresh revenue cache')
   assert.equal(count('deduction-rates'), 1)
   assert.ok(button('Sync latest payments'), 'Company owner can sync the payment feed')
-  assert.ok(text().includes('Select Sync latest payments'))
-  assert.ok(text().includes('imported into the revenue totals'))
+  assert.ok(text().includes('Read-only feed'))
+  assert.equal(count('payments'), 1, 'Opening Revenue fetches payment feed without syncing')
+  assert.equal(count('sync', 'POST'), 0, 'Reading the feed does not import payments')
   await click(button('Sync latest payments'))
   assert.equal(count('sync', 'POST'), 1, 'Button imports the payment feed')
-  assert.equal(count('payments'), 1, 'Sync refreshes the visible payment feed')
+  assert.ok(count('payments') >= 2, 'Sync refreshes the visible payment feed')
   assert.ok(text().includes('txn-001'))
   assert.ok(text().includes('pending'))
   assert.equal(count('machine-wise'), 2, 'Sync refreshes ledger totals')
   await fill('revenue-search', 'missing'); assert.ok(text().includes('No machines match'))
   await fill('revenue-search', 'partner b'); assert.ok(document.querySelector('tbody')?.textContent?.includes('K-001'))
   await fill('revenue-search', '')
-  console.log('PASS loading, real totals, machine search, active navigation and cached remount')
+  console.log('PASS loading, real totals, machine search, read-only payment fetch, explicit sync, active navigation and cached remount')
 
   await click(button('Edit rates'))
   assert.equal((document.getElementById('pgFeePercentage') as HTMLInputElement).value, '2.5')

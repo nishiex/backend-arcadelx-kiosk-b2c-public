@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Download, RefreshCw } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, Download, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -19,6 +19,7 @@ import {
   Panel,
   Skeleton,
 } from "@/components/dashboard/ui"
+import RevenueTrendChart from "@/components/dashboard/RevenueTrendChart"
 
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -28,6 +29,13 @@ const buttonClass =
   "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+const selectClass = `${inputClass} sm:w-auto sm:min-w-36`
+const PAGE_SIZE = 10
+function istDateKey(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value ?? ""
+  return `${part("year")}-${part("month")}-${part("day")}`
+}
 const rateFields = [
   ["gstPercentage", "GST (%)"],
   ["pgFeePercentage", "Payment gateway fee (%)"],
@@ -143,10 +151,21 @@ function RateEditor({
 
 export default function RevenueScreen() {
   const { me, isLoading, isError, canViewRevenue, isCompany, role } = useMe()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
+  const [machineSort, setMachineSort] = useState<"totalRevenue" | "thisMonth" | "today" | "machineCode">("totalRevenue")
+  const [machinePage, setMachinePage] = useState(1)
   const [editing, setEditing] = useState(false)
-  const [paymentsRequested, setPaymentsRequested] = useState(false)
   const [paymentsPage, setPaymentsPage] = useState(1)
+  const [paymentSearch, setPaymentSearch] = useState("")
+  const [paymentStatus, setPaymentStatus] = useState("")
+  const [paymentDevice, setPaymentDevice] = useState("")
+  const [paymentGame, setPaymentGame] = useState("")
+  const [paymentProvider, setPaymentProvider] = useState("")
+  const [paymentFrom, setPaymentFrom] = useState("")
+  const [paymentTo, setPaymentTo] = useState("")
+  const [paymentSort, setPaymentSort] = useState<"date" | "amount">("date")
+  const [paymentSortDesc, setPaymentSortDesc] = useState(true)
   const scope = [me?.id ?? "", me?.membership?.organizationId ?? "", role ?? ""]
   const ratesKey = ["revenue-rates", ...scope]
   const revenue = useQuery({
@@ -166,19 +185,19 @@ export default function RevenueScreen() {
   const canEdit =
     canViewRevenue && isCompany && (role === "OWNER" || role === "ADMIN")
   const payments = useQuery({
-    queryKey: ["mothership-payments", paymentsPage, ...scope],
-    queryFn: ({ signal }) => fetchMothershipPayments(paymentsPage, signal),
-    enabled: canEdit && paymentsRequested,
+    queryKey: ["mothership-payments", ...scope],
+    queryFn: ({ signal }) => fetchMothershipPayments(1, signal, 50),
+    enabled: canEdit,
     staleTime: 30_000,
     retry: 1,
   })
   const syncPayments = useMutation({
     mutationFn: syncMothershipPayments,
     onSuccess: (result) => {
-      void revenue.refetch()
       setPaymentsPage(1)
-      setPaymentsRequested(true)
-      void payments.refetch()
+      void queryClient.invalidateQueries({ queryKey: ["revenue-machines", ...scope] })
+      void queryClient.invalidateQueries({ queryKey: ["revenue-series", ...scope] })
+      void queryClient.invalidateQueries({ queryKey: ["mothership-payments", ...scope] })
       const linked = result.devices?.newKiosksCreated ?? 0
       toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported${linked ? `; ${linked} device${linked === 1 ? "" : "s"} linked` : ""}`)
     },
@@ -199,22 +218,41 @@ export default function RevenueScreen() {
       <EmptyState message="Revenue is available to active Owners, Admins and Managers." />
     )
   const rows = revenue.data ?? []
-  const filtered = rows.filter((row) =>
-    [row.machineCode, row.location, row.distributor, row.partner].some(
-      (value) => value.toLowerCase().includes(search.trim().toLowerCase())
-    )
-  )
+  const periodMetrics = (["today", "thisMonth", "totalRevenue"] as const).map((key) => {
+    const gross = rows.reduce((sum, row) => sum + Math.round(row[key] * 100), 0) / 100
+    if (!rates.data) return { gross, estimatedNet: null, deductions: null }
+    const gst = Math.round(gross * rates.data.gstPercentage) / 100
+    const gateway = Math.round(gross * rates.data.pgFeePercentage) / 100
+    const beforeTds = gross - gst - gateway
+    const tds = Math.round(beforeTds * rates.data.tdsPercentage) / 100
+    return { gross, estimatedNet: beforeTds - tds, deductions: gst + gateway + tds }
+  })
+  const filtered = rows.filter((row) => [row.machineCode, row.location, row.distributor, row.partner].some((value) => value.toLowerCase().includes(search.trim().toLowerCase())))
+  const sortedMachines = [...filtered].sort((a, b) => machineSort === "machineCode" ? a.machineCode.localeCompare(b.machineCode) : b[machineSort] - a[machineSort])
+  const machinePages = Math.max(1, Math.ceil(sortedMachines.length / PAGE_SIZE))
+  const visibleMachines = sortedMachines.slice((machinePage - 1) * PAGE_SIZE, machinePage * PAGE_SIZE)
+  const feed = payments.data?.payments ?? []
+  const unique = (field: "status" | "device_id" | "game_id" | "provider") => [...new Set(feed.map(payment => payment[field]).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b))
+  const normalizedPaymentSearch = paymentSearch.trim().toLowerCase()
+  const filteredPayments = feed.filter((payment) => {
+    const day = istDateKey(payment.created_at)
+    return (!paymentStatus || payment.status.toLowerCase() === paymentStatus.toLowerCase()) && (!paymentDevice || payment.device_id === paymentDevice) && (!paymentGame || payment.game_id === paymentGame) && (!paymentProvider || payment.provider === paymentProvider) && (!paymentFrom || day >= paymentFrom) && (!paymentTo || day <= paymentTo) && (!normalizedPaymentSearch || `${payment.txnid} ${payment.device_id} ${payment.game_id} ${payment.provider ?? ""}`.toLowerCase().includes(normalizedPaymentSearch))
+  }).sort((a, b) => {
+    const comparison = paymentSort === "amount" ? a.amount - b.amount : Date.parse(a.created_at) - Date.parse(b.created_at)
+    return paymentSortDesc ? -comparison : comparison
+  })
+  const paymentPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE))
+  const visiblePayments = filteredPayments.slice((paymentsPage - 1) * PAGE_SIZE, paymentsPage * PAGE_SIZE)
+  const resetPaymentFilters = () => { setPaymentSearch(""); setPaymentStatus(""); setPaymentDevice(""); setPaymentGame(""); setPaymentProvider(""); setPaymentFrom(""); setPaymentTo(""); setPaymentsPage(1) }
   const refreshing =
     revenue.isFetching || rates.isFetching || payments.isFetching || syncPayments.isPending
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Revenue</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gross revenue across your fleet. All amounts in INR; day and month
-            follow India Standard Time.
-          </p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">ArcadeLX · Finance</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Revenue</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Fleet performance and payment activity · Figures use India Standard Time (IST)</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canEdit && (
@@ -237,7 +275,8 @@ export default function RevenueScreen() {
             onClick={() => {
               void revenue.refetch()
               void rates.refetch()
-              if (canEdit && paymentsRequested) void payments.refetch()
+              if (canEdit) void payments.refetch()
+              void queryClient.invalidateQueries({ queryKey: ["revenue-series", ...scope] })
             }}
           >
             <span className="flex items-center gap-2">
@@ -248,7 +287,7 @@ export default function RevenueScreen() {
         </div>
       </header>
       {revenue.isPending ? (
-        <Skeleton className="h-64 w-full" />
+        <div className="grid gap-4 sm:grid-cols-3"><Skeleton className="h-32"/><Skeleton className="h-32"/><Skeleton className="h-32"/></div>
       ) : revenue.isError ? (
         <ErrorState
           message={revenue.error.message}
@@ -257,51 +296,39 @@ export default function RevenueScreen() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            {(
-              [
-                ["today", "Today"],
-                ["thisMonth", "This month"],
-                ["totalRevenue", "All time"],
-              ] as const
-            ).map(([key, title]) => (
-              <Panel key={key} title={title}>
-                <p className="text-2xl font-semibold tabular-nums">
-                  {money.format(
-                    rows.reduce(
-                      (sum, row) => sum + Math.round(row[key] * 100),
-                      0
-                    ) / 100
-                  )}
-                </p>
-              </Panel>
+            {([ ["Today’s gross", "IST calendar day"], ["This month gross", "IST calendar month"], ["All-time gross", `${rows.length} tracked machines`] ] as const).map(([title, detail], index) => (
+              <section key={title} className={`relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm ${index === 0 ? "border-t-2 border-t-primary" : ""}`}>
+                <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{money.format(periodMetrics[index]!.gross)}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
+                <div className="mt-4 border-t border-border/70 pt-3">
+                  <p className="text-xs text-muted-foreground">Estimated after all deduction rates</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">{periodMetrics[index]!.estimatedNet === null ? "Rates unavailable" : money.format(periodMetrics[index]!.estimatedNet)}</p>
+                  {periodMetrics[index]!.deductions !== null && <p className="mt-1 text-xs text-muted-foreground">Estimated deductions: {money.format(periodMetrics[index]!.deductions!)}</p>}
+                </div>
+              </section>
             ))}
           </div>
-          <Panel title="Machine revenue" subtitle={`${rows.length} machines`}>
-            <label
-              htmlFor="revenue-search"
-              className="mb-1.5 block text-sm font-medium"
-            >
-              Search machines
-            </label>
-            <input
-              id="revenue-search"
-              className={`${inputClass} mb-4 max-w-md`}
-              placeholder="Machine, location, distributor or partner"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
+          {rates.isSuccess && <p className="-mt-3 text-xs text-muted-foreground">Estimate applies GST and gateway rates to gross, then estimates TDS on the remaining amount. Actual TDS and payouts vary by distributor/partner agreements; finalized statements are authoritative.</p>}
+          <RevenueTrendChart />
+          <Panel title="Machine revenue" subtitle={`${rows.length} machines · gross recognized revenue by assignment window`}>
+            <div className="mb-4 flex flex-wrap items-end gap-3">
+              <div className="min-w-56 flex-1"><label htmlFor="revenue-search" className="mb-1.5 block text-xs font-medium text-muted-foreground">Find a machine</label><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><input id="revenue-search" className={`${inputClass} pl-9`} placeholder="Machine, location, distributor or partner" value={search} onChange={(event) => { setSearch(event.target.value); setMachinePage(1) }}/></div></div>
+              <div><label htmlFor="machine-sort" className="mb-1.5 block text-xs font-medium text-muted-foreground">Sort machines</label><select id="machine-sort" className={selectClass} value={machineSort} onChange={(event) => { setMachineSort(event.target.value as typeof machineSort); setMachinePage(1) }}><option value="totalRevenue">All-time revenue</option><option value="thisMonth">This month</option><option value="today">Today</option><option value="machineCode">Machine ID</option></select></div>
+            </div>
             {!rows.length ? (
               <EmptyState message="No machine revenue to show yet." />
             ) : !filtered.length ? (
               <EmptyState message="No machines match your search." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm whitespace-nowrap">
+              <>
+              <div className="overflow-x-auto rounded-lg border border-border/70">
+                <table className="w-full min-w-[860px] text-sm whitespace-nowrap">
                   <caption className="sr-only">
                     Gross revenue by machine in INR
                   </caption>
                   <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
+                    <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
                       {[
                         "Machine",
                         "Location",
@@ -322,16 +349,16 @@ export default function RevenueScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((row) => (
+                    {visibleMachines.map((row) => (
                       <tr
                         key={row.machineCode}
-                        className="border-b border-border/60 last:border-0"
+                        className="border-b border-border/60 transition-colors hover:bg-muted/25 last:border-0"
                       >
                         <th
                           scope="row"
                           className="px-3 py-3 text-left font-medium"
                         >
-                          {row.machineCode}
+                          <span title={row.machineCode} className="inline-block max-w-40 truncate align-bottom">{row.machineCode}</span>
                         </th>
                         {[row.location, row.distributor, row.partner].map(
                           (value, index) => (
@@ -355,39 +382,46 @@ export default function RevenueScreen() {
                   </tbody>
                 </table>
               </div>
+              {filtered.length > PAGE_SIZE && <div className="mt-4 flex items-center justify-between border-t border-border pt-3"><span className="text-xs text-muted-foreground">Showing {(machinePage - 1) * PAGE_SIZE + 1}–{Math.min(machinePage * PAGE_SIZE, filtered.length)} of {filtered.length}</span><div className="flex gap-2"><button className={buttonClass} disabled={machinePage <= 1} onClick={() => setMachinePage(page => page - 1)}>Previous</button><span className="self-center text-xs text-muted-foreground">{machinePage} / {machinePages}</span><button className={buttonClass} disabled={machinePage >= machinePages} onClick={() => setMachinePage(page => page + 1)}>Next</button></div></div>}
+              </>
             )}
           </Panel>
         </>
       )}
       {canEdit && (
-        <Panel
-          title="Mothership payments"
-          subtitle="Completed payments are imported into revenue totals when you sync. Mothership provides the newest 50 records, shown 10 per page."
-        >
+        <Panel title="Mothership payment feed" subtitle="Latest 50 upstream records · Read-only feed; synchronization is a separate, explicit action" className="border-primary/20">
           {syncPayments.isError && (
             <p role="alert" className="mb-4 text-sm text-destructive">
-              {syncPayments.error.message}
+              Payment synchronization failed. The local ledger was not confirmed as updated; retry when the service is available.
             </p>
           )}
-          {!paymentsRequested ? (
-            <EmptyState message="Select Sync latest payments to import and inspect the live feed." />
-          ) : payments.isPending ? (
-            <Skeleton className="h-16 w-full" />
-          ) : payments.isError ? (
+          {payments.isPending ? (
+            <div className="space-y-2"><Skeleton className="h-10 w-full"/><Skeleton className="h-12 w-full"/><Skeleton className="h-12 w-full"/></div>
+          ) : payments.isError && !payments.data ? (
             <ErrorState
-              message={payments.error.message}
+              message="Couldn't refresh the Mothership feed. Try again."
               onRetry={() => void payments.refetch()}
             />
           ) : !payments.data.payments.length ? (
             <EmptyState message="No payments were returned by Mothership." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm whitespace-nowrap">
+            <>
+            {payments.isError && payments.data && <p role="status" className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">Refresh failed. Showing the last successfully fetched feed below.</p>}
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-border/70 bg-background/60 p-3">
+              <div className="min-w-44 flex-1"><label htmlFor="payment-search" className="mb-1 block text-xs font-medium text-muted-foreground">Search the latest feed</label><input id="payment-search" className={inputClass} placeholder="Transaction, device, game or provider" value={paymentSearch} onChange={e => { setPaymentSearch(e.target.value); setPaymentsPage(1) }}/></div>
+              {([["payment-status", "Status", paymentStatus, setPaymentStatus, unique("status")], ["payment-device", "Device", paymentDevice, setPaymentDevice, unique("device_id")], ["payment-game", "Game", paymentGame, setPaymentGame, unique("game_id")], ["payment-provider", "Provider", paymentProvider, setPaymentProvider, unique("provider")]] as const).map(([id, label, value, setter, options]) => <div key={id}><label htmlFor={id} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label><select id={id} className={selectClass} value={value} onChange={e => { setter(e.target.value); setPaymentsPage(1) }}><option value="">All {label.toLowerCase()}s</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select></div>)}
+              <div><label htmlFor="payment-from" className="mb-1 block text-xs font-medium text-muted-foreground">From (IST)</label><input id="payment-from" className={selectClass} type="date" value={paymentFrom} onChange={e => { setPaymentFrom(e.target.value); setPaymentsPage(1) }}/></div>
+              <div><label htmlFor="payment-to" className="mb-1 block text-xs font-medium text-muted-foreground">To (IST)</label><input id="payment-to" className={selectClass} type="date" value={paymentTo} onChange={e => { setPaymentTo(e.target.value); setPaymentsPage(1) }}/></div>
+              <button className={`${buttonClass} inline-flex items-center gap-1.5`} onClick={resetPaymentFilters}><SlidersHorizontal size={14}/>Reset filters</button>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{filteredPayments.length} matching records in latest {payments.data.total} · fetched {new Date(payments.data.fetchedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</span><div className="flex items-center gap-2"><label htmlFor="payment-sort">Sort by</label><select id="payment-sort" className={`${selectClass} py-1.5`} value={paymentSort} onChange={e => { setPaymentSort(e.target.value as typeof paymentSort); setPaymentsPage(1) }}><option value="date">Payment date</option><option value="amount">Amount</option></select><button className="rounded-md border border-border p-1.5 hover:bg-muted" aria-label={paymentSortDesc ? "Descending sort; reverse order" : "Ascending sort; reverse order"} onClick={() => setPaymentSortDesc(value => !value)}>{paymentSortDesc ? <ArrowDownWideNarrow size={15}/> : <ArrowUpWideNarrow size={15}/>}</button></div></div>
+            {!filteredPayments.length ? <EmptyState message="No payments match these filters. Adjust or reset the filters to explore the latest feed."/> : <div className="overflow-x-auto rounded-lg border border-border/70">
+              <table className="w-full min-w-[800px] text-sm whitespace-nowrap">
                 <caption className="sr-only">
                   Mothership payment records. Payment statuses are not revenue totals.
                 </caption>
                 <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
+                  <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
                     {["Date", "Transaction", "Device", "Game", "Amount", "Status", "Provider"].map(
                       (label) => (
                         <th scope="col" key={label} className="px-3 py-3 font-medium">
@@ -398,10 +432,10 @@ export default function RevenueScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.data.payments.map((payment) => (
+                  {visiblePayments.map((payment) => (
                     <tr
                       key={payment.txnid}
-                      className="border-b border-border/60 last:border-0"
+                      className="border-b border-border/60 transition-colors hover:bg-muted/25 last:border-0"
                     >
                       <td className="px-3 py-3">
                         {new Date(payment.created_at).toLocaleString("en-IN", {
@@ -409,58 +443,54 @@ export default function RevenueScreen() {
                         })}
                       </td>
                       <th scope="row" className="px-3 py-3 text-left font-medium">
-                        {payment.txnid}
+                        <span className="inline-block max-w-44 truncate align-bottom" title={payment.txnid}>{payment.txnid}</span>
                       </th>
-                      <td className="px-3 py-3">{payment.device_id}</td>
-                      <td className="px-3 py-3">{payment.game_id}</td>
+                      <td className="px-3 py-3"><span className="inline-block max-w-36 truncate align-bottom" title={payment.device_id}>{payment.device_id || "Unknown device"}</span></td>
+                      <td className="px-3 py-3"><span className="inline-block max-w-40 truncate align-bottom" title={payment.game_id}>{payment.game_id || "Unknown game"}</span></td>
                       <td className="px-3 py-3 tabular-nums">
                         {new Intl.NumberFormat("en-IN", {
                           style: "currency",
                           currency: payment.currency,
                         }).format(payment.amount)}
                       </td>
-                      <td className="px-3 py-3">{payment.status}</td>
+                      <td className="px-3 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${payment.status.toLowerCase() === "completed" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : payment.status.toLowerCase() === "pending" ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : payment.status.toLowerCase() === "expired" || payment.status.toLowerCase() === "failed" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-muted text-muted-foreground"}`}>{payment.status}</span></td>
                       <td className="px-3 py-3">{payment.provider ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="mt-3 text-xs text-muted-foreground">
-                {payments.data.total} payments · fetched{" "}
-                {new Date(payments.data.fetchedAt).toLocaleString("en-IN", {
-                  timeZone: "Asia/Kolkata",
-                })}
-              </p>
-              {payments.data.totalPages > 1 && (
+              {filteredPayments.length > PAGE_SIZE && (
                 <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">Showing {(paymentsPage - 1) * PAGE_SIZE + 1}–{Math.min(paymentsPage * PAGE_SIZE, filteredPayments.length)} of {filteredPayments.length} matching</span>
                   <button
                     type="button"
                     className={buttonClass}
-                    disabled={paymentsPage <= 1 || payments.isFetching}
+                    disabled={paymentsPage <= 1}
                     onClick={() => setPaymentsPage(page => Math.max(1, page - 1))}
                   >
                     Previous
                   </button>
                   <span className="text-xs text-muted-foreground">
-                    Page {payments.data.page} of {payments.data.totalPages}
+                    Page {paymentsPage} of {paymentPages}
                   </span>
                   <button
                     type="button"
                     className={buttonClass}
-                    disabled={paymentsPage >= payments.data.totalPages || payments.isFetching}
-                    onClick={() => setPaymentsPage(page => Math.min(payments.data.totalPages, page + 1))}
+                    disabled={paymentsPage >= paymentPages}
+                    onClick={() => setPaymentsPage(page => Math.min(paymentPages, page + 1))}
                   >
                     Next
                   </button>
                 </div>
               )}
-            </div>
+            </div>}
+            </>
           )}
         </Panel>
       )}
       <Panel
         title="Deduction rates"
-        subtitle="Used when generating new statements. Saved statements retain their original amounts."
+        subtitle="Current rates used for new statements. Existing statements retain their saved amounts."
         action={
           canEdit && rates.isSuccess && !editing ? (
             <button className={buttonClass} onClick={() => setEditing(true)}>
@@ -484,13 +514,12 @@ export default function RevenueScreen() {
             onClose={() => setEditing(false)}
           />
         ) : (
-          <dl className="grid gap-4 sm:grid-cols-3">
-            {rateFields.map(([key, label]) => (
-              <div key={key}>
-                <dt className="text-sm text-muted-foreground">{label}</dt>
-                <dd className="mt-1 text-lg font-semibold">
-                  {rates.data[key]}%
-                </dd>
+          <dl className="grid gap-3 sm:grid-cols-3">
+            {rateFields.map(([key, label], index) => (
+              <div key={key} className={`rounded-lg border border-border/70 bg-background/60 p-4 ${index === 0 ? "sm:border-l-2 sm:border-l-primary" : ""}`}>
+                <dt className="text-sm font-medium">{label.replace(" (%)", "")}</dt>
+                <dd className="mt-2 text-2xl font-semibold tabular-nums">{rates.data[key]}<span className="ml-0.5 text-base text-muted-foreground">%</span></dd>
+                <p className="mt-1 text-xs text-muted-foreground">{key === "gstPercentage" ? "Goods and Services Tax rate" : key === "pgFeePercentage" ? "Payment gateway fee rate" : "Tax Deducted at Source rate"}</p>
               </div>
             ))}
           </dl>

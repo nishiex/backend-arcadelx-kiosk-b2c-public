@@ -18,6 +18,7 @@ import {
   type RevenueSeriesPoint,
   type RevenueSeriesRange,
 } from "@/lib/backend-api"
+import { useMe } from "@/hooks/useMe"
 import { prefersReducedMotion } from "@/lib/gsap"
 import { Panel, Skeleton, ErrorState, EmptyState } from "./ui"
 
@@ -100,9 +101,12 @@ function RangeFilter({
 
 export default function RevenueTrendChart() {
   const [range, setRange] = React.useState<RevenueSeriesRange>("30d")
+  const { me, role, canViewRevenue } = useMe()
+  const scope = [me?.id ?? "", me?.membership?.organizationId ?? "", role ?? ""]
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ["revenue-series", range],
+    queryKey: ["revenue-series", ...scope, range],
     queryFn: ({ signal }) => fetchRevenueSeries(range, signal),
+    enabled: canViewRevenue,
   })
 
   const points: RevenueSeriesPoint[] = data?.points ?? []

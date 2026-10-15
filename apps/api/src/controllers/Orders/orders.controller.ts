@@ -12,7 +12,7 @@ import {
   invoiceDeliveryKey,
   retryOwnedDelivery,
 } from "../../services/email/delivery.service";
-import { lockAgreementParties } from "../../services/agreement-rules";
+import { lockAgreementParties, requireImmediateSupplier } from "../../services/agreement-rules";
 import { requireWorkflow } from '../../services/workflow-readiness';
 import {
   CreateOrderSchema,
@@ -92,43 +92,6 @@ const reserveKiosks = async (
   });
 };
 
-const getRequestSupplier = async (
-  tx: Prisma.TransactionClient,
-  childOrgId: string,
-  childOrgType: string,
-) => {
-  const parentType =
-    childOrgType === "PARTNER"
-      ? "DISTRIBUTOR"
-      : childOrgType === "DISTRIBUTOR"
-        ? "COMPANY"
-        : null;
-  if (!parentType) {
-    throw new ApiError(403, "Only Partners and Distributors can request kiosks");
-  }
-  const agreements = await tx.agreement.findMany({
-    where: {
-      childOrgId,
-      status: "ACTIVE",
-      parentOrg: { is: { type: parentType } },
-    },
-    include: { parentOrg: { select: { id: true, name: true, type: true } } },
-  });
-  if (agreements.length === 0) {
-    throw new ApiError(
-      403,
-      "Cannot create request: No active agreement with the required immediate supplier found",
-    );
-  }
-  if (agreements.length > 1) {
-    throw new ApiError(
-      409,
-      "Multiple active supplier agreements found; contact support before requesting kiosks",
-    );
-  }
-  return agreements[0]!;
-};
-
 const assertRequestModelAvailable = async (
   tx: Prisma.TransactionClient,
   supplierOrgId: string,
@@ -170,7 +133,7 @@ export const getRequestModelAvailability = asyncHandler(async (req, res) => {
   const requesterOrgId = req.membership!.organizationId;
   const requesterOrgType = req.membership!.type;
   const result = await prisma.$transaction(async (tx) => {
-    const agreement = await getRequestSupplier(
+    const agreement = await requireImmediateSupplier(
       tx,
       requesterOrgId,
       requesterOrgType,
@@ -318,7 +281,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   if (parsed.type === 'REQUEST') {
     childOrgId = currentOrgId;
     const supplierAgreement = await prisma.$transaction((tx) =>
-      getRequestSupplier(tx, childOrgId, currentOrgType),
+      requireImmediateSupplier(tx, childOrgId, currentOrgType),
     );
     parentOrgId = supplierAgreement.parentOrg.id;
     requestSupplierId = parentOrgId;

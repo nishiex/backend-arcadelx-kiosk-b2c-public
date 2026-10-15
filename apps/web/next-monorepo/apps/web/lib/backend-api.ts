@@ -654,8 +654,8 @@ export type MothershipPaymentsFeed = {
 };
 
 /** Read the current payment feed without importing or mutating revenue records. */
-export async function fetchMothershipPayments(page = 1, signal?: AbortSignal): Promise<MothershipPaymentsFeed> {
-  const query = new URLSearchParams({ page: String(page), pageSize: '10' });
+export async function fetchMothershipPayments(page = 1, signal?: AbortSignal, pageSize = 50): Promise<MothershipPaymentsFeed> {
+  const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   const res = await apiFetch(`/api/revenue/payments?${query.toString()}`, {
     credentials: 'include',
     cache: 'no-store',
