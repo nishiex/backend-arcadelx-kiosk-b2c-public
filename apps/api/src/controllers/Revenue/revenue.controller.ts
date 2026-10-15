@@ -6,7 +6,10 @@ import { ApiError } from '../../utils/ApiError';
 import { MothershipPaymentsQuerySchema, SettingsSchema, RevenueSeriesQuerySchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
 import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-period';
 import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
-import { getMothershipPayments } from '../../services/Revenue/revenueTransaction.services';
+import { getMothershipPayments, syncRevenueData } from '../../services/Revenue/revenueTransaction.services';
+import { syncDevices } from '../../services/Revenue/deviceSync.service';
+
+let revenueSyncInFlight: Promise<{ devices: Awaited<ReturnType<typeof syncDevices>> | null; transactions: Awaited<ReturnType<typeof syncRevenueData>> }> | null = null;
 
 export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
   const organizationId = req.membership!.organizationId;
@@ -42,6 +45,20 @@ export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
       'Mothership payments fetched successfully',
     ),
   );
+});
+
+/** Import the current Mothership feed into the local revenue ledger on demand. */
+export const syncMothershipPayments = asyncHandler(async (_req, res) => {
+  if (!revenueSyncInFlight) {
+    revenueSyncInFlight = (async () => {
+      const devices = process.env.MOTHERSHIP_DEVICE_API_URL ? await syncDevices() : null;
+      return { devices, transactions: await syncRevenueData() };
+    })().finally(() => {
+      revenueSyncInFlight = null;
+    });
+  }
+  const result = await revenueSyncInFlight;
+  res.json(new ApiResponse(200, result, 'Mothership payments synchronized successfully'));
 });
 
 export const getMachineWiseRevenue = asyncHandler(async (req, res) => {

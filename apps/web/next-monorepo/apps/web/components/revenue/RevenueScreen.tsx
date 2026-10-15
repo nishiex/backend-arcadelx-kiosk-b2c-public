@@ -9,6 +9,7 @@ import {
   fetchDeductionRates,
   fetchMachineRevenue,
   fetchMothershipPayments,
+  syncMothershipPayments,
   updateDeductionRates,
   type DeductionRates,
 } from "@/lib/backend-api"
@@ -171,6 +172,16 @@ export default function RevenueScreen() {
     staleTime: 30_000,
     retry: 1,
   })
+  const syncPayments = useMutation({
+    mutationFn: syncMothershipPayments,
+    onSuccess: (result) => {
+      void revenue.refetch()
+      setPaymentsPage(1)
+      setPaymentsRequested(true)
+      void payments.refetch()
+      toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported`)
+    },
+  })
   if (isLoading)
     return (
       <div aria-label="Loading revenue" className="space-y-4">
@@ -193,7 +204,7 @@ export default function RevenueScreen() {
     )
   )
   const refreshing =
-    revenue.isFetching || rates.isFetching || payments.isFetching
+    revenue.isFetching || rates.isFetching || payments.isFetching || syncPayments.isPending
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -210,17 +221,12 @@ export default function RevenueScreen() {
               className={buttonClass}
               disabled={refreshing || editing}
               onClick={() => {
-                if (paymentsRequested && paymentsPage === 1) {
-                  void payments.refetch()
-                  return
-                }
-                setPaymentsPage(1)
-                setPaymentsRequested(true)
+                syncPayments.mutate()
               }}
             >
               <span className="flex items-center gap-2">
-                <Download size={16} className={payments.isFetching ? "animate-pulse" : ""} />
-                {payments.isFetching ? "Fetching payments…" : "Fetch latest payments"}
+                <Download size={16} className={syncPayments.isPending ? "animate-pulse" : ""} />
+                {syncPayments.isPending ? "Syncing payments…" : "Sync latest payments"}
               </span>
             </button>
           )}
@@ -355,10 +361,15 @@ export default function RevenueScreen() {
       {canEdit && (
         <Panel
           title="Mothership payments"
-          subtitle="Live payment feed. Load it when needed. Results show the newest 50 records per page and are not imported into revenue totals."
+          subtitle="Completed payments are imported into the revenue totals when you sync. The table shows the newest 50 records per page."
         >
+          {syncPayments.isError && (
+            <p role="alert" className="mb-4 text-sm text-destructive">
+              {syncPayments.error.message}
+            </p>
+          )}
           {!paymentsRequested ? (
-            <EmptyState message="Select Fetch latest payments when you need to inspect the live feed." />
+            <EmptyState message="Select Sync latest payments to import and inspect the live feed." />
           ) : payments.isPending ? (
             <Skeleton className="h-16 w-full" />
           ) : payments.isError ? (

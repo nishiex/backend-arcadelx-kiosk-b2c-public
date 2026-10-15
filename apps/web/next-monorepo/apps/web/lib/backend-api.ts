@@ -646,6 +646,31 @@ export async function fetchMothershipPayments(page = 1, signal?: AbortSignal): P
   return handleRes<MothershipPaymentsFeed>(res);
 }
 
+export type MothershipSyncResult = {
+  devices: {
+    totalRecordsFetched: number;
+    newKiosksCreated: number;
+    kiosksUpdated: number;
+    devicesWithoutId: number;
+    rejectedRecords: number;
+    createdMachineCodes: string[];
+  } | null;
+  transactions: {
+    totalRecordsFetched: number;
+    newRecordsInserted: number;
+    unattributedCount: number;
+  };
+};
+
+/** Import completed Mothership payments into the local revenue ledger. */
+export async function syncMothershipPayments(): Promise<MothershipSyncResult> {
+  const res = await apiFetch('/api/revenue/payments/sync', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return handleRes<MothershipSyncResult>(res);
+}
+
 /** Windows offered by the dashboard revenue trend; each also sets its granularity. */
 export const REVENUE_SERIES_RANGES = ['7d', '30d', '3m', '1y'] as const;
 export type RevenueSeriesRange = (typeof REVENUE_SERIES_RANGES)[number];
