@@ -5,7 +5,7 @@ import Link from "next/link"
 import * as Dialog from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 import { useForm } from "react-hook-form"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useMe } from "@/hooks/useMe"
 import { createPartner, retryOrganizationCredentials, type CreatePartnerInput } from "@/lib/backend-api"
 
@@ -20,10 +20,16 @@ const fields = [
 
 function PartnerForm({ modal }: { modal: boolean }) {
   const { canRegisterPartners } = useMe()
+  const queryClient = useQueryClient()
   const [open, setOpen] = React.useState(false)
   const busy = React.useRef(false)
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreatePartnerInput>()
-  const create = useMutation({ mutationFn: createPartner })
+  const create = useMutation({
+    mutationFn: createPartner,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["partners"] })
+    },
+  })
   const retry = useMutation({ mutationFn: retryOrganizationCredentials })
   const result = create.data
   const sent = result?.credentialsEmailSent || retry.data?.credentialsEmailSent

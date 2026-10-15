@@ -50,7 +50,7 @@ const NAV: NavItem[] = [
   { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue },
   { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways },
   { name: "Distributors", href: "/distributors", icon: Building2, show: (p) => p.canManageDistributors },
-  { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canRegisterPartners },
+  { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canViewPartners },
   { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers },
   { name: "Settings", href: "/settings", icon: Settings },
 ]

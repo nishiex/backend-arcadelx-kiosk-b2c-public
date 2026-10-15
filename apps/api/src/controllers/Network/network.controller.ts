@@ -439,3 +439,58 @@ export const getDistributors = asyncHandler(
       );
   },
 );
+
+/**
+ * List Partners connected to the current Distributor.
+ *
+ * The Distributor must be the active network initiator and the other end must
+ * be a PARTNER. This keeps the response limited to the caller's own downstream
+ * network and avoids exposing unrelated Partners from other organizations.
+ */
+export const getPartners = asyncHandler(async (req: Request, res: Response) => {
+  const organizationId = req.membership!.organizationId;
+  const connections = await prisma.networkConnection.findMany({
+    where: {
+      initiatorOrgId: organizationId,
+      status: "ACTIVE",
+      reciever: { type: "PARTNER" },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: {
+      reciever: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          state: true,
+          city: true,
+          pincode: true,
+          address: true,
+          owner: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      },
+      agreements: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: { status: true },
+      },
+    },
+  });
+
+  res.json(
+    new ApiResponse(
+      200,
+      {
+        partners: connections.map((connection) => ({
+          ...connection.reciever,
+          connectionId: connection.id,
+          connectedAt: connection.createdAt,
+          agreementStatus: connection.agreements[0]?.status ?? null,
+        })),
+      },
+      "Partners fetched successfully",
+    ),
+  );
+});

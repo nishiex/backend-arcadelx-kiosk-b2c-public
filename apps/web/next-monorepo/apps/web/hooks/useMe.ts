@@ -30,6 +30,8 @@ export type Permissions = {
   canManageNetwork: boolean
   canManageAgreements: boolean
   canManageDistributors: boolean
+  /** Active Distributor members may view their connected Partners. */
+  canViewPartners: boolean
   canRegisterPartners: boolean
   canReviewRequests: boolean
   canViewRevenue: boolean
@@ -87,6 +89,8 @@ export function useMe(): Permissions {
     canManageAgreements: canTransact && role === "OWNER",
     /** Only a company admin/super-admin (OWNER/ADMIN) may add distributors. */
     canManageDistributors: isCompany && isOwnerOrAdmin,
+    canViewPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor &&
+      (isOwnerOrAdmin || role === "MANAGER"),
     canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor && isOwnerOrAdmin,
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&

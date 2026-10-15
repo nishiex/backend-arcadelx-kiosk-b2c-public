@@ -426,6 +426,26 @@ export async function fetchDistributors(): Promise<Distributor[]> {
   return json.distributors;
 }
 
+export type Partner = {
+  id: string;
+  name: string;
+  type: 'PARTNER';
+  state: string;
+  city: string;
+  pincode: number;
+  address: string;
+  owner: { id: string; name: string; email: string } | null;
+  connectionId: string;
+  connectedAt: string;
+  agreementStatus: 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | null;
+};
+
+export async function fetchPartners(): Promise<Partner[]> {
+  const res = await apiFetch('/api/network/partners', { credentials: 'include', cache: 'no-store' });
+  const json = await handleRes<{ partners: Partner[] }>(res);
+  return json.partners;
+}
+
 export async function logout(): Promise<void> {
   signingOut = true;
   try {
@@ -610,13 +630,18 @@ export type MothershipPaymentsFeed = {
   total: number;
   payments: MothershipPayment[];
   fetchedAt: string;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 /** Read the current payment feed without importing or mutating revenue records. */
-export async function fetchMothershipPayments(): Promise<MothershipPaymentsFeed> {
-  const res = await apiFetch('/api/revenue/payments', {
+export async function fetchMothershipPayments(page = 1, signal?: AbortSignal): Promise<MothershipPaymentsFeed> {
+  const query = new URLSearchParams({ page: String(page), pageSize: '50' });
+  const res = await apiFetch(`/api/revenue/payments?${query.toString()}`, {
     credentials: 'include',
     cache: 'no-store',
+    signal,
   });
   return handleRes<MothershipPaymentsFeed>(res);
 }

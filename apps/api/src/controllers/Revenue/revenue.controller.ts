@@ -3,13 +3,14 @@ import { prisma } from '../../utils/db';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
-import { SettingsSchema, RevenueSeriesQuerySchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
+import { MothershipPaymentsQuerySchema, SettingsSchema, RevenueSeriesQuerySchema } from '@shared-types/validationSchemas/Revenue/revenue.validation';
 import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-period';
 import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
 import { getMothershipPayments } from '../../services/Revenue/revenueTransaction.services';
 
 export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
   const organizationId = req.membership!.organizationId;
+  const { page, pageSize } = MothershipPaymentsQuerySchema.parse(req.query);
   const result = await getMothershipPayments();
 
   // The upstream feed is fleet-wide. Restrict it to devices currently owned by
@@ -22,11 +23,22 @@ export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
   const allowedDeviceIds = new Set(
     kiosks.flatMap((kiosk) => [kiosk.externalDeviceId, kiosk.machineCode].filter(Boolean)),
   );
-  const payments = result.payments.filter((payment) => allowedDeviceIds.has(payment.device_id));
+  const filteredPayments = result.payments
+    .filter((payment) => allowedDeviceIds.has(payment.device_id))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const total = filteredPayments.length;
+  const payments = filteredPayments.slice((page - 1) * pageSize, page * pageSize);
   res.json(
     new ApiResponse(
       200,
-      { ...result, total: payments.length, payments },
+      {
+        ...result,
+        total,
+        payments,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
       'Mothership payments fetched successfully',
     ),
   );

@@ -144,6 +144,8 @@ export default function RevenueScreen() {
   const { me, isLoading, isError, canViewRevenue, isCompany, role } = useMe()
   const [search, setSearch] = useState("")
   const [editing, setEditing] = useState(false)
+  const [paymentsRequested, setPaymentsRequested] = useState(false)
+  const [paymentsPage, setPaymentsPage] = useState(1)
   const scope = [me?.id ?? "", me?.membership?.organizationId ?? "", role ?? ""]
   const ratesKey = ["revenue-rates", ...scope]
   const revenue = useQuery({
@@ -163,9 +165,9 @@ export default function RevenueScreen() {
   const canEdit =
     canViewRevenue && isCompany && (role === "OWNER" || role === "ADMIN")
   const payments = useQuery({
-    queryKey: ["mothership-payments", ...scope],
-    queryFn: fetchMothershipPayments,
-    enabled: canEdit,
+    queryKey: ["mothership-payments", paymentsPage, ...scope],
+    queryFn: ({ signal }) => fetchMothershipPayments(paymentsPage, signal),
+    enabled: canEdit && paymentsRequested,
     staleTime: 30_000,
     retry: 1,
   })
@@ -207,7 +209,14 @@ export default function RevenueScreen() {
             <button
               className={buttonClass}
               disabled={refreshing || editing}
-              onClick={() => void payments.refetch()}
+              onClick={() => {
+                if (paymentsRequested && paymentsPage === 1) {
+                  void payments.refetch()
+                  return
+                }
+                setPaymentsPage(1)
+                setPaymentsRequested(true)
+              }}
             >
               <span className="flex items-center gap-2">
                 <Download size={16} className={payments.isFetching ? "animate-pulse" : ""} />
@@ -221,7 +230,7 @@ export default function RevenueScreen() {
             onClick={() => {
               void revenue.refetch()
               void rates.refetch()
-              if (canEdit) void payments.refetch()
+              if (canEdit && paymentsRequested) void payments.refetch()
             }}
           >
             <span className="flex items-center gap-2">
@@ -346,9 +355,11 @@ export default function RevenueScreen() {
       {canEdit && (
         <Panel
           title="Mothership payments"
-          subtitle="Live payment feed. These records are shown as received and are not imported into revenue totals."
+          subtitle="Live payment feed. Load it when needed. Results show the newest 50 records per page and are not imported into revenue totals."
         >
-          {payments.isPending ? (
+          {!paymentsRequested ? (
+            <EmptyState message="Select Fetch latest payments when you need to inspect the live feed." />
+          ) : payments.isPending ? (
             <Skeleton className="h-16 w-full" />
           ) : payments.isError ? (
             <ErrorState
@@ -408,6 +419,29 @@ export default function RevenueScreen() {
                   timeZone: "Asia/Kolkata",
                 })}
               </p>
+              {payments.data.totalPages > 1 && (
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={paymentsPage <= 1 || payments.isFetching}
+                    onClick={() => setPaymentsPage(page => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    Page {payments.data.page} of {payments.data.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={paymentsPage >= payments.data.totalPages || payments.isFetching}
+                    onClick={() => setPaymentsPage(page => Math.min(payments.data.totalPages, page + 1))}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </Panel>
