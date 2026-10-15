@@ -28,7 +28,7 @@ export default function PartnersScreen() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Partners</h1>
-          <p className="mt-1 text-sm text-muted-foreground">View partners connected to your distributor account.</p>
+          <p className="mt-1 text-sm text-muted-foreground">View partners registered under or connected to your distributor account.</p>
         </div>
         <button type="button" className={`${buttonClass} inline-flex items-center gap-2`} onClick={() => void partners.refetch()} disabled={partners.isFetching}>
           <RefreshCw size={15} className={partners.isFetching ? "animate-spin" : ""} /> Refresh
@@ -38,8 +38,8 @@ export default function PartnersScreen() {
         <div className="mb-5 flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 size={22} aria-hidden="true" /></span>
           <div>
-            <h2 id="partner-list-title" className="text-lg font-semibold">Connected partners</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Only partners connected to this Distributor are shown.</p>
+            <h2 id="partner-list-title" className="text-lg font-semibold">Registered and connected partners</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Partners registered under or connected to this Distributor are shown.</p>
           </div>
         </div>
         {partners.isLoading ? (

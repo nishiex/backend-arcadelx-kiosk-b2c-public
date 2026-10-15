@@ -28,8 +28,8 @@ enum MembershipStatus {
 
 // 1 User can only join 1 Organization at a time
 model User {
-  id           String @id @default(uuid())
-  email        String @unique
+  id           String  @id @default(uuid())
+  email        String  @unique
   passwordHash String
   name         String
   // Required by organization registration; legacy users and staff may omit it.
@@ -76,8 +76,9 @@ model PasswordReset {
 }
 
 model Organization {
-  id      String @id @default(uuid())
-  ownerId String
+  id          String  @id @default(uuid())
+  ownerId     String
+  parentOrgId String?
 
   name      String
   type      OrgType
@@ -101,20 +102,25 @@ model Organization {
   owner       User         @relation("OrganizationOwner", fields: [ownerId], references: [id])
   memberships Membership[]
 
+  parentOrg Organization?  @relation("OrganizationParent", fields: [parentOrgId], references: [id])
+  childOrgs Organization[] @relation("OrganizationParent")
+
   initiatedConnections NetworkConnection[] @relation("InitiatorOrg")
   receivedConnections  NetworkConnection[] @relation("ReceiverOrg")
 
-  parentAgreements Agreement[]       @relation("ParentAgreements")
-  childAgreements  Agreement[]       @relation("ChildAgreements")
+  parentAgreements Agreement[] @relation("ParentAgreements")
+  childAgreements  Agreement[] @relation("ChildAgreements")
 
   kioskReturnRequests KioskReturnRequest[]
-  kiosks           Kiosk[]
-  kioskAssignments KioskAssignment[]
-  ordersAsParent   Order[]           @relation("OrderParent")
-  ordersAsChild    Order[]           @relation("OrderChild")
-  emailDeliveries  EmailDelivery[]
+  kiosks              Kiosk[]
+  kioskAssignments    KioskAssignment[]
+  ordersAsParent      Order[]              @relation("OrderParent")
+  ordersAsChild       Order[]              @relation("OrderChild")
+  emailDeliveries     EmailDelivery[]
   revenueStatements   RevenueStatement[]
   devicePriceRequests DevicePriceRequest[] @relation("DevicePriceRequestOrganization")
+
+  @@index([parentOrgId])
 }
 
 model Membership {
@@ -233,11 +239,11 @@ model Kiosk {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  currentOrg    Organization?     @relation(fields: [currentOrgId], references: [id])
-  assignments   KioskAssignment[]
-  orderKiosks   OrderKiosk[]
-  transactions  Transaction[]
-  reservedOrder Order?            @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
+  currentOrg     Organization?        @relation(fields: [currentOrgId], references: [id])
+  assignments    KioskAssignment[]
+  orderKiosks    OrderKiosk[]
+  transactions   Transaction[]
+  reservedOrder  Order?               @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
   returnRequests KioskReturnRequest[]
 }
 
@@ -245,8 +251,8 @@ model Kiosk {
 // Ported from the Backend branch. Kept separate from KioskStatus history: the request
 // carries its own status so a decision is auditable after the kiosk moves on.
 model KioskReturnRequest {
-  id     String @id @default(uuid())
-  kioskId String
+  id             String @id @default(uuid())
+  kioskId        String
   organizationId String
   requestedById  String
 
@@ -255,9 +261,9 @@ model KioskReturnRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  kiosk          Kiosk        @relation(fields: [kioskId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  requestedBy    User         @relation(fields: [requestedById], references: [id])
+  kiosk        Kiosk        @relation(fields: [kioskId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  requestedBy  User         @relation(fields: [requestedById], references: [id])
 
   @@index([kioskId, status])
 }
@@ -378,19 +384,19 @@ model OrderKiosk {
 
 // PHASE 5: Revenue Tracking Models
 model Transaction {
-  id                    String   @id @default(uuid())
+  id                    String  @id @default(uuid())
   kioskId               String
   gameId                String
-  amount                Decimal  @db.Decimal(10, 2)
-  currency              String   @default("INR")
-  externalTransactionId String   @unique // Maps to 'txnid'
+  amount                Decimal @db.Decimal(10, 2)
+  currency              String  @default("INR")
+  externalTransactionId String  @unique // Maps to 'txnid'
 
   // Store the upstream instant with its timezone so reports do not depend on the API host timezone.
-  occurredAt            DateTime @db.Timestamptz(3) // Maps to 'updated_at'
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  occurredAt DateTime @db.Timestamptz(3) // Maps to 'updated_at'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  kiosk                 Kiosk    @relation(fields: [kioskId], references: [id])
+  kiosk Kiosk @relation(fields: [kioskId], references: [id])
 
   @@index([kioskId, occurredAt])
 }
@@ -433,24 +439,25 @@ model DevicePriceRequest {
 }
 
 model RevenueSyncRunLog {
-  id                  String     @id @default(uuid())
-  runAt               DateTime   @default(now())
+  id    String   @id @default(uuid())
+  runAt DateTime @default(now())
 
-  totalRecordsFetched Int        @default(0)
-  newRecordsInserted  Int        @default(0)
-  unattributedCount   Int        @default(0) // Records where device_id didn't match a Kiosk
+  totalRecordsFetched Int @default(0)
+  newRecordsInserted  Int @default(0)
+  unattributedCount   Int @default(0) // Records where device_id didn't match a Kiosk
 
-  status              SyncStatus
-  errorMessage        String?    @db.Text
+  status       SyncStatus
+  errorMessage String?    @db.Text
 
-  createdAt           DateTime   @default(now())
+  createdAt DateTime @default(now())
 }
+
 //Company can modify these values according to the law and the third party payment
 model SystemSettings {
   id              String   @id @default("default")
-  gstPercentage   Decimal  @db.Decimal(5,2) @default(18.00)
-  pgFeePercentage Decimal  @db.Decimal(5,2) @default(2.50)
-  tdsPercentage   Decimal  @db.Decimal(5,2) @default(2.00)
+  gstPercentage   Decimal  @default(18.00) @db.Decimal(5, 2)
+  pgFeePercentage Decimal  @default(2.50) @db.Decimal(5, 2)
+  tdsPercentage   Decimal  @default(2.00) @db.Decimal(5, 2)
   updatedAt       DateTime @updatedAt
 }
 
@@ -460,27 +467,26 @@ enum StatementStatus {
 }
 
 model RevenueStatement {
-    id String @id @default(uuid())
-    organizationId  String
-    Month         Int
-    Year          Int
-    GrossRevenue       Decimal  @db.Decimal(12,2)
-    netRevenue         Decimal  @db.Decimal(12, 2)
-    companyShare       Decimal  @db.Decimal(12, 2)
-    distributorShare   Decimal  @db.Decimal(12, 2)
-    partnerShare       Decimal  @db.Decimal(12, 2)
-    tdsAmount          Decimal  @db.Decimal(12, 2)
-    finalPayout        Decimal  @db.Decimal(12, 2)
+  id               String  @id @default(uuid())
+  organizationId   String
+  Month            Int
+  Year             Int
+  GrossRevenue     Decimal @db.Decimal(12, 2)
+  netRevenue       Decimal @db.Decimal(12, 2)
+  companyShare     Decimal @db.Decimal(12, 2)
+  distributorShare Decimal @db.Decimal(12, 2)
+  partnerShare     Decimal @db.Decimal(12, 2)
+  tdsAmount        Decimal @db.Decimal(12, 2)
+  finalPayout      Decimal @db.Decimal(12, 2)
 
-    pdfPath            String
-    status             StatementStatus @default(GENERATED)
+  pdfPath String
+  status  StatementStatus @default(GENERATED)
 
-    createdAt          DateTime @default(now())
-    updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    organization       Organization @relation(fields: [organizationId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
 
-    // DB-level duplicate-prevention safety net
-    @@unique([organizationId, Month, Year])
-
+  // DB-level duplicate-prevention safety net
+  @@unique([organizationId, Month, Year])
 }

@@ -300,43 +300,25 @@ export const getDistributors = asyncHandler(
     });
 
     // Partners genuinely associated with each Distributor, reachable from this Company.
-    //
-    // A Partner registration records no parent pointer (Organization has no self-relation),
-    // so "associated" is taken from relationships that do exist and that the Company is
-    // legitimately a party to. Two sources, both intersected with the Company's own network:
+    // Registration now records the parent organization directly. Network connections,
+    // agreements and orders remain as legacy association sources for older rows.
     //
     //   1. an ACTIVE NetworkConnection between a Distributor and the Partner, where the
     //      Distributor is one this Company is connected to, or
     //   2. an Agreement/Order between that Distributor and the Partner.
     //
-    // Scoping rule: a Partner is only reported when a row links it to a Distributor *and* the
-    // calling Company holds an ACTIVE connection to that Distributor, so every returned
-    // organization stays inside the caller's own network. No schema change.
-    const companyConnections = await prisma.networkConnection.findMany({
-      where: {
-        status: "ACTIVE",
-        OR: [{ initiatorOrgId: companyOrgId }, { receiverOrgId: companyOrgId }],
-      },
-      select: { initiatorOrgId: true, receiverOrgId: true },
-    });
-
-    // The organizations this Company is actually connected to (its own network).
-    const connectedOrgIds = Array.from(
-      new Set(
-        companyConnections.map((connection) =>
-          connection.initiatorOrgId === companyOrgId
-            ? connection.receiverOrgId
-            : connection.initiatorOrgId,
-        ),
-      ),
-    );
+    // This endpoint already exposes every Distributor in the single-company
+    // deployment, so that same visible Distributor set is the boundary for child
+    // Partner details. A separate Company↔Distributor connection is not required
+    // merely to display a Partner registered under a visible Distributor.
+    const visibleDistributorIds = organizations.map((organization) => organization.id);
 
     const partnersByDistributor = new Map<
       string,
       { id: string; name: string; type: string; state: string | null; city: string | null; owner: { id: string; name: string; email: string } | null }[]
     >();
 
-    if (connectedOrgIds.length > 0) {
+    if (visibleDistributorIds.length > 0) {
       const partnerSelect = {
         id: true,
         name: true,
@@ -351,11 +333,16 @@ export const getDistributors = asyncHandler(
         where: {
           status: "ACTIVE",
           OR: [
-            { initiatorOrgId: { in: connectedOrgIds } },
-            { receiverOrgId: { in: connectedOrgIds } },
+            { initiatorOrgId: { in: visibleDistributorIds } },
+            { receiverOrgId: { in: visibleDistributorIds } },
           ],
         },
         include: { initiator: { select: partnerSelect }, reciever: { select: partnerSelect } },
+      });
+
+      const registeredPartners = await prisma.organization.findMany({
+        where: { parentOrgId: { in: visibleDistributorIds }, type: "PARTNER" },
+        select: { ...partnerSelect, parentOrgId: true },
       });
 
       // Source 2: Partners sharing an Agreement or an Order with a connected organization.
@@ -363,8 +350,8 @@ export const getDistributors = asyncHandler(
         prisma.agreement.findMany({
           where: {
             OR: [
-              { parentOrgId: { in: connectedOrgIds } },
-              { childOrgId: { in: connectedOrgIds } },
+              { parentOrgId: { in: visibleDistributorIds } },
+              { childOrgId: { in: visibleDistributorIds } },
             ],
           },
           select: {
@@ -377,8 +364,8 @@ export const getDistributors = asyncHandler(
         prisma.order.findMany({
           where: {
             OR: [
-              { parentOrgId: { in: connectedOrgIds } },
-              { childOrgId: { in: connectedOrgIds } },
+              { parentOrgId: { in: visibleDistributorIds } },
+              { childOrgId: { in: visibleDistributorIds } },
             ],
           },
           select: {
@@ -391,6 +378,12 @@ export const getDistributors = asyncHandler(
       ]);
 
       const links = [
+        ...registeredPartners.map((partner) => ({
+          aId: partner.parentOrgId!,
+          bId: partner.id,
+          a: organizations.find((organization) => organization.id === partner.parentOrgId)!,
+          b: partner,
+        })),
         ...partnerConnections.map((connection) => ({
           aId: connection.initiatorOrgId,
           bId: connection.receiverOrgId,
@@ -408,7 +401,7 @@ export const getDistributors = asyncHandler(
           [link.aId, link.a, link.b],
           [link.bId, link.b, link.a],
         ] as const) {
-          if (!connectedOrgIds.includes(anchorId)) continue;
+          if (!visibleDistributorIds.includes(anchorId)) continue;
           if (anchor.type !== "DISTRIBUTOR") continue;
           if (candidate.type !== "PARTNER" || candidate.id === companyOrgId) continue;
           const list = partnersByDistributor.get(anchorId) ?? [];
@@ -443,52 +436,85 @@ export const getDistributors = asyncHandler(
 /**
  * List Partners connected to the current Distributor.
  *
- * The Distributor must be the active network initiator and the other end must
- * be a PARTNER. This keeps the response limited to the caller's own downstream
- * network and avoids exposing unrelated Partners from other organizations.
+ * Partners registered by the Distributor are visible immediately. Active network
+ * connections are merged in as well so legacy registrations and agreement flows
+ * continue to work without exposing another Distributor's children.
  */
 export const getPartners = asyncHandler(async (req: Request, res: Response) => {
   const organizationId = req.membership!.organizationId;
-  const connections = await prisma.networkConnection.findMany({
-    where: {
-      initiatorOrgId: organizationId,
-      status: "ACTIVE",
-      reciever: { type: "PARTNER" },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    include: {
-      reciever: {
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          state: true,
-          city: true,
-          pincode: true,
-          address: true,
-          owner: {
-            select: { id: true, name: true, email: true },
-          },
+  const partnerSelect = {
+    id: true,
+    name: true,
+    type: true,
+    state: true,
+    city: true,
+    pincode: true,
+    address: true,
+    createdAt: true,
+    owner: { select: { id: true, name: true, email: true } },
+  } as const;
+  const [connections, registeredPartners] = await Promise.all([
+    prisma.networkConnection.findMany({
+      where: {
+        initiatorOrgId: organizationId,
+        status: "ACTIVE",
+        reciever: { type: "PARTNER" },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      include: {
+        reciever: { select: partnerSelect },
+        agreements: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: { status: true },
         },
       },
-      agreements: {
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 1,
-        select: { status: true },
-      },
-    },
-  });
+    }),
+    prisma.organization.findMany({
+      where: { parentOrgId: organizationId, type: "PARTNER" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: partnerSelect,
+    }),
+  ]);
+
+  const partners = new Map<string, {
+    id: string;
+    name: string;
+    type: string;
+    state: string;
+    city: string;
+    pincode: number;
+    address: string;
+    createdAt: Date;
+    owner: { id: string; name: string; email: string } | null;
+    connectionId: string | null;
+    connectedAt: Date | null;
+    agreementStatus: string | null;
+  }>();
+  for (const connection of connections) {
+    partners.set(connection.reciever.id, {
+      ...connection.reciever,
+      connectionId: connection.id,
+      connectedAt: connection.createdAt,
+      agreementStatus: connection.agreements[0]?.status ?? null,
+    });
+  }
+  for (const partner of registeredPartners) {
+    if (!partners.has(partner.id)) {
+      partners.set(partner.id, {
+        ...partner,
+        connectionId: null,
+        connectedAt: null,
+        agreementStatus: null,
+      });
+    }
+  }
 
   res.json(
     new ApiResponse(
       200,
       {
-        partners: connections.map((connection) => ({
-          ...connection.reciever,
-          connectionId: connection.id,
-          connectedAt: connection.createdAt,
-          agreementStatus: connection.agreements[0]?.status ?? null,
-        })),
+        partners: [...partners.values()],
       },
       "Partners fetched successfully",
     ),

@@ -435,8 +435,8 @@ export type Partner = {
   pincode: number;
   address: string;
   owner: { id: string; name: string; email: string } | null;
-  connectionId: string;
-  connectedAt: string;
+  connectionId: string | null;
+  connectedAt: string | null;
   agreementStatus: 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | null;
 };
 

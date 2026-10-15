@@ -140,6 +140,9 @@ export const registerOrganization = asyncHandler(
         data: {
           name: validatedData.orgName,
           type: validatedData.orgType,
+          // Preserve the registration hierarchy. Network connections and agreements
+          // still govern collaboration, but the parent is visible immediately.
+          parentOrgId: req.membership!.organizationId,
           state: validatedData.state,
           city: validatedData.city,
           pincode: validatedData.pincode,
