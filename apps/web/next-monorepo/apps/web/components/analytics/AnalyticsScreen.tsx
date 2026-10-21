@@ -10,8 +10,8 @@ const number = new Intl.NumberFormat("en-IN")
 const buttonClass = "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
 
 export default function AnalyticsScreen() {
-  const { role, me, isLoading, isError } = useMe()
-  const canViewAnalytics = role === "ADMIN" && me?.membership?.status === "ACTIVE"
+  const { isMasterAdmin, me, isLoading, isError } = useMe()
+  const canViewAnalytics = isMasterAdmin && me?.membership?.status === "ACTIVE"
   const analytics = useQuery({
     queryKey: ["analytics-summary"],
     queryFn: ({ signal }) => fetchAnalyticsSummary(signal),
@@ -22,7 +22,7 @@ export default function AnalyticsScreen() {
 
   if (isLoading) return <Skeleton className="h-64 w-full" />
   if (isError) return <ErrorState message="Unable to verify your access. Refresh the page to try again." />
-  if (!canViewAnalytics) return <EmptyState message="Analytics is available to active Admins only." />
+  if (!canViewAnalytics) return <EmptyState message="Analytics is available to the active Company Master Admin only." />
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

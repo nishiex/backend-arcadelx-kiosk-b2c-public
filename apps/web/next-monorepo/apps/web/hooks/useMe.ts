@@ -19,6 +19,8 @@ export type Permissions = {
   orgName: string | null
   /** COMPANY can mint kiosks and manage members. */
   isCompany: boolean
+  /** The Company OWNER is the highest-level Master Admin. */
+  isMasterAdmin: boolean
   isDistributor: boolean
   /** COMPANY or DISTRIBUTOR — the two org types that transact. */
   canTransact: boolean
@@ -64,6 +66,7 @@ export function useMe(): Permissions {
   const orgName = me?.membership?.organization.name ?? null
 
   const isCompany = orgType === "COMPANY"
+  const isMasterAdmin = isCompany && role === "OWNER"
   const isDistributor = orgType === "DISTRIBUTOR"
   const canTransact = isCompany || isDistributor
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
@@ -81,6 +84,7 @@ export function useMe(): Permissions {
     role,
     orgName,
     isCompany,
+    isMasterAdmin,
     isDistributor,
     canTransact,
     canManageMembers: isCompany && isOwnerOrAdmin,

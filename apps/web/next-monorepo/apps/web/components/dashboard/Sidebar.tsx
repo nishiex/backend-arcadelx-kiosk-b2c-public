@@ -68,7 +68,7 @@ const NAV: NavEntry[] = [
     },
   },
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
-  { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.role === "ADMIN" && p.me?.membership?.status === "ACTIVE" } },
+  { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.isMasterAdmin && p.me?.membership?.status === "ACTIVE" } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;

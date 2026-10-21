@@ -17,7 +17,7 @@ import orderRoutes from './routes/Orders/order.route'
 import revenueRoutes from './routes/Revenue/revenue.routes';
 import adminGatewayRoutes from './routes/Admin/gateway.routes';
 import deviceRoutes from './routes/Admin/device.routes';
-import { requireAuth, loadMembership, requireRole } from './middlewares/auth';
+import { requireAuth, loadMembership, requireOrgType, requireRole } from './middlewares/auth';
 import { asyncHandler } from './utils/asyncHandler';
 import { workflowReadiness } from './services/workflow-readiness';
 const app = express();
@@ -41,7 +41,7 @@ app.use('/api/kiosks', kioskRoutes);
 
 // Same-origin proxy for the Mothership analytics feed. Keeping the upstream call
 // server-side avoids browser CORS failures and prevents exposing upstream details.
-app.get('/api/analytics/summary', requireAuth, loadMembership, requireRole('ADMIN'), asyncHandler(async (_req, res) => {
+app.get('/api/analytics/summary', requireAuth, loadMembership, requireOrgType('COMPANY'), requireRole('OWNER'), asyncHandler(async (_req, res) => {
     const upstream = await fetch('https://main.arcadelx.games/api/v1/analytics/summary', {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(15000),
