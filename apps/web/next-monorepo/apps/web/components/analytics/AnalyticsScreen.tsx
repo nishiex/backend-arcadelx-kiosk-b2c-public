@@ -7,7 +7,13 @@ import { fetchAnalyticsSummary } from "@/lib/backend-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
 
 const number = new Intl.NumberFormat("en-IN")
+const dateTime = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" })
 const buttonClass = "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+
+function formatTimestamp(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : dateTime.format(date)
+}
 
 export default function AnalyticsScreen() {
   const { isMasterAdmin, me, isLoading, isError } = useMe()
@@ -60,7 +66,31 @@ export default function AnalyticsScreen() {
               <div className="overflow-x-auto rounded-lg border border-border/70">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground"><th className="px-3 py-3 font-medium">Category</th><th className="px-3 py-3 text-right font-medium">Events</th></tr></thead>
-                  <tbody>{analytics.data.groups.map((group, index) => <tr key={index} className="border-b border-border/60 last:border-0"><td className="px-3 py-3">{String(group.category ?? group.name ?? group.group ?? "Unknown")}</td><td className="px-3 py-3 text-right tabular-nums">{number.format(Number(group.count ?? group.total ?? group.events ?? 0))}</td></tr>)}</tbody>
+                  <tbody>{analytics.data.groups.map((group) => <tr key={group.key} className="border-b border-border/60 last:border-0"><td className="px-3 py-3">{group.key}</td><td className="px-3 py-3 text-right tabular-nums">{number.format(group.count)}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+          <Panel title="Recent events" subtitle={`${analytics.data.events.length} records returned · Page ${analytics.data.page} of ${analytics.data.total_pages}`}>
+            {analytics.data.events.length === 0 ? <EmptyState message="No event records are available yet." /> : (
+              <div className="overflow-x-auto rounded-lg border border-border/70">
+                <table className="w-full min-w-[980px] text-sm">
+                  <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                    <th className="px-3 py-3 font-medium">Category</th>
+                    <th className="px-3 py-3 font-medium">Device</th>
+                    <th className="px-3 py-3 font-medium">Game</th>
+                    <th className="px-3 py-3 font-medium">Code</th>
+                    <th className="px-3 py-3 font-medium">Event time</th>
+                    <th className="px-3 py-3 font-medium">Received</th>
+                  </tr></thead>
+                  <tbody>{analytics.data.events.map((event) => <tr key={event.id} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-3">{event.category}</td>
+                    <td className="px-3 py-3 font-mono text-xs">{event.device_id}</td>
+                    <td className="px-3 py-3">{event.game_id}</td>
+                    <td className="px-3 py-3">{event.error_code}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">{formatTimestamp(event.event_timestamp)}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">{formatTimestamp(event.received_at)}</td>
+                  </tr>)}</tbody>
                 </table>
               </div>
             )}

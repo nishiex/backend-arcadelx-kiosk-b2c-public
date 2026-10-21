@@ -61,13 +61,32 @@ export type InventorySummaryResponse = {
   summary: Record<string, number>;
 }
 
+export type AnalyticsEvent = {
+  id: number;
+  category: string;
+  device_id: string;
+  error_code: string;
+  event_timestamp: string;
+  game_id: string;
+  received_at: string;
+}
+
+export type AnalyticsGroup = {
+  key: string;
+  count: number;
+}
+
 export type AnalyticsSummaryResponse = {
   status: string;
   group_by: string;
   total_events: number;
   error_events: number;
   unique_devices: number;
-  groups: Array<Record<string, unknown>>;
+  events: AnalyticsEvent[];
+  groups: AnalyticsGroup[];
+  limit: number;
+  page: number;
+  total_pages: number;
 }
 
 export async function fetchAnalyticsSummary(signal?: AbortSignal): Promise<AnalyticsSummaryResponse> {
