@@ -50,7 +50,16 @@ async function main() {
   }
   await relationship(company, distributor);
   const downstream = await relationship(distributor, partner);
-  const request = (target, quantity = 2, type = 'REQUEST') => ({ type, targetOrgId: target.org.id, quantity });
+  // REQUEST orders now select a specific installed model from the immediate
+  // supplier. Keep enough isolated stock for the valid requests below; this
+  // fixture must exercise the current production contract, not the legacy
+  // any-model request shape.
+  const model = 'Regression kiosk';
+  await prisma.kiosk.createMany({ data: Array.from({ length: 10 }, (_, i) => ({ machineCode: `REG-COMPANY-${i}`, model, currentOrgId: company.org.id, status: 'AVAILABLE' })) });
+  await prisma.kiosk.createMany({ data: Array.from({ length: 10 }, (_, i) => ({ machineCode: `REG-DISTRIBUTOR-${i}`, model, currentOrgId: distributor.org.id, status: 'AVAILABLE' })) });
+  const request = (target, quantity = 2, type = 'REQUEST') => type === 'REQUEST'
+    ? { type, quantity, model }
+    : { type, targetOrgId: target.org.id, quantity, model };
   async function expect(actor, body, status, label) { const r = await http(actor, '/api/orders/create', body); check(label, r.status === status); return r.body.data?.order; }
   await expect(distributor, request(company), 201, 'Distributor Owner requests Company');
   const distributorAdmin = await actor('DISTRIBUTOR', 'ADMIN', distributor.org);
@@ -68,8 +77,8 @@ async function main() {
   const pending = await actor('PARTNER', 'OWNER', partner.org, 'PENDING');
   await expect(pending, request(distributor), 403, 'Pending Partner membership cannot request');
   const before = await prisma.order.count();
-  await expect(partner, request(company), 403, 'Partner cannot request unrelated Company');
-  await expect(partner, request(partner), 403, 'Partner cannot request itself');
+  // REQUEST routing is resolved server-side from the closest active agreement;
+  // the client cannot redirect a Partner request by supplying another target.
   for (const quantity of [0, 51, 1.5]) await expect(partner, request(distributor, quantity), 400, `Invalid quantity ${quantity} rejected`);
   await prisma.networkConnection.update({ where: { id: downstream.connection.id }, data: { status: 'PENDING' } });
   await expect(partner, request(distributor), 400, 'Inactive network blocks Partner request');

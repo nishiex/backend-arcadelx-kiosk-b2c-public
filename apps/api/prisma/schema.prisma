@@ -141,6 +141,14 @@ model Membership {
   @@index([organizationId])
 }
 
+// Mothership currently supports disabling gateways but not deleting them. This
+// tombstone makes a removal permanent in our application layer across restarts
+// and serverless cold starts.
+model RemovedGateway {
+  provider  String   @id @db.VarChar(64)
+  removedAt DateTime @default(now())
+}
+
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique

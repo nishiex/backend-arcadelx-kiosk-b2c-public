@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, X } from "lucide-react"
@@ -50,12 +51,12 @@ function activeConnection(connections: NetworkConnection[], distributorId: strin
     .pop()
 }
 
-function pendingConnection(connections: NetworkConnection[], distributorId: string, organizationId: string) {
+/** The latest Company-initiated network request for this distributor, whatever its status. */
+function organizationConnection(connections: NetworkConnection[], distributorId: string, organizationId: string) {
   return connections
-    .filter(row => row.receiverOrgId === distributorId && row.initiatorOrgId === organizationId && row.status === "PENDING")
+    .filter(row => row.receiverOrgId === distributorId && row.initiatorOrgId === organizationId)
     .pop()
 }
-
 
 /** The newest agreement still occupying the distributor's open slot, if any. */
 function currentAgreement(agreements: Agreement[]) {
@@ -113,8 +114,6 @@ export default function DistributorAgreementDialog({
   const [formError, setFormError] = React.useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const ownerEmail = distributor.owner?.email ?? null
-
   const connections = useQuery({
     queryKey: ["network-connections", organizationId],
     queryFn: ({ signal }) => fetchOrganizationConnections(signal),
@@ -126,8 +125,8 @@ export default function DistributorAgreementDialog({
     enabled: open,
   })
 
+  const connectionRequest = organizationConnection(connections.data ?? [], distributor.id, organizationId)
   const connection = activeConnection(connections.data ?? [], distributor.id, organizationId)
-  const pending = pendingConnection(connections.data ?? [], distributor.id, organizationId)
   const current = currentAgreement(agreements.data ?? [])
 
   const refresh = async () => {
@@ -141,11 +140,6 @@ export default function DistributorAgreementDialog({
     ])
   }
 
-  const connect = useMutation({
-    mutationFn: () => initiateConnection(ownerEmail!),
-    onSuccess: async () => { toast.success("Connection request sent"); await refresh() },
-    onError: (error: Error) => toast.error(error.message),
-  })
   const draft = useMutation({
     mutationFn: (terms: Parameters<typeof createAgreement>[0]) => createAgreement(terms),
     onSuccess: async () => {
@@ -156,13 +150,25 @@ export default function DistributorAgreementDialog({
     },
     onError: (error: Error) => toast.error(error.message),
   })
+  const sendConnectionRequest = useMutation({
+    mutationFn: () => {
+      const email = distributor.owner?.email
+      if (!email) throw new Error("This distributor does not have an owner email yet.")
+      return initiateConnection(email)
+    },
+    onSuccess: async () => {
+      toast.success("Connection request sent")
+      await refresh()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
   const terminate = useMutation({
     mutationFn: () => terminateAgreement(current!.id),
     onSuccess: async () => { toast.success("Agreement terminated"); await refresh() },
     onError: (error: Error) => toast.error(error.message),
   })
 
-  const busy = connect.isPending || draft.isPending || terminate.isPending
+  const busy = draft.isPending || sendConnectionRequest.isPending || terminate.isPending
 
   const submitTerms = (event: React.FormEvent) => {
     event.preventDefault()
@@ -193,7 +199,7 @@ export default function DistributorAgreementDialog({
     })
   }
 
-  const showForm = Boolean(connection) && !current && !pending
+  const showForm = Boolean(connection) && !current
 
   return (
     <Dialog.Root
@@ -201,8 +207,8 @@ export default function DistributorAgreementDialog({
       onOpenChange={value => {
         if (busy) return
         if (value) {
-          connect.reset()
           draft.reset()
+          sendConnectionRequest.reset()
           terminate.reset()
           setFormError(null)
         }
@@ -296,49 +302,36 @@ export default function DistributorAgreementDialog({
                   </div>
                 )}
 
-                {pending && !current && (
-                  <p role="status" className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                    A connection request is awaiting this distributor&apos;s decision. Terms can be drafted once they accept
-                    it.
-                  </p>
-                )}
-
-                {!connection && !pending && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      No active network connection exists yet. Terms can only be drafted between
-                      connected organizations.
+                {!connection && !current && !connectionRequest && (
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                    <p role="status" className="text-muted-foreground">
+                      No active network connection exists yet. Send a request to {distributor.owner?.email ?? "this distributor's Owner"} before drafting agreement terms.
                     </p>
-                    {ownerEmail ? (
+                    {distributor.owner?.email ? (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => connect.mutate()}
+                        onClick={() => sendConnectionRequest.mutate()}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                       >
-                        {connect.isPending && <Loader2 size={16} className="animate-spin" />}
-                        {connect.isPending ? "Sending…" : "Send connection request"}
+                        {sendConnectionRequest.isPending && <Loader2 size={16} className="animate-spin" />}
+                        {sendConnectionRequest.isPending ? "Sending…" : "Send connection request"}
                       </button>
                     ) : (
-                      <p role="alert" className="text-sm text-destructive">
-                        This distributor has no owner email on record, so a connection request cannot be sent.
-                      </p>
-                    )}
-                    {ownerEmail && (
-                      <p className="text-xs text-muted-foreground">The request goes to {ownerEmail}.</p>
+                      <p className="text-xs text-muted-foreground">The distributor owner email is unavailable.</p>
                     )}
                   </div>
                 )}
 
-                {!connection && !pending && connect.isError && (
-                  <p role="alert" className="text-sm text-destructive">
-                    {connect.error.message}
+                {!connection && !current && connectionRequest?.status === "PENDING" && (
+                  <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                    A connection request is awaiting this distributor&apos;s decision. <Link href="/requests" className="font-medium underline underline-offset-2">Track it in Requests</Link>
                   </p>
                 )}
 
-                {!connection && !pending && connect.isSuccess && (
-                  <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                    Connection request sent to {ownerEmail}. Ask them to accept it, then reopen this dialog to draft terms.
+                {!connection && !current && connectionRequest?.status === "REJECTED" && (
+                  <p role="status" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                    This distributor declined the previous connection request.
                   </p>
                 )}
 

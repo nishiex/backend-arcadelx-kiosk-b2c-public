@@ -3,7 +3,7 @@
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Inbox } from "lucide-react"
-import { fetchReviewRequests, fetchWorkflowReadiness } from "@/lib/backend-api"
+import { fetchReviewRequests } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import { orderDate, orderMoney } from "@/components/orders/order-display"
@@ -43,13 +43,6 @@ export default function ReviewRequestList({
     enabled: canReviewRequests,
     refetchInterval: 10_000,
   })
-  const readiness = useQuery({
-    queryKey: ["workflow-readiness"],
-    queryFn: fetchWorkflowReadiness,
-    enabled: canReviewRequests,
-    refetchInterval: 30_000,
-  })
-
   const pages = Math.max(1, query.data?.meta.totalPages ?? 1)
   // Keep the caller's page within range once the server reports the real total.
   React.useEffect(() => {
@@ -73,9 +66,6 @@ export default function ReviewRequestList({
         <p className="text-sm text-muted-foreground">
           Only your organization&apos;s Owner can approve financial agreements.
         </p>
-      )}
-      {readiness.isError && (
-        <ErrorState message="Couldn't check action availability." onRetry={() => readiness.refetch()} />
       )}
       <section className="rounded-xl border border-border bg-card" aria-busy={query.isFetching}>
         {query.isLoading ? (

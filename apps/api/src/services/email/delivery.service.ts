@@ -131,20 +131,23 @@ async function deliverInvoice(orderId: string) {
     include: {
       parentOrg: { select: { name: true } },
       childOrg: { select: { name: true, owner: { select: { email: true } } } },
+      dispatchedKiosks: {
+        select: {
+          kiosk: { select: { machineCode: true, model: true } },
+        },
+        orderBy: { kioskId: "asc" },
+      },
     },
   });
-  let invoiceFilename = order.invoiceFilename;
-  if (
-    !invoiceFilename ||
-    !(await fs.stat(path.join(INVOICES_DIR, invoiceFilename)).catch(() => null))
-  ) {
-    invoiceFilename = await generateInvoicePDF({
-      ...order,
-      parentOrgName: order.parentOrg.name,
-      childOrgName: order.childOrg.name,
-      date: order.createdAt,
-    });
-  }
+  // Re-render on every delivery attempt so retries also pick up the complete
+  // machine inventory, including Machine Code and Model.
+  const invoiceFilename = await generateInvoicePDF({
+    ...order,
+    parentOrgName: order.parentOrg.name,
+    childOrgName: order.childOrg.name,
+    date: order.createdAt,
+    kiosks: order.dispatchedKiosks.map(({ kiosk }) => kiosk),
+  });
   await prisma.order.update({
     where: { id: orderId },
     data: { invoiceFilename, invoiceUrl: `/api/orders/${orderId}/invoice` },

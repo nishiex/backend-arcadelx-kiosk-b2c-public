@@ -483,18 +483,6 @@ function GamePriceTable({
             : "Price changes apply only to the selected device by default, and each save is read back and checked."}
         </p>
       )}
-      {(canWrite || canRequest) && editingGame && (
-        <DeviceGamePriceEditor
-          deviceId={deviceId}
-          game={editingGame}
-          requestOnly={canRequest && !canWrite}
-          onCancel={() => setEditingGame(null)}
-          onSaved={async () => {
-            setEditingGame(null)
-            await onSaved()
-          }}
-        />
-      )}
       {confirmingReset && (
         <div
           role="alertdialog"
@@ -550,38 +538,56 @@ function GamePriceTable({
           </thead>
           <tbody className="divide-y divide-border">
             {games.map(game => (
-              <tr key={game.gameId} className="hover:bg-muted/40">
-                <td className="px-4 py-3">
-                  <p className="font-medium">{game.displayName}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{game.gameId}</p>
-                </td>
-                <td className="px-4 py-3 tabular-nums">{inr.format(game.effectivePrice)}</td>
-                <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                  {inr.format(game.effectiveReplayPrice)}
-                </td>
-                <td className="px-4 py-3">
-                  {gameHasOverride(game) ? (
-                    <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                      Override
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Default</span>
-                  )}
-                </td>
-                {(canWrite || canRequest) && (
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      aria-label={`Change ${game.displayName} price on ${deviceId}`}
-                      onClick={() => setEditingGame(game)}
-                      disabled={resetMutation.isPending}
-                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-                    >
-                      Change price
-                    </button>
+              <React.Fragment key={game.gameId}>
+                <tr className="hover:bg-muted/40">
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{game.displayName}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{game.gameId}</p>
                   </td>
+                  <td className="px-4 py-3 tabular-nums">{inr.format(game.effectivePrice)}</td>
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                    {inr.format(game.effectiveReplayPrice)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {gameHasOverride(game) ? (
+                      <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        Override
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Default</span>
+                    )}
+                  </td>
+                  {(canWrite || canRequest) && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        aria-label={`Change ${game.displayName} price on ${deviceId}`}
+                        onClick={() => setEditingGame(game)}
+                        disabled={resetMutation.isPending}
+                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                      >
+                        Change price
+                      </button>
+                    </td>
+                  )}
+                </tr>
+                {editingGame?.gameId === game.gameId && (
+                  <tr>
+                    <td colSpan={canWrite || canRequest ? 5 : 4} className="p-3">
+                      <DeviceGamePriceEditor
+                        deviceId={deviceId}
+                        game={game}
+                        requestOnly={canRequest && !canWrite}
+                        onCancel={() => setEditingGame(null)}
+                        onSaved={async () => {
+                          setEditingGame(null)
+                          await onSaved()
+                        }}
+                      />
+                    </td>
+                  </tr>
                 )}
-              </tr>
+              </React.Fragment>
             ))}
           </tbody>
         </table>

@@ -31,6 +31,7 @@ const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 const selectClass = `${inputClass} sm:w-auto sm:min-w-36`
 const PAGE_SIZE = 10
+type RevenuePeriod = "today" | "thisMonth" | "totalRevenue"
 function istDateKey(value: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value))
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value ?? ""
@@ -154,6 +155,7 @@ export default function RevenueScreen() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [machineSort, setMachineSort] = useState<"totalRevenue" | "thisMonth" | "today" | "machineCode">("totalRevenue")
+  const [selectedPeriod, setSelectedPeriod] = useState<RevenuePeriod | null>(null)
   const [machinePage, setMachinePage] = useState(1)
   const [editing, setEditing] = useState(false)
   const [paymentsPage, setPaymentsPage] = useState(1)
@@ -227,7 +229,10 @@ export default function RevenueScreen() {
     const tds = Math.round(beforeTds * rates.data.tdsPercentage) / 100
     return { gross, estimatedNet: beforeTds - tds, deductions: gst + gateway + tds }
   })
-  const filtered = rows.filter((row) => [row.machineCode, row.location, row.distributor, row.partner].some((value) => value.toLowerCase().includes(search.trim().toLowerCase())))
+  const periodRows = selectedPeriod
+    ? rows.filter((row) => row[selectedPeriod] > 0)
+    : rows
+  const filtered = periodRows.filter((row) => [row.machineCode, row.location, row.distributor, row.partner].some((value) => value.toLowerCase().includes(search.trim().toLowerCase())))
   const sortedMachines = [...filtered].sort((a, b) => machineSort === "machineCode" ? a.machineCode.localeCompare(b.machineCode) : b[machineSort] - a[machineSort])
   const machinePages = Math.max(1, Math.ceil(sortedMachines.length / PAGE_SIZE))
   const visibleMachines = sortedMachines.slice((machinePage - 1) * PAGE_SIZE, machinePage * PAGE_SIZE)
@@ -296,8 +301,21 @@ export default function RevenueScreen() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            {([ ["Today’s gross", "IST calendar day"], ["This month gross", "IST calendar month"], ["All-time gross", `${rows.length} tracked machines`] ] as const).map(([title, detail], index) => (
-              <section key={title} className={`relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm ${index === 0 ? "border-t-2 border-t-primary" : ""}`}>
+            {([ ["Today’s gross", "IST calendar day", "today"], ["This month gross", "IST calendar month", "thisMonth"], ["All-time gross", `${rows.length} tracked machines`, "totalRevenue"] ] as const).map(([title, detail, period], index) => {
+              const isSelected = selectedPeriod === period
+              return (
+              <button
+                type="button"
+                key={title}
+                aria-pressed={isSelected}
+                onClick={() => {
+                  const nextPeriod = isSelected ? null : period
+                  setSelectedPeriod(nextPeriod)
+                  setMachinePage(1)
+                  if (nextPeriod) setMachineSort(nextPeriod)
+                }}
+                className={`relative overflow-hidden rounded-xl border bg-card p-5 text-left shadow-sm transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"} ${index === 0 && !isSelected ? "border-t-2 border-t-primary" : ""}`}
+              >
                 <p className="text-sm font-medium text-muted-foreground">{title}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{money.format(periodMetrics[index]!.gross)}</p>
                 <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
@@ -306,12 +324,13 @@ export default function RevenueScreen() {
                   <p className="mt-1 text-lg font-semibold tabular-nums">{periodMetrics[index]!.estimatedNet === null ? "Rates unavailable" : money.format(periodMetrics[index]!.estimatedNet)}</p>
                   {periodMetrics[index]!.deductions !== null && <p className="mt-1 text-xs text-muted-foreground">Estimated deductions: {money.format(periodMetrics[index]!.deductions!)}</p>}
                 </div>
-              </section>
-            ))}
+              </button>
+              )
+            })}
           </div>
           {rates.isSuccess && <p className="-mt-3 text-xs text-muted-foreground">Estimate applies GST and gateway rates to gross, then estimates TDS on the remaining amount. Actual TDS and payouts vary by distributor/partner agreements; finalized statements are authoritative.</p>}
           <RevenueTrendChart />
-          <Panel title="Machine revenue" subtitle={`${rows.length} machines · gross recognized revenue by assignment window`}>
+          <Panel title="Machine revenue" subtitle={`${filtered.length} ${selectedPeriod ? `${selectedPeriod === "today" ? "today" : selectedPeriod === "thisMonth" ? "this-month" : "all-time"} revenue machines` : "machines"} · gross recognized revenue by assignment window`}>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <div className="min-w-56 flex-1"><label htmlFor="revenue-search" className="mb-1.5 block text-xs font-medium text-muted-foreground">Find a machine</label><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><input id="revenue-search" className={`${inputClass} pl-9`} placeholder="Machine, location, distributor or partner" value={search} onChange={(event) => { setSearch(event.target.value); setMachinePage(1) }}/></div></div>
               <div><label htmlFor="machine-sort" className="mb-1.5 block text-xs font-medium text-muted-foreground">Sort machines</label><select id="machine-sort" className={selectClass} value={machineSort} onChange={(event) => { setMachineSort(event.target.value as typeof machineSort); setMachinePage(1) }}><option value="totalRevenue">All-time revenue</option><option value="thisMonth">This month</option><option value="today">Today</option><option value="machineCode">Machine ID</option></select></div>
@@ -319,7 +338,7 @@ export default function RevenueScreen() {
             {!rows.length ? (
               <EmptyState message="No machine revenue to show yet." />
             ) : !filtered.length ? (
-              <EmptyState message="No machines match your search." />
+              <EmptyState message={selectedPeriod ? "No machines recorded revenue for this period." : "No machines match your search."} />
             ) : (
               <>
               <div className="overflow-x-auto rounded-lg border border-border/70">
@@ -460,22 +479,22 @@ export default function RevenueScreen() {
                 </tbody>
               </table>
               {filteredPayments.length > PAGE_SIZE && (
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                <div className="mt-4 grid grid-cols-1 items-center gap-3 border-t border-border px-1 pb-1 pt-4 sm:grid-cols-[1fr_auto_auto_auto]">
                   <span className="text-xs text-muted-foreground">Showing {(paymentsPage - 1) * PAGE_SIZE + 1}–{Math.min(paymentsPage * PAGE_SIZE, filteredPayments.length)} of {filteredPayments.length} matching</span>
                   <button
                     type="button"
-                    className={buttonClass}
+                    className={`${buttonClass} justify-self-start sm:justify-self-auto`}
                     disabled={paymentsPage <= 1}
                     onClick={() => setPaymentsPage(page => Math.max(1, page - 1))}
                   >
                     Previous
                   </button>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-center text-xs text-muted-foreground">
                     Page {paymentsPage} of {paymentPages}
                   </span>
                   <button
                     type="button"
-                    className={buttonClass}
+                    className={`${buttonClass} justify-self-start sm:justify-self-end`}
                     disabled={paymentsPage >= paymentPages}
                     onClick={() => setPaymentsPage(page => Math.min(paymentPages, page + 1))}
                   >

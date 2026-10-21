@@ -1,11 +1,9 @@
-import fs from "node:fs";
-import path from "node:path";
 import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../utils/db";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { INVOICES_DIR, renderInvoicePDF } from "../../services/pdf/invoice.pdf";
+import { renderInvoicePDF } from "../../services/pdf/invoice.pdf";
 import {
   queueInvoice,
   attemptDelivery,
@@ -21,6 +19,8 @@ import {
   OrderParamsSchema,
 } from "@shared-types/validationSchemas/Orders/order.validation";
 
+const REQUESTABLE_KIOSK_STATUSES = ["AVAILABLE", "INSTALLED"] as const;
+
 const reserveKiosks = async (
   tx: Prisma.TransactionClient,
   orgId: string,
@@ -28,12 +28,9 @@ const reserveKiosks = async (
   orderId: string,
   model?: string,
 ) => {
-  // Only INSTALLED kiosks may be reserved.
-  //
-  // A kiosk is created AVAILABLE and becomes INSTALLED when real hardware is paired to
-  // it (see internal.controller.ts). Reserving AVAILABLE stock would therefore hand out
-  // machines that have no device attached, which is the opposite of the business rule:
-  // an order must only ever commit hardware that exists.
+  // Batch-created kiosks start AVAILABLE and may become INSTALLED when hardware is
+  // paired. Both states represent real, unreserved supplier stock that can be
+  // requested; reservation moves either state to RESERVED.
   //
   // Deterministic selection: oldest first, then by machine code. Ordering by `id`
   // alone is arbitrary because ids are random UUIDs, so kiosks sharing a
@@ -47,31 +44,31 @@ const reserveKiosks = async (
   // predicate so a row that changed between SELECT and UPDATE cannot slip through.
   const kiosks = model
     ? await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL AND model=${model}
+        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND "reservedOrderId" IS NULL AND model=${model}
         ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`
     : await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND "reservedOrderId" IS NULL
+        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND "reservedOrderId" IS NULL
         ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
   if (kiosks.length !== quantity) {
     // Distinguish missing model stock from stock that is already committed.
     const [installedTotal] = model
       ? await tx.$queryRaw<{ n: bigint }[]>`
-          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED' AND model=${model}`
+          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND model=${model}`
       : await tx.$queryRaw<{ n: bigint }[]>`
-          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status='INSTALLED'`;
+          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED')`;
     if (Number(installedTotal?.n ?? 0) === 0) {
       throw new ApiError(
         409,
         model
-          ? `No installed kiosks of model "${model}" are available from this supplier.`
-          : "No installed kiosks are available to reserve. A kiosk becomes reservable only after its hardware is paired (status INSTALLED).",
+          ? `No kiosks of model "${model}" are available from this supplier.`
+          : "No kiosks are available to reserve from this supplier.",
       );
     }
     throw new ApiError(
       409,
-      model
-        ? `Insufficient installed, unreserved kiosks of model "${model}"; retry if another allocation is in progress.`
-        : "Insufficient installed, unreserved inventory; retry if another allocation is in progress",
+        model
+          ? `Insufficient unreserved kiosks of model "${model}"; retry if another allocation is in progress.`
+          : "Insufficient unreserved inventory; retry if another allocation is in progress",
     );
   }
   const ids = kiosks.map((k) => k.id);
@@ -79,7 +76,7 @@ const reserveKiosks = async (
     where: {
       id: { in: ids },
       currentOrgId: orgId,
-      status: "INSTALLED",
+      status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
       reservedOrderId: null,
       ...(model ? { model } : {}),
     },
@@ -104,7 +101,7 @@ const assertRequestModelAvailable = async (
   const available = await tx.kiosk.count({
     where: {
       currentOrgId: supplierOrgId,
-      status: "INSTALLED",
+      status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
       reservedOrderId: null,
       model,
     },
@@ -143,7 +140,7 @@ export const getRequestModelAvailability = asyncHandler(async (req, res) => {
         by: ["model"],
         where: {
           currentOrgId: agreement.parentOrgId,
-          status: "INSTALLED",
+          status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
           reservedOrderId: null,
         },
         _count: { _all: true },
@@ -553,12 +550,18 @@ export const getOrderInvoice = asyncHandler(async (req, res) => {
   const order = await prisma.order.findUnique({
     where: { id },
     select: {
-      parentOrgId: true, childOrgId: true, invoiceFilename: true,
+      parentOrgId: true, childOrgId: true,
       orderNumber: true, createdAt: true, quantity: true,
       depositPerMachine: true, nonRefundablePerMachine: true,
       totalDeposit: true, totalNonRefundable: true, taxAmount: true, grandTotal: true,
       parentOrg: { select: { name: true } },
       childOrg: { select: { name: true } },
+      dispatchedKiosks: {
+        select: {
+          kiosk: { select: { machineCode: true, model: true } },
+        },
+        orderBy: { kioskId: "asc" },
+      },
     },
   });
   if (!order) throw new ApiError(404, "Order not found");
@@ -568,23 +571,21 @@ export const getOrderInvoice = asyncHandler(async (req, res) => {
     )
   )
     throw new ApiError(403, "Unauthorized to access this invoice");
-  if (!order.invoiceFilename)
-    throw new ApiError(404, "Invoice has not been generated yet");
-  const file = path.resolve(INVOICES_DIR, order.invoiceFilename);
-  if (path.dirname(file) !== INVOICES_DIR || !fs.existsSync(file))
-    throw new ApiError(404, "Invoice file not found");
-  // Refresh existing invoices from saved amounts without changing their archives.
+  // Render from the immutable order snapshot on every request. This keeps downloads
+  // available on Vercel, where /tmp is ephemeral and generated invoice files do not
+  // survive across invocations or instances.
   const pdf = await renderInvoicePDF({
     ...order,
     parentOrgName: order.parentOrg.name,
     childOrgName: order.childOrg.name,
     date: order.createdAt,
+    kiosks: order.dispatchedKiosks.map(({ kiosk }) => kiosk),
   });
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${path.basename(file)}"`,
+    `attachment; filename="${order.orderNumber}.pdf"`,
   );
   res.send(pdf);
 });

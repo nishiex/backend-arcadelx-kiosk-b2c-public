@@ -455,6 +455,17 @@ export type Distributor = {
   createdAt: string;
   owner: { id: string; name: string; email: string } | null;
   _count: { kiosks: number; memberships: number };
+  agreementStatus: 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED' | null;
+  partners?: DistributorPartner[];
+};
+
+export type DistributorPartner = {
+  id: string;
+  name: string;
+  type: 'PARTNER';
+  state: string | null;
+  city: string | null;
+  owner: { id: string; name: string; email: string } | null;
 };
 
 export async function fetchDistributors(): Promise<Distributor[]> {

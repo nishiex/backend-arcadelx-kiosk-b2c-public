@@ -3,14 +3,14 @@
 import { useQuery } from "@tanstack/react-query"
 import { Building2, RefreshCw, UsersRound } from "lucide-react"
 import { useMe } from "@/hooks/useMe"
-import { fetchPartners } from "@/lib/backend-api"
+import { fetchDistributors, fetchPartners } from "@/lib/backend-api"
 import AddPartnerForm from "./AddPartnerForm"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 
 const buttonClass = "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
 
 export default function PartnersScreen() {
-  const { canViewPartners, canRegisterPartners, isLoading, me } = useMe()
+  const { canViewPartners, canRegisterPartners, canManageDistributors, isCompany, isLoading, me } = useMe()
   const organizationId = me?.membership?.organizationId
   const partners = useQuery({
     queryKey: ["partners", organizationId],
@@ -19,9 +19,32 @@ export default function PartnersScreen() {
     staleTime: 30_000,
     retry: 1,
   })
+  const distributors = useQuery({
+    queryKey: ["distributors", organizationId, "partners"],
+    queryFn: fetchDistributors,
+    enabled: isCompany && canManageDistributors,
+    staleTime: 30_000,
+    retry: 1,
+  })
 
   if (isLoading) return <p role="status" className="text-sm text-muted-foreground">Loading partners…</p>
-  if (!canViewPartners) return <p role="alert" className="text-sm text-muted-foreground">You don’t have permission to view partners.</p>
+  if (!canViewPartners && !(isCompany && canManageDistributors)) {
+    return <p role="alert" className="text-sm text-muted-foreground">You don’t have permission to view partners.</p>
+  }
+
+  const companyRows = (distributors.data ?? []).flatMap(distributor =>
+    (distributor.partners ?? []).map(partner => ({
+      ...partner,
+      distributorName: distributor.name,
+      agreementStatus: null,
+    })),
+  )
+  const rows = isCompany
+    ? companyRows
+    : (partners.data ?? []).map(partner => ({
+        ...partner,
+        distributorName: null,
+      }))
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -39,14 +62,18 @@ export default function PartnersScreen() {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 size={22} aria-hidden="true" /></span>
           <div>
             <h2 id="partner-list-title" className="text-lg font-semibold">Registered and connected partners</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Partners registered under or connected to this Distributor are shown.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isCompany
+                ? "Partners associated with each distributor in your network are shown."
+                : "Partners registered under or connected to this Distributor are shown."}
+            </p>
           </div>
         </div>
-        {partners.isLoading ? (
+        {(isCompany ? distributors.isLoading : partners.isLoading) ? (
           <div className="space-y-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-        ) : partners.isError ? (
-          <ErrorState message="Couldn’t load partners." onRetry={() => void partners.refetch()} />
-        ) : !partners.data?.length ? (
+        ) : (isCompany ? distributors.isError : partners.isError) ? (
+          <ErrorState message="Couldn’t load partners." onRetry={() => void (isCompany ? distributors.refetch() : partners.refetch())} />
+        ) : !rows.length ? (
           <EmptyState className="py-10" icon={<UsersRound size={28} />} message="No connected partners yet." />
         ) : (
           <div className="overflow-x-auto">
@@ -54,15 +81,17 @@ export default function PartnersScreen() {
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-3 font-medium">Business</th>
+                  {isCompany && <th className="px-3 py-3 font-medium">Distributor</th>}
                   <th className="px-3 py-3 font-medium">Owner</th>
                   <th className="px-3 py-3 font-medium">Location</th>
                   <th className="px-3 py-3 font-medium">Agreement</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {partners.data.map((partner) => (
+                {rows.map((partner) => (
                   <tr key={partner.id} className="hover:bg-muted/40">
                     <th scope="row" className="px-3 py-3 text-left font-medium">{partner.name}</th>
+                    {isCompany && <td className="px-3 py-3">{partner.distributorName}</td>}
                     <td className="px-3 py-3">{partner.owner?.email ?? "—"}</td>
                     <td className="px-3 py-3 text-muted-foreground">{[partner.city, partner.state].filter(Boolean).join(", ") || "—"}</td>
                     <td className="px-3 py-3 text-muted-foreground">{partner.agreementStatus?.replaceAll("_", " ") ?? "Not created"}</td>

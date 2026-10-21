@@ -299,6 +299,18 @@ export const getDistributors = asyncHandler(
       },
     });
 
+    const latestAgreements = await prisma.agreement.findMany({
+      where: { childOrgId: { in: organizations.map((organization) => organization.id) } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { childOrgId: true, status: true },
+    });
+    const agreementStatusByDistributor = new Map<string, string>();
+    for (const agreement of latestAgreements) {
+      if (!agreementStatusByDistributor.has(agreement.childOrgId)) {
+        agreementStatusByDistributor.set(agreement.childOrgId, agreement.status);
+      }
+    }
+
     // Partners genuinely associated with each Distributor, reachable from this Company.
     // Registration now records the parent organization directly. Network connections,
     // agreements and orders remain as legacy association sources for older rows.
@@ -418,6 +430,7 @@ export const getDistributors = asyncHandler(
       country: organization.country ?? null,
       isActive: organization.isActive ?? true,
       statusManagementAvailable: availableProfileColumns.has("isActive") && availableProfileColumns.has("accessVersion"),
+      agreementStatus: agreementStatusByDistributor.get(organization.id) ?? null,
       partners: partnersByDistributor.get(organization.id) ?? [],
     }));
 

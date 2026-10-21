@@ -100,16 +100,10 @@ export default function LoginForm() {
         </div>
 
         <div data-reveal>
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-1.5">
             <label htmlFor="password" className="block text-sm font-medium">
               Password
             </label>
-            <Link
-              href="/forgot-password"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              Forgot password?
-            </Link>
           </div>
           <div className="relative">
             <Lock size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

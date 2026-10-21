@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ClipboardList, RefreshCw, Search } from "lucide-react"
+import { ClipboardList, Download, RefreshCw, Search } from "lucide-react"
 import { fetchOrders, fetchWorkflowReadiness, ORDER_STATUSES, type OrderStatus } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
@@ -97,6 +97,16 @@ export default function OrdersScreen() {
                             requires the caller to be the parent organization. */}
                         {canApproveOrders && order.parentOrgId === organizationId && (
                           <OrderStatusDialog order={order} disabled={orderActionsDisabled} />
+                        )}
+                        {order.status === "DELIVERED" && (
+                          <a
+                            href={`/api/orders/${encodeURIComponent(order.id)}/invoice`}
+                            download={`${order.orderNumber}-invoice.pdf`}
+                            aria-label={`Download invoice for ${order.orderNumber}`}
+                            className="inline-flex items-center gap-2 rounded-md border border-primary px-2.5 py-2 font-medium text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            <Download size={16} /> Invoice
+                          </a>
                         )}
                         <OrderDetailsDialog order={order} organizationId={organizationId} />
                       </div>

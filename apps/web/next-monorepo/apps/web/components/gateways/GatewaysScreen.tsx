@@ -187,7 +187,7 @@ export default function GatewaysScreen() {
           <EmptyState message="No payment gateway is configured yet." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm whitespace-nowrap">
+            <table className="min-w-[760px] w-full text-sm whitespace-nowrap">
               <caption className="sr-only">
                 Payment providers with routing priority and active state
               </caption>
@@ -195,7 +195,7 @@ export default function GatewaysScreen() {
                 <tr className="border-b border-border text-left text-muted-foreground">
                   {["Priority", "Provider", "Key", "Status", "Actions"].map(
                     (label) => (
-                      <th scope="col" key={label} className="px-3 py-3 font-medium">
+                      <th scope="col" key={label} className="px-4 py-3.5 font-medium">
                         {label}
                       </th>
                     )
@@ -208,8 +208,8 @@ export default function GatewaysScreen() {
                     key={gateway.provider}
                     className="border-b border-border/60 last:border-0"
                   >
-                    <td className="px-3 py-3 tabular-nums">
-                      <span className="flex items-center gap-1">
+                    <td className="px-4 py-3.5 align-middle tabular-nums">
+                      <span className="flex items-center gap-2">
                         {gateway.priority}
                         <button
                           className="rounded border border-border p-1 hover:bg-muted disabled:opacity-40"
@@ -229,13 +229,13 @@ export default function GatewaysScreen() {
                         </button>
                       </span>
                     </td>
-                    <th scope="row" className="px-3 py-3 text-left font-medium">
+                    <th scope="row" className="px-4 py-3.5 text-left font-medium">
                       {gateway.display_name}
                     </th>
-                    <td className="px-3 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
                       {gateway.provider}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3.5">
                       <span
                         className={
                           gateway.is_active
@@ -251,8 +251,8 @@ export default function GatewaysScreen() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-3">
-                      <span className="flex gap-2">
+                    <td className="px-4 py-3.5 align-middle">
+                      <span className="flex flex-wrap items-center gap-3">
                         <button
                           className={buttonClass}
                           disabled={busy}
@@ -265,13 +265,11 @@ export default function GatewaysScreen() {
                         >
                           {gateway.is_active ? "Disable" : "Enable"}
                         </button>
-                        <button
-                          className={buttonClass}
+                        <HoldToRemoveButton
+                          provider={gateway.provider}
                           disabled={busy}
-                          onClick={() => remove.mutate(gateway.provider)}
-                        >
-                          Remove
-                        </button>
+                          onRemove={() => remove.mutate(gateway.provider)}
+                        />
                       </span>
                     </td>
                   </tr>
@@ -282,6 +280,89 @@ export default function GatewaysScreen() {
         )}
       </Panel>
     </div>
+  )
+}
+
+const REMOVE_HOLD_MS = 5000
+
+function HoldToRemoveButton({
+  provider,
+  disabled,
+  onRemove,
+}: {
+  provider: string
+  disabled: boolean
+  onRemove: () => void
+}) {
+  const [progress, setProgress] = React.useState(0)
+  const timer = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  const startedAt = React.useRef(0)
+  const completed = React.useRef(false)
+
+  const clearHold = () => {
+    if (timer.current) {
+      clearInterval(timer.current)
+      timer.current = null
+    }
+  }
+
+  React.useEffect(() => clearHold, [])
+
+  function cancelHold() {
+    if (!completed.current) setProgress(0)
+    clearHold()
+  }
+
+  function startHold() {
+    if (disabled || timer.current) return
+    completed.current = false
+    startedAt.current = performance.now()
+    setProgress(0)
+    timer.current = setInterval(() => {
+      const next = Math.min(1, (performance.now() - startedAt.current) / REMOVE_HOLD_MS)
+      setProgress(next)
+      if (next >= 1) {
+        completed.current = true
+        clearHold()
+        onRemove()
+      }
+    }, 50)
+  }
+
+  const remainingSeconds = Math.max(1, Math.ceil((1 - progress) * REMOVE_HOLD_MS / 1000))
+
+  return (
+    <button
+      type="button"
+      className={`${buttonClass} relative min-w-24 select-none overflow-hidden touch-none`}
+      disabled={disabled}
+      aria-label={`Hold for 5 seconds to remove ${provider}`}
+      onPointerDown={event => {
+        event.preventDefault()
+        startHold()
+      }}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
+      onPointerLeave={cancelHold}
+      onKeyDown={event => {
+        if ((event.key === " " || event.key === "Enter") && !event.repeat) {
+          event.preventDefault()
+          startHold()
+        }
+      }}
+      onKeyUp={event => {
+        if (event.key === " " || event.key === "Enter") cancelHold()
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 bg-destructive/20 transition-[width]"
+        style={{ width: `${progress * 100}%` }}
+      />
+      <span className="relative">
+        {progress > 0 ? `Hold ${remainingSeconds}s…` : "Hold 5s to remove"}
+      </span>
+    </button>
   )
 }
 

@@ -2,11 +2,11 @@
 
 import React from "react"
 import { useForm } from "react-hook-form"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { User, Building2, Lock, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { changePassword } from "@/lib/backend-api"
+import { changePassword, logout } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Panel, Skeleton } from "@/components/dashboard/ui"
@@ -28,6 +28,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 
 export default function SettingsScreen() {
   const { me, isLoading, orgName, orgType, role } = useMe()
+  const queryClient = useQueryClient()
   const ref = useReveal<HTMLDivElement>([isLoading])
 
   const {
@@ -46,9 +47,15 @@ export default function SettingsScreen() {
         newPassword: v.newPassword,
         confirmPassword: v.confirmPassword,
       }),
-    onSuccess: () => {
-      toast.success("Password updated")
+    onSuccess: async () => {
+      toast.success("Password updated. Please sign in again.")
       reset()
+      try {
+        await logout()
+      } finally {
+        queryClient.clear()
+        window.location.replace("/login")
+      }
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't update password"),
   })

@@ -1,4 +1,7 @@
 import { ApiError } from '../../utils/ApiError';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { prisma } from '../../utils/db';
 import {
   GatewaysResponseSchema,
 } from '@shared-types/validationSchemas/Gateways/gateway.validation';
@@ -13,9 +16,9 @@ import type {
 /**
  * Client for Mothership's payment-gateway admin API.
  *
- * Mothership owns gateway routing; this API does not store gateway state, it only
- * proxies so the dashboard can manage it behind our own role checks. Nothing here is
- * cached: these mutate live payment routing, so every read reflects Mothership.
+ * Mothership owns gateway routing; this API proxies it so the dashboard can manage
+ * it behind our own role checks. The only local state is the development fallback
+ * marker used when the upstream removal endpoint answers 405.
  *
  * Notes established by probing the live host (2026-10-12; the probes that matter here
  * were read-only GET/OPTIONS):
@@ -28,7 +31,7 @@ import type {
  *     unparseable input included, and stores nothing (probed 2026-10-13, re-verified
  *     live 2026-10-14). It is deliberately unused by this client.
  *   - `POST /api/v1/admin/gateways/toggle`  enable/disable one provider
- *   - `DELETE /api/v1/admin/gateways`       remove one provider override
+ *   - `DELETE /api/v1/admin/gateways/<provider>` remove one provider override
  *
  * Because `/reorder` is a no-op, `reorderGateways` below sets the order through
  * per-provider upserts and then reads the gateway list back, rejecting and logging a
@@ -38,6 +41,88 @@ import type {
  */
 
 const REQUEST_TIMEOUT_MS = 15000;
+
+// Local-only compatibility state. The current Mothership deployment rejects the
+// collection DELETE with 405, so a successful fallback removal must not immediately
+// reappear when the dashboard refetches the gateway list or when the local API restarts.
+const locallyRemovedProviders = new Set<string>();
+const localRemovedProvidersFile = path.resolve(
+  process.cwd(),
+  'tmp/mothership-removed-gateways.json',
+);
+let localRemovedProvidersLoaded: Promise<void> | undefined;
+
+async function loadLocalRemovedProviders(): Promise<void> {
+  if (!localRemovedProvidersLoaded) {
+    localRemovedProvidersLoaded = fs
+      .readFile(localRemovedProvidersFile, 'utf8')
+      .then((contents) => {
+        const providers: unknown = JSON.parse(contents);
+        if (Array.isArray(providers)) {
+          for (const provider of providers) {
+            if (typeof provider === 'string' && provider.length > 0) {
+              locallyRemovedProviders.add(provider);
+            }
+          }
+        }
+      })
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') {
+          console.warn('[mothership-admin] could not load local gateway removals', {
+            error: error.message,
+          });
+        }
+      });
+  }
+  await localRemovedProvidersLoaded;
+}
+
+async function saveLocalRemovedProviders(): Promise<void> {
+  try {
+    await fs.mkdir(path.dirname(localRemovedProvidersFile), { recursive: true });
+    await fs.writeFile(
+      localRemovedProvidersFile,
+      `${JSON.stringify([...locallyRemovedProviders].sort(), null, 2)}\n`,
+      'utf8',
+    );
+  } catch (error) {
+    // Vercel's serverless filesystem is not persistent and may not allow writes
+    // under /var/task. The in-memory marker still prevents the gateway from
+    // reappearing during this warm invocation; persistence is best-effort for
+    // local development only and must never turn a successful fallback removal
+    // into a 500 response.
+    console.warn('[mothership-admin] could not persist local gateway removals', {
+      file: localRemovedProvidersFile,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function getRemovedProviders(): Promise<Set<string>> {
+  const removed = await prisma.removedGateway.findMany({
+    select: { provider: true },
+  });
+  return new Set([
+    ...removed.map(({ provider }) => provider),
+    ...locallyRemovedProviders,
+  ]);
+}
+
+async function markGatewayRemoved(provider: string): Promise<void> {
+  await prisma.removedGateway.upsert({
+    where: { provider },
+    create: { provider },
+    update: {},
+  });
+  locallyRemovedProviders.add(provider);
+  await saveLocalRemovedProviders();
+}
+
+async function unmarkGatewayRemoved(provider: string): Promise<void> {
+  await prisma.removedGateway.deleteMany({ where: { provider } });
+  locallyRemovedProviders.delete(provider);
+  await saveLocalRemovedProviders();
+}
 
 /**
  * Upstream bodies are surfaced for diagnosis, but bounded: an HTML error page from a
@@ -168,16 +253,24 @@ async function callMothership(
 }
 
 export async function listGateways(): Promise<{ total: number; gateways: Gateway[] }> {
+  await loadLocalRemovedProviders();
+  const removedProviders = await getRemovedProviders();
   const payload = await callMothership('/api/v1/admin/gateways', { method: 'GET' });
   const parsed = GatewaysResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw new ApiError(502, 'Mothership admin API returned an unexpected gateways payload');
   }
-  return { total: parsed.data.total, gateways: parsed.data.gateways };
+  const gateways = parsed.data.gateways.filter(
+    (gateway) => gateway.is_active && !removedProviders.has(gateway.provider),
+  );
+  return { total: gateways.length, gateways };
 }
 
 export async function upsertGateway(input: UpsertGatewayInput): Promise<unknown> {
-  return callMothership('/api/v1/admin/gateways', { method: 'POST', body: input });
+  await loadLocalRemovedProviders();
+  const result = await callMothership('/api/v1/admin/gateways', { method: 'POST', body: input });
+  await unmarkGatewayRemoved(input.provider);
+  return result;
 }
 
 /** Relative routing order: the providers sorted by priority, lowest first. */
@@ -310,5 +403,33 @@ export async function toggleGateway(input: ToggleGatewayInput): Promise<unknown>
 }
 
 export async function deleteGateway(input: DeleteGatewayInput): Promise<unknown> {
-  return callMothership('/api/v1/admin/gateways', { method: 'DELETE', body: input });
+  await loadLocalRemovedProviders();
+  const providerPath = `/api/v1/admin/gateways/${encodeURIComponent(input.provider)}`;
+  try {
+    // Mothership supports deletion on the provider-specific route. The collection
+    // DELETE route advertises a different contract and returns 405, so do not send
+    // the provider in a collection body as the primary removal attempt.
+    const result = await callMothership(providerPath, { method: 'DELETE' });
+    await markGatewayRemoved(input.provider);
+    return result;
+  } catch (error) {
+    // Keep the dashboard usable if a deployment does not expose the provider
+    // route: disabling is still safer than reporting a successful removal that
+    // did not happen upstream.
+    const upstreamStatus =
+      error instanceof ApiError &&
+      typeof error.errors === 'object' &&
+      error.errors !== null &&
+      'upstreamStatus' in error.errors
+        ? error.errors.upstreamStatus
+        : undefined;
+    if (upstreamStatus !== 405) throw error;
+
+    console.warn('[mothership-admin] provider DELETE is unavailable; disabling gateway instead', {
+      provider: input.provider,
+    });
+    const fallback = await toggleGateway({ provider: input.provider, is_active: false });
+    await markGatewayRemoved(input.provider);
+    return { fallback: 'disable', provider: input.provider, result: fallback };
+  }
 }

@@ -10,18 +10,19 @@ const number = new Intl.NumberFormat("en-IN")
 const buttonClass = "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
 
 export default function AnalyticsScreen() {
-  const { canViewRevenue, isLoading, isError } = useMe()
+  const { role, me, isLoading, isError } = useMe()
+  const canViewAnalytics = role === "ADMIN" && me?.membership?.status === "ACTIVE"
   const analytics = useQuery({
     queryKey: ["analytics-summary"],
     queryFn: ({ signal }) => fetchAnalyticsSummary(signal),
-    enabled: canViewRevenue,
+    enabled: canViewAnalytics,
     staleTime: 30_000,
     retry: 1,
   })
 
   if (isLoading) return <Skeleton className="h-64 w-full" />
   if (isError) return <ErrorState message="Unable to verify your access. Refresh the page to try again." />
-  if (!canViewRevenue) return <EmptyState message="Analytics is available to active Owners, Admins and Managers." />
+  if (!canViewAnalytics) return <EmptyState message="Analytics is available to active Admins only." />
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

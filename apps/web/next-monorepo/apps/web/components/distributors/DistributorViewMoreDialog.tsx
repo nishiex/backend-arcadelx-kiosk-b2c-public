@@ -12,16 +12,16 @@ import ReviewRequestList from "@/components/requests/ReviewRequestList"
  * Per-distributor detail view, opened from the row's "View More" action.
  *
  * Three tabs:
- *   - Details             the organization's own fields
  *   - Network connections this distributor's connection requests, accept/approve inline
  *   - Agreements          this distributor's agreements, OWNER-only approval
+ *   - Partners            Partners associated with this distributor
  *
  * The two review tabs reuse `ReviewRequestList`, which is the same component the
  * Requests page renders, so the API calls, pagination, loading/error states and
  * authorization rules are shared rather than copied. Because this dialog is
  * Company-side, the lists are scoped to the row's distributor.
  */
-type Tab = "details" | "partners" | "network" | "agreements"
+type Tab = "partners" | "network" | "agreements"
 
 /**
  * `GET /api/network/distributors` returns each Distributor's associated Partners alongside
@@ -34,55 +34,46 @@ type DistributorWithPartners = Distributor & {
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "details", label: "Details" },
-  // Partners are shown before the review tabs: they answer "who operates here", which is
-  // what the Company most often opens this dialog for.
-  { id: "partners", label: "Partners" },
-  { id: "network", label: "Network connections" },
+  { id: "network", label: "Network" },
   { id: "agreements", label: "Agreements" },
+  { id: "partners", label: "Partners" },
 ]
 
-/** Indian digit grouping, matching the currency format used elsewhere in the app. */
-const countFormat = new Intl.NumberFormat("en-IN")
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words">{value ?? <span className="text-muted-foreground">—</span>}</dd>
-    </div>
-  )
-}
-
-export default function DistributorViewMoreDialog({ distributor }: { distributor: DistributorWithPartners }) {
+export default function DistributorViewMoreDialog({
+  distributor,
+  trigger,
+}: {
+  distributor: DistributorWithPartners
+  trigger?: React.ReactElement
+}) {
   const { canReviewRequests } = useMe()
   const [open, setOpen] = React.useState(false)
-  const [tab, setTab] = React.useState<Tab>("details")
+  const [tab, setTab] = React.useState<Tab>("network")
   const [networkPage, setNetworkPage] = React.useState(1)
   const [agreementPage, setAgreementPage] = React.useState(1)
 
   // Reopening should start clean rather than resume a stale page.
   function change(next: boolean) {
     if (next) {
-      setTab("details")
+      setTab("network")
       setNetworkPage(1)
       setAgreementPage(1)
     }
     setOpen(next)
   }
 
-  const location = [distributor.city, distributor.state].filter(Boolean).join(", ")
-
   return (
     <Dialog.Root open={open} onOpenChange={change}>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          aria-label={`View More ${distributor.name}`}
-          className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-        >
-          View More
-        </button>
+        {trigger ?? (
+          <button
+            type="button"
+            aria-label={`Open ${distributor.name}`}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Open
+          </button>
+        )}
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
@@ -90,7 +81,7 @@ export default function DistributorViewMoreDialog({ distributor }: { distributor
           <header className="border-b border-border p-4 pr-12 sm:p-6">
             <Dialog.Title className="break-words text-xl font-semibold">{distributor.name}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              Details, connection requests and agreements for this distributor.
+              Review this distributor&apos;s network, agreements and associated partners.
             </Dialog.Description>
             <Dialog.Close
               aria-label="Close distributor details"
@@ -100,12 +91,16 @@ export default function DistributorViewMoreDialog({ distributor }: { distributor
             </Dialog.Close>
           </header>
 
-          <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3 sm:px-6" aria-label="Distributor view">
+          <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3 sm:px-6" role="tablist" aria-label="Distributor sections">
             {TABS.map(item => (
               <button
                 key={item.id}
                 type="button"
-                aria-pressed={tab === item.id}
+                id={`distributor-tab-${item.id}`}
+                role="tab"
+                aria-selected={tab === item.id}
+                aria-controls={`distributor-panel-${item.id}`}
+                tabIndex={tab === item.id ? 0 : -1}
                 onClick={() => setTab(item.id)}
                 className={`rounded-lg border px-3 py-2 text-sm font-medium ${
                   tab === item.id
@@ -118,34 +113,14 @@ export default function DistributorViewMoreDialog({ distributor }: { distributor
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-            {tab === "details" ? (
-              <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                <Field label="Owner" value={distributor.owner?.name} />
-                <Field label="Owner email" value={distributor.owner?.email} />
-                <Field label="Location" value={location} />
-                <Field label="Pincode" value={distributor.pincode} />
-                <Field label="GST" value={distributor.gstNumber} />
-                <Field label="Phone" value={distributor.phone} />
-                <Field label="Country" value={distributor.country} />
-                <Field label="Kiosks" value={countFormat.format(distributor._count.kiosks)} />
-                <Field label="Members" value={countFormat.format(distributor._count.memberships)} />
-                <Field
-                  label="Status"
-                  value={
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        distributor.isActive
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                          : "bg-red-500/10 text-red-700 dark:text-red-300"
-                      }`}
-                    >
-                      {distributor.isActive ? "Active" : "Inactive"}
-                    </span>
-                  }
-                />
-              </dl>
-            ) : tab === "partners" ? (
+          <div
+            id={`distributor-panel-${tab}`}
+            role="tabpanel"
+            aria-labelledby={`distributor-tab-${tab}`}
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-y-auto p-4 outline-none sm:p-6"
+          >
+            {tab === "partners" ? (
               /* Partners genuinely associated with this Distributor, as returned by the API.
                  A Partner registration records no parent pointer, so this is derived from
                  existing connections/agreements/orders -- an empty list is a real answer,

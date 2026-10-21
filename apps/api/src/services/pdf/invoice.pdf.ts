@@ -37,14 +37,18 @@ interface InvoiceData {
   taxAmount: number;
   grandTotal: number;
   date: Date;
+  kiosks: Array<{ machineCode: string; model: string | null }>;
 }
 
 // Both emailed files and downloads use the same layout and stored order amounts.
 // Rendering into a buffer also keeps concurrent downloads independent.
 export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
   new Promise((resolve, reject) => {
+    // Keep each invoice to one continuous page. For larger orders the page grows
+    // vertically instead of splitting the machine inventory across page 2+.
+    const pageHeight = 842 + (data.kiosks.length > 0 ? 120 + data.kiosks.length * 24 : 0);
     const doc = new PDFDocument({
-      size: 'A4', margin: 44,
+      size: [595.28, pageHeight], margin: 44,
       info: { Title: 'Order invoice ' + data.orderNumber, Author: 'ArcadeLX', Creator: 'ArcadeLX' },
     });
     const chunks: Buffer[] = [];
@@ -144,10 +148,30 @@ export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
       text('GRAND TOTAL', summaryX + 2, totalBoxY + 15, 200, 8, colors.violet, true);
       fitted(money(data.grandTotal), summaryX + 2, totalBoxY + 36, right - summaryX - 18, 24, colors.violet, true);
 
-      line(765);
-      text('ArcadeLX', left, 784, 110, 9, colors.ink, true);
-      text('Order reference: ' + data.orderNumber, left + 115, 784, width - 180, 8, colors.muted);
-      text('1 / 1', right - 45, 784, 45, 8, colors.muted, false, 'right');
+      let footerY = 765;
+      if (data.kiosks.length > 0) {
+        // Keep the inventory inside the existing Order summary block, directly
+        // below the financial summary and before the invoice footer.
+        const inventoryY = totalBoxY + 108;
+        text('Kiosk inventory', left, inventoryY, 220, 13, colors.ink, true);
+        text(`${data.kiosks.length} assigned ${data.kiosks.length === 1 ? 'kiosk' : 'kiosks'}`,
+          right - 180, inventoryY + 4, 180, 8, colors.muted, false, 'right');
+        const tableY = inventoryY + 28;
+        doc.roundedRect(left, tableY, width, 28, 5).fill(colors.light);
+        text('MACHINE CODE', left + 12, tableY + 10, 220, 8, colors.muted, true);
+        text('MODEL', 300, tableY + 10, right - 312, 8, colors.muted, true);
+        let rowY = tableY + 28;
+        data.kiosks.forEach((kiosk, index) => {
+          if (index % 2 === 0) doc.rect(left, rowY, width, 24).fill(colors.light);
+          text(kiosk.machineCode, left + 12, rowY + 7, 220, 9.5, colors.ink, true);
+          text(kiosk.model ?? '—', 300, rowY + 7, right - 312, 9.5, colors.ink);
+          rowY += 24;
+        });
+        footerY = rowY + 24;
+      }
+      line(footerY);
+      text('ArcadeLX', left, footerY + 19, 110, 9, colors.ink, true);
+      text('Order reference: ' + data.orderNumber, left + 115, footerY + 19, width - 180, 8, colors.muted);
       doc.end();
     } catch (error) {
       doc.destroy();

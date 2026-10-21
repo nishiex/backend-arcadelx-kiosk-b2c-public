@@ -4,6 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { Search, Bell, Users, Share2, ClipboardList, ScrollText } from "lucide-react"
+import { toast } from "sonner"
 import Avatar from "@/components/ui/avatar"
 import ThemeToggle from "@/components/dashboard/ThemeToggle"
 import { useMe } from "@/hooks/useMe"
@@ -143,6 +144,26 @@ export default function Header() {
     (canManageMembers && members.isLoading) ||
     (canReview &&
       (incomingConnections.isLoading || pendingAgreements.isLoading || readiness.isLoading || orders.isLoading))
+
+  // Surface every pending notification as a popup when it first arrives or grows.
+  // Keep the bell/dropdown as the persistent detail view, but do not make users open it
+  // just to discover new work.
+  const notifiedCounts = React.useRef(new Map<string, number>())
+  React.useEffect(() => {
+    if (queuesLoading) return
+
+    const nextCounts = new Map(notices.map(notice => [notice.key, notice.count]))
+    notices.forEach(notice => {
+      const previous = notifiedCounts.current.get(notice.key) ?? 0
+      if (notice.count > previous) {
+        toast.info(notice.label, {
+          description: `${notice.count} pending item${notice.count === 1 ? "" : "s"}`,
+          duration: 6000,
+        })
+      }
+    })
+    notifiedCounts.current = nextCounts
+  }, [notices, queuesLoading])
 
   // Pop the badge when the count first becomes positive.
   React.useEffect(() => {

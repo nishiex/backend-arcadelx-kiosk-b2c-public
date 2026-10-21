@@ -12,6 +12,10 @@ import rateLimit from "express-rate-limit";
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
+  // Isolated regression suites create more than ten synthetic users by design.
+  // Keep the production limiter unchanged while allowing those suites to test
+  // authorization and order behavior without waiting for the window to expire.
+  skip: () => process.env.NODE_ENV === "test",
   standardHeaders: true,
   legacyHeaders: false,
   message: {

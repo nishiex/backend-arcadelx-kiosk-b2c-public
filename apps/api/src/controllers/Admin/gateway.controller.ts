@@ -65,5 +65,9 @@ export const removeGateway = asyncHandler(async (req: Request, res: Response) =>
   if (!parsed.success) throw new ApiError(400, 'Invalid delete payload', parsed.error.issues);
 
   const result = await deleteGateway(parsed.data);
-  res.status(200).json(new ApiResponse(200, result, 'Gateway removed successfully'));
+  const message =
+    typeof result === 'object' && result !== null && 'fallback' in result
+      ? 'Gateway disabled successfully (upstream does not support removal)'
+      : 'Gateway removed successfully';
+  res.status(200).json(new ApiResponse(200, result, message));
 });

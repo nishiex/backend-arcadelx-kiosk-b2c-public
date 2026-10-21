@@ -3,7 +3,7 @@
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useQuery } from "@tanstack/react-query"
-import { Eye, X } from "lucide-react"
+import { Download, Eye, X } from "lucide-react"
 import { fetchOrderDetails, type KioskOrder } from "@/lib/backend-api"
 import { ErrorState, Skeleton } from "@/components/dashboard/ui"
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, orderDate, orderMoney, orderPerspective } from "./order-display"
@@ -43,7 +43,18 @@ export default function OrderDetailsDialog({ order, organizationId }: { order: K
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><p className="font-medium">{orderPerspective(data, organizationId).counterparty.name}</p><p className="mt-1 text-sm text-muted-foreground">{orderPerspective(data, organizationId).flow}</p></div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[data.status]}`}>{ORDER_STATUS_LABELS[data.status]}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[data.status]}`}>{ORDER_STATUS_LABELS[data.status]}</span>
+                    {data.status === "DELIVERED" && (
+                      <a
+                        href={`/api/orders/${encodeURIComponent(data.id)}/invoice`}
+                        download={`${data.orderNumber}-invoice.pdf`}
+                        className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <Download size={15} /> Download invoice PDF
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/20 p-4 text-sm sm:grid-cols-5">
                   <div><dt className="text-muted-foreground">Type</dt><dd className="mt-1 font-medium">{data.type === "REQUEST" ? "Machine request" : "Machine allocation"}</dd></div>

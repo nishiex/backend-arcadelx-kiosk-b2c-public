@@ -88,8 +88,8 @@ export default function DistributorsScreen() {
                   <th className="px-4 py-3 text-right font-medium">Kiosks</th>
                   <th className="px-4 py-3 text-right font-medium">Members</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Agreement</th>
                   {canManageAgreementTerms && <th className="px-4 py-3 text-right font-medium">Agreement</th>}
-                  <th className="px-4 py-3 text-right font-medium">Details</th>
                 </tr>
               </thead>
               <tbody ref={bodyRef}>
@@ -100,17 +100,26 @@ export default function DistributorsScreen() {
                     className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                          {d.name.slice(0, 2).toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{d.name}</div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {d.owner?.email ?? "—"}
-                          </div>
-                        </div>
-                      </div>
+                      <DistributorViewMoreDialog
+                        distributor={d}
+                        trigger={
+                          <button
+                            type="button"
+                            className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-ring"
+                            aria-label={`Open ${d.name}`}
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                              {d.name.slice(0, 2).toUpperCase()}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium hover:underline">{d.name}</span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {d.owner?.email ?? "—"}
+                              </span>
+                            </span>
+                          </button>
+                        }
+                      />
                     </td>
                     <td className="px-4 py-3">
                       {[d.city, d.state].filter(Boolean).join(", ") || <span className="text-muted-foreground">—</span>}
@@ -120,10 +129,12 @@ export default function DistributorsScreen() {
                     <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.kiosks)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.memberships)}</td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${d.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-red-500/10 text-red-700 dark:text-red-300"}`}>{d.isActive ? "Active" : "Inactive"}</span></td>
-                    {canManageAgreementTerms && <td className="px-4 py-3 text-right">{organizationId && <DistributorAgreementDialog distributor={d} organizationId={organizationId} />}</td>}
-                    <td className="px-4 py-3 text-right">
-                      <DistributorViewMoreDialog distributor={d} />
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${d.agreementStatus === "ACTIVE" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : d.agreementStatus === "PENDING_APPROVAL" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-muted text-muted-foreground"}`}>
+                        {d.agreementStatus ? d.agreementStatus.replaceAll("_", " ") : "Not drafted"}
+                      </span>
                     </td>
+                    {canManageAgreementTerms && <td className="px-4 py-3 text-right">{organizationId && <DistributorAgreementDialog distributor={d} organizationId={organizationId} />}</td>}
                   </tr>
                 ))}
               </tbody>

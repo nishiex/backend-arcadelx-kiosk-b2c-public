@@ -1,5 +1,5 @@
 {
-  "database": "arcadelx_partner_orders_1791270301880",
+  "database": "arcadelx_partner_orders_1792413549489",
   "checks": [
     "Distributor Owner requests Company",
     "Distributor Admin requests Company",
@@ -13,8 +13,6 @@
     "PARTNER MANAGER cannot request",
     "PARTNER STAFF cannot request",
     "Pending Partner membership cannot request",
-    "Partner cannot request unrelated Company",
-    "Partner cannot request itself",
     "Invalid quantity 0 rejected",
     "Invalid quantity 51 rejected",
     "Invalid quantity 1.5 rejected",
