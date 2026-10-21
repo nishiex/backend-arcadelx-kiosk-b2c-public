@@ -54,6 +54,22 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Short-lived verification requests for phone ownership checks. The phone is
+// intentionally kept independent from User so registration can verify a
+// number before an account exists.
+model PhoneVerification {
+  id         String   @id @default(uuid())
+  phone      String   @db.VarChar(16)
+  otpHash    String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([phone, createdAt])
+}
+
 model PasswordReset {
   id     String @id @default(uuid())
   userId String

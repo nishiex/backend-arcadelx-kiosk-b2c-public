@@ -123,6 +123,20 @@ export const VerifyResetOtpSchema = z.object({
     .regex(/^\d{6}$/, "OTP must contain only numbers"),
 });
 
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^(?:\d{10}|\+[1-9]\d{7,14})$/, "Enter a valid phone number");
+
+export const SendPhoneOtpSchema = z.object({
+  phone: phoneSchema,
+});
+
+export const VerifyPhoneOtpSchema = z.object({
+  phone: phoneSchema,
+  otp: z.string().length(6, "OTP must be 6 digits").regex(/^\d{6}$/, "OTP must contain only numbers"),
+});
+
 export const CompletePasswordResetSchema = z
   .object({
     resetToken: z.string().min(1, "Reset token is required"),

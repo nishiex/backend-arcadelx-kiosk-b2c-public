@@ -21,6 +21,9 @@ const envSchema = z.object({
   MAIL_FROM_EMAIL: z.string().optional(),
   MAIL_FROM_NAME: z.string().optional(),
   FRONTEND_LOGIN_URL: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
 });
 
 const productionSchema = envSchema.extend({

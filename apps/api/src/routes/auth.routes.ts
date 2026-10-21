@@ -12,6 +12,7 @@ import {
   completeForgotPassword,
   retryOrganizationCredentials,
 } from "../controllers/auth.controller";
+import { sendPhoneOtp, verifyPhoneOtp } from "../controllers/phone-verification.controller";
 import {
   requireAuth,
   loadMembership,
@@ -41,6 +42,9 @@ router.post(
 router.post("/join", joinOrganization);
 
 router.post("/login", authRateLimiter, login);
+
+router.post("/phone/send-otp", authRateLimiter, sendPhoneOtp);
+router.post("/phone/verify-otp", authRateLimiter, verifyPhoneOtp);
 
 router.post("/refresh", refresh);
 // Existing refresh cookies are scoped here, so this path receives them too.
