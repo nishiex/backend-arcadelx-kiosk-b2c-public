@@ -117,12 +117,17 @@ export async function saveGateway(
 
 export async function toggleGateway(
   provider: string,
-  isActive: boolean
+  isActive: boolean,
+  totpCode?: string,
 ): Promise<unknown> {
   const res = await apiFetch("/api/admin/gateways/toggle", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider, is_active: isActive }),
+    body: JSON.stringify({
+      provider,
+      is_active: isActive,
+      ...(totpCode ? { totpCode } : {}),
+    }),
   })
   return handleRes<unknown>(res)
 }
@@ -138,11 +143,11 @@ export async function reorderGateways(
   return handleRes<unknown>(res)
 }
 
-export async function deleteGateway(provider: string): Promise<unknown> {
+export async function deleteGateway(provider: string, totpCode: string): Promise<unknown> {
   const res = await apiFetch("/api/admin/gateways", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider }),
+    body: JSON.stringify({ provider, totpCode }),
   })
   return handleRes<unknown>(res)
 }

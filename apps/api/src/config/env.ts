@@ -24,6 +24,9 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),
+  // Base32 secret provisioned in Google Authenticator for destructive gateway actions.
+  // Sensitive gateway mutations fail closed when this is not configured.
+  GATEWAY_TOTP_SECRET: z.string().trim().min(16).optional(),
 });
 
 const productionSchema = envSchema.extend({

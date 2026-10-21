@@ -260,8 +260,19 @@ export async function listGateways(): Promise<{ total: number; gateways: Gateway
   if (!parsed.success) {
     throw new ApiError(502, 'Mothership admin API returned an unexpected gateways payload');
   }
+  // Mothership is the source of truth. If a provider that was previously hidden by a
+  // local removal marker is active upstream again, reconcile the stale marker so an
+  // automatic refresh can show the provider immediately.
+  const reappearedProviders = parsed.data.gateways
+    .filter((gateway) => gateway.is_active && removedProviders.has(gateway.provider))
+    .map((gateway) => gateway.provider);
+  await Promise.all(reappearedProviders.map((provider) => unmarkGatewayRemoved(provider)));
+  for (const provider of reappearedProviders) removedProviders.delete(provider);
+
+  // Return disabled providers too: the dashboard needs them to display status and
+  // allow an Admin/Owner to enable them again.
   const gateways = parsed.data.gateways.filter(
-    (gateway) => gateway.is_active && !removedProviders.has(gateway.provider),
+    (gateway) => !removedProviders.has(gateway.provider),
   );
   return { total: gateways.length, gateways };
 }

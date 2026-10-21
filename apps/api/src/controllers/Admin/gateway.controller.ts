@@ -15,6 +15,17 @@ import {
   toggleGateway,
   upsertGateway,
 } from '../../services/Mothership/gateways.service';
+import { verifyTotpCode } from '../../utils/totp';
+
+function requireGatewayTotp(code: string | undefined): void {
+  const secret = process.env.GATEWAY_TOTP_SECRET;
+  if (!secret) {
+    throw new ApiError(503, 'Gateway TOTP verification is not configured');
+  }
+  if (!code || !verifyTotpCode(secret, code)) {
+    throw new ApiError(403, 'Invalid or expired gateway authentication code');
+  }
+}
 
 /**
  * Payment-gateway administration.
@@ -54,7 +65,13 @@ export const toggleGatewayState = asyncHandler(async (req: Request, res: Respons
   const parsed = ToggleGatewaySchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid toggle payload', parsed.error.issues);
 
-  const result = await toggleGateway(parsed.data);
+  if (!parsed.data.is_active) requireGatewayTotp(parsed.data.totpCode);
+
+  // Never forward the local TOTP code to Mothership.
+  const result = await toggleGateway({
+    provider: parsed.data.provider,
+    is_active: parsed.data.is_active,
+  });
   res
     .status(200)
     .json(new ApiResponse(200, result, `Gateway ${parsed.data.is_active ? 'enabled' : 'disabled'} successfully`));
@@ -63,6 +80,8 @@ export const toggleGatewayState = asyncHandler(async (req: Request, res: Respons
 export const removeGateway = asyncHandler(async (req: Request, res: Response) => {
   const parsed = DeleteGatewaySchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid delete payload', parsed.error.issues);
+
+  requireGatewayTotp(parsed.data.totpCode);
 
   const result = await deleteGateway(parsed.data);
   const message =

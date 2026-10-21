@@ -77,6 +77,12 @@ export const ToggleGatewaySchema = z
   .object({
     provider: z.string().min(1).max(64),
     is_active: z.boolean(),
+    /** Required by the API when disabling a provider; omitted when enabling. */
+    totpCode: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'TOTP code must be 6 digits')
+      .optional(),
   })
   .strict();
 
@@ -91,6 +97,10 @@ export type ToggleGatewayInput = z.infer<typeof ToggleGatewaySchema>;
 export const DeleteGatewaySchema = z
   .object({
     provider: z.string().min(1).max(64),
+    totpCode: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'TOTP code must be 6 digits'),
   })
   .strict();
 

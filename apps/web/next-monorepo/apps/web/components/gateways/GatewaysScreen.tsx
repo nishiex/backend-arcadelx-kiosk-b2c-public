@@ -19,6 +19,11 @@ const buttonClass =
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
+type SensitiveGatewayAction = {
+  kind: "disable" | "remove"
+  provider: string
+}
+
 /**
  * Payment gateway administration.
  *
@@ -31,6 +36,9 @@ export default function GatewaysScreen() {
   const { me, isLoading, isError, isCompany, role } = useMe()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const [securityAction, setSecurityAction] = useState<SensitiveGatewayAction | null>(null)
+  const [totpCode, setTotpCode] = useState("")
+  const [totpValidation, setTotpValidation] = useState("")
   const canManage = isCompany && (role === "OWNER" || role === "ADMIN")
   const scope = [me?.id ?? "", me?.membership?.organizationId ?? "", role ?? ""]
   const listKey = ["gateways", ...scope]
@@ -41,24 +49,35 @@ export default function GatewaysScreen() {
     enabled: canManage,
     staleTime: 30_000,
     // Gateway state changes outside this screen too, so keep it fairly fresh.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
     retry: 1,
   })
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gateways"] })
 
   const toggle = useMutation({
-    mutationFn: ({ provider, active }: { provider: string; active: boolean }) =>
-      toggleGateway(provider, active),
+    mutationFn: ({ provider, active, code }: { provider: string; active: boolean; code?: string }) =>
+      toggleGateway(provider, active, code),
     onSuccess: (_r, vars) => {
       toast.success(`${vars.provider} ${vars.active ? "enabled" : "disabled"}`)
+      if (securityAction?.kind === "disable" && securityAction.provider === vars.provider) {
+        setSecurityAction(null)
+        setTotpCode("")
+      }
       void invalidate()
     },
   })
 
   const remove = useMutation({
-    mutationFn: (provider: string) => deleteGateway(provider),
-    onSuccess: (_r, provider) => {
-      toast.success(`${provider} removed`)
+    mutationFn: ({ provider, code }: { provider: string; code: string }) =>
+      deleteGateway(provider, code),
+    onSuccess: (_r, vars) => {
+      toast.success(`${vars.provider} removed`)
+      if (securityAction?.kind === "remove" && securityAction.provider === vars.provider) {
+        setSecurityAction(null)
+        setTotpCode("")
+      }
       void invalidate()
     },
   })
@@ -81,6 +100,36 @@ export default function GatewaysScreen() {
   const rows = gateways.data?.gateways ?? []
   const sorted = [...rows].sort((a, b) => a.priority - b.priority)
   const busy = toggle.isPending || remove.isPending || reorder.isPending
+
+  function requestSensitiveAction(action: SensitiveGatewayAction) {
+    toggle.reset()
+    remove.reset()
+    setTotpValidation("")
+    setTotpCode("")
+    setSecurityAction(action)
+  }
+
+  function cancelSensitiveAction() {
+    if (toggle.isPending || remove.isPending) return
+    setSecurityAction(null)
+    setTotpCode("")
+    setTotpValidation("")
+  }
+
+  function submitSensitiveAction(event: React.FormEvent) {
+    event.preventDefault()
+    if (!securityAction || toggle.isPending || remove.isPending) return
+    if (!/^\d{6}$/.test(totpCode)) {
+      setTotpValidation("Enter the current 6-digit Google Authenticator code.")
+      return
+    }
+    setTotpValidation("")
+    if (securityAction.kind === "remove") {
+      remove.mutate({ provider: securityAction.provider, code: totpCode })
+    } else {
+      toggle.mutate({ provider: securityAction.provider, active: false, code: totpCode })
+    }
+  }
 
   function move(index: number, direction: -1 | 1) {
     if (busy) return
@@ -147,6 +196,53 @@ export default function GatewaysScreen() {
           </button>
         </div>
       </header>
+
+      {securityAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gateway-security-title"
+            onSubmit={submitSensitiveAction}
+            className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl"
+          >
+            <h2 id="gateway-security-title" className="text-lg font-semibold">
+              Confirm gateway {securityAction.kind}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Enter the current 6-digit code from Google Authenticator to {securityAction.kind} {securityAction.provider}.
+            </p>
+            <label htmlFor="gateway-totp-code" className="mt-4 block text-sm font-medium">
+              Authentication code
+            </label>
+            <input
+              id="gateway-totp-code"
+              className={`${inputClass} mt-1.5 font-mono tracking-[0.3em]`}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              pattern="[0-9]{6}"
+              autoFocus
+              value={totpCode}
+              disabled={toggle.isPending || remove.isPending}
+              onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+            {(totpValidation || toggle.isError || remove.isError) && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {totpValidation || toggle.error?.message || remove.error?.message}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={buttonClass} disabled={toggle.isPending || remove.isPending} onClick={cancelSensitiveAction}>
+                Cancel
+              </button>
+              <button type="submit" className={buttonClass} disabled={toggle.isPending || remove.isPending || totpCode.length !== 6}>
+                {toggle.isPending || remove.isPending ? "Verifying…" : `Confirm ${securityAction.kind}`}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {editing && (
         <Panel title="Add or update a provider">
@@ -257,10 +353,9 @@ export default function GatewaysScreen() {
                           className={buttonClass}
                           disabled={busy}
                           onClick={() =>
-                            toggle.mutate({
-                              provider: gateway.provider,
-                              active: !gateway.is_active,
-                            })
+                            gateway.is_active
+                              ? requestSensitiveAction({ kind: "disable", provider: gateway.provider })
+                              : toggle.mutate({ provider: gateway.provider, active: true })
                           }
                         >
                           {gateway.is_active ? "Disable" : "Enable"}
@@ -268,7 +363,7 @@ export default function GatewaysScreen() {
                         <HoldToRemoveButton
                           provider={gateway.provider}
                           disabled={busy}
-                          onRemove={() => remove.mutate(gateway.provider)}
+                          onRemove={() => requestSensitiveAction({ kind: "remove", provider: gateway.provider })}
                         />
                       </span>
                     </td>

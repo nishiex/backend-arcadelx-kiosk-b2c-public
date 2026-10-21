@@ -251,11 +251,13 @@ export const updateKioskStatus = asyncHandler(
 export const getInventorySummary = asyncHandler(
   async (req: Request, res: Response) => {
     const currentOrgId = req.membership!.organizationId;
+    const orgType = req.membership!.type;
 
-    // Group by status to generate the dashboard counters
+    // Company dashboards match the Kiosks page and cover the whole company fleet.
+    // Distributor/Partner dashboards remain scoped to their current inventory.
     const summary = await prisma.kiosk.groupBy({
       by: ["status"],
-      where: { currentOrgId },
+      where: orgType === "COMPANY" ? {} : { currentOrgId },
       _count: {
         status: true,
       },
