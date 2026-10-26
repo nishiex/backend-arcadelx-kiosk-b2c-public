@@ -4,9 +4,9 @@ import React from "react"
 import { useForm } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Building2, Lock, Loader2, AlertTriangle } from "lucide-react"
+import { User, Building2, Lock, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
-import { changePassword, logout, wipeLiveDatabase } from "@/lib/backend-api"
+import { changePassword, logout } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import { Panel, Skeleton } from "@/components/dashboard/ui"
@@ -30,8 +30,6 @@ export default function SettingsScreen() {
   const { me, isLoading, orgName, orgType, role } = useMe()
   const queryClient = useQueryClient()
   const ref = useReveal<HTMLDivElement>([isLoading])
-  const [showWipeConfirmation, setShowWipeConfirmation] = React.useState(false)
-  const [wipeConfirmation, setWipeConfirmation] = React.useState("")
 
   const {
     register,
@@ -61,19 +59,6 @@ export default function SettingsScreen() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't update password"),
   })
-
-  const wipeMutation = useMutation({
-    mutationFn: () => wipeLiveDatabase(wipeConfirmation),
-    onSuccess: () => {
-      queryClient.clear()
-      toast.success("Live database wiped. You have been signed out.")
-      window.setTimeout(() => window.location.replace("/login"), 800)
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Couldn't wipe the live database"),
-  })
-
-  const canWipeDatabase = orgType === "COMPANY" && role === "OWNER"
 
   return (
     <div ref={ref} className="mx-auto max-w-3xl space-y-6">
@@ -114,70 +99,6 @@ export default function SettingsScreen() {
           )}
         </Panel>
       </div>
-
-      {canWipeDatabase && (
-        <div data-reveal>
-          <Panel
-            title={<span className="inline-flex items-center gap-2 text-destructive"><AlertTriangle size={16} /> Danger zone</span>}
-            subtitle="This permanently removes all live application data. It cannot be undone."
-          >
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">Wipe live database</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Users, kiosks, orders, revenue, sessions, and organization records will be deleted.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowWipeConfirmation(true)}
-                  disabled={wipeMutation.isPending || isLoading}
-                  className="rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Wipe database
-                </button>
-              </div>
-
-              {showWipeConfirmation && (
-                <div role="alertdialog" aria-modal="true" aria-label="Confirm live database wipe" className="mt-4 border-t border-destructive/20 pt-4">
-                  <label htmlFor="wipe-live-database" className="block text-sm font-medium">
-                    Type <span className="font-mono">WIPE LIVE DATABASE</span> to continue
-                  </label>
-                  <input
-                    id="wipe-live-database"
-                    value={wipeConfirmation}
-                    onChange={(event) => setWipeConfirmation(event.target.value)}
-                    autoComplete="off"
-                    className={cn(inputCls, "mt-2 border-destructive/40")}
-                  />
-                  <div className="mt-3 flex flex-wrap justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowWipeConfirmation(false)
-                        setWipeConfirmation("")
-                        wipeMutation.reset()
-                      }}
-                      disabled={wipeMutation.isPending}
-                      className="rounded-lg border border-input px-4 py-2 text-sm font-medium disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => wipeMutation.mutate()}
-                      disabled={wipeConfirmation !== "WIPE LIVE DATABASE" || wipeMutation.isPending}
-                      className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {wipeMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-                      Permanently wipe data
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Panel>
-        </div>
-      )}
 
       <div data-reveal>
         <Panel
