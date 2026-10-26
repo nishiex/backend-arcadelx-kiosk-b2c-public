@@ -30,9 +30,11 @@ const envSchema = z.object({
   BUSINESS_TIMEZONE: z.string().default('Asia/Kolkata'),
   EOD_PRICE_JOBS_ENABLED: z.enum(['true', 'false']).default('false'),
   MOTHERSHIP_ANALYTICS_SUMMARY_URL: z.string().url().default('https://main.arcadelx.games/api/v1/analytics/summary'),
+  LOCAL_DATABASE_WIPE_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 const productionSchema = envSchema.extend({
+  LOCAL_DATABASE_WIPE_ENABLED: z.literal('false').default('false'),
   INVOICES_DIR: z.string().refine(path.isAbsolute, 'Use an absolute path on persistent storage'),
   MAILJET_API_KEY: z.string().min(1),
   MAILJET_SECRET_KEY: z.string().min(1),

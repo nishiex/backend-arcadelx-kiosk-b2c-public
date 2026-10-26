@@ -227,6 +227,15 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return sessionApiFetch(input, init);
 }
 
+export async function wipeLocalDatabase(confirmation: string): Promise<{ tablesCleared: number }> {
+  const res = await apiFetch('/api/admin/database/wipe-local', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmation }),
+  });
+  return handleRes<{ tablesCleared: number }>(res);
+}
+
 export async function fetchInventorySummary(): Promise<InventorySummaryResponse> {
   const res = await apiFetch('/api/kiosks/summary', { credentials: 'include' });
   return handleRes<InventorySummaryResponse>(res);
