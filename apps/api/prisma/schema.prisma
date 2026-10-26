@@ -49,6 +49,7 @@ model User {
 
   devicePriceRequests   DevicePriceRequest[] @relation("DevicePriceRequestRequester")
   reviewedPriceRequests DevicePriceRequest[] @relation("DevicePriceRequestReviewer")
+  eodDevicePriceUpdates EodDevicePriceUpdate[] @relation("EodDevicePriceUpdateCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -155,6 +156,28 @@ model Membership {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
+}
+
+model AuditLog {
+  id                  String   @id @default(uuid())
+  actorUserId         String?
+  actorOrganizationId String?
+  actorName           String
+  actorOrgType        OrgType?
+  actorOrgName        String?
+  action              String   @db.VarChar(64)
+  entity              String   @db.VarChar(64)
+  reference           String?
+  detail              String?  @db.Text
+  method              String   @db.VarChar(10)
+  path                String   @db.VarChar(500)
+  statusCode          Int
+  status              String   @db.VarChar(16)
+  createdAt           DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorOrganizationId, createdAt])
+  @@index([entity, action, createdAt])
 }
 
 // Mothership currently supports disabling gateways but not deleting them. This
@@ -358,12 +381,18 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  RAZORPAY
+  CASH
+}
+
 model Order {
   id            String        @id @default(uuid())
   orderNumber   String        @unique // e.g., ORD-2026-0001
   type          OrderType
   status        OrderStatus   @default(UNDER_REVIEW)
   paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod?
 
   parentOrgId String
   childOrgId  String
@@ -374,13 +403,22 @@ model Order {
   depositPerMachine       Float
   nonRefundablePerMachine Float
 
+  // For current orders this is the gross collection, including the fee and GST;
+  // legacy rows may retain the former refundable-deposit meaning.
   totalDeposit       Float
   totalNonRefundable Float // Without tax
-  taxAmount          Float // 18% GST on the totalNonRefundable
-  grandTotal         Float // totalDeposit + totalNonRefundable + taxAmount
+  taxAmount          Float // GST on the totalDeposit (gross collection)
+  // Current orders equal totalDeposit; legacy rows retain the additive total.
+  grandTotal         Float
 
   invoiceUrl      String? // Path to the VPS file
   invoiceFilename String?
+
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?   @unique
+  razorpaySignature String?
+  paidAt            DateTime?
+  cashPaymentRequestedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -435,6 +473,39 @@ enum DevicePriceRequestStatus {
   PROCESSING
   APPROVED
   REJECTED
+}
+
+enum EodDevicePriceStatus {
+  PENDING
+  PROCESSING
+  APPLIED
+  FAILED
+}
+
+model EodDevicePriceUpdate {
+  id                    String              @id @default(uuid())
+  deviceId              String
+  gameId                String
+  displayName           String
+  businessDate          DateTime            @db.Date
+  price                 Decimal             @db.Decimal(10, 2)
+  replayPrice           Decimal             @db.Decimal(10, 2)
+  status                EodDevicePriceStatus @default(PENDING)
+  attempts              Int                 @default(0)
+  processingAt          DateTime?
+  appliedAt             DateTime?
+  verifiedPrice         Decimal?            @db.Decimal(10, 2)
+  verifiedReplayPrice   Decimal?            @db.Decimal(10, 2)
+  lastError             String?             @db.Text
+  createdById           String
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  createdBy User @relation("EodDevicePriceUpdateCreator", fields: [createdById], references: [id])
+
+  @@unique([deviceId, gameId, businessDate])
+  @@index([status, businessDate])
+  @@index([deviceId, gameId, status])
 }
 
 model DevicePriceRequest {

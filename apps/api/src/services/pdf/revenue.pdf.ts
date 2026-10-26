@@ -65,7 +65,6 @@ export const generateRevenueStatement = (config: ReportConfig): Promise<string> 
     doc.fontSize(9).font('Helvetica-Bold');
     doc.text('MachineCode', colX, startY); colX += 95;
     doc.text('Gross Rev', colX, startY); colX += 75;
-    doc.text(`${config.gstRate}% GST`, colX, startY); colX += 65;
     doc.text(`PG Fee (${config.pgRate}%)`, colX, startY); colX += 75;
     doc.text('Net Rev', colX, startY); colX += 75;
 
@@ -100,7 +99,6 @@ export const generateRevenueStatement = (config: ReportConfig): Promise<string> 
       colX = 30;
       doc.text(row.machineCode, colX, currentY); colX += 95;
       doc.text(`Rs. ${row.gross.toFixed(2)}`, colX, currentY); colX += 75;
-      doc.text(`Rs. ${row.gst.toFixed(2)}`, colX, currentY); colX += 65;
       doc.text(`Rs. ${row.pgFee.toFixed(2)}`, colX, currentY); colX += 75;
       doc.text(`Rs. ${row.net.toFixed(2)}`, colX, currentY); colX += 75;
 

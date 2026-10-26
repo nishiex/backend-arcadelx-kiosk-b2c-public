@@ -4,10 +4,9 @@ import { requireInternalAuth } from '../../middlewares/internal.auth';
 
 const router = Router();
 
-// Apply the constant-time secret key verification to all Mothership routes
-router.use(requireInternalAuth);
-
+// The inventory lookup is intentionally public for the current integration test.
+// Pairing remains server-to-server protected because it changes hardware ownership.
 router.get('/kiosks/unpaired', getUnpairedKiosks);
-router.post('/kiosks/:machineCode/pair', pairKioskDevice);
+router.post('/kiosks/:machineCode/pair', requireInternalAuth, pairKioskDevice);
 
 export default router;

@@ -12,13 +12,24 @@
 -- value cannot be *used* in the same transaction. The statements below only add the
 -- value; the new table uses the separate ReturnRequestStatus enum, so nothing here
 -- references RETURN_REQUESTED in this transaction.
-ALTER TYPE "KioskStatus" ADD VALUE 'RETURN_REQUESTED';
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'KioskStatus' AND e.enumlabel = 'RETURN_REQUESTED'
+  ) THEN
+    ALTER TYPE "KioskStatus" ADD VALUE 'RETURN_REQUESTED';
+  END IF;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ReturnRequestStatus" AS ENUM ('PENDING', 'APPROVED');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ReturnRequestStatus') THEN
+    CREATE TYPE "ReturnRequestStatus" AS ENUM ('PENDING', 'APPROVED');
+  END IF;
+END $$;
 
 -- CreateTable
-CREATE TABLE "KioskReturnRequest" (
+CREATE TABLE IF NOT EXISTS "KioskReturnRequest" (
     "id" TEXT NOT NULL,
     "kioskId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -31,13 +42,25 @@ CREATE TABLE "KioskReturnRequest" (
 );
 
 -- CreateIndex
-CREATE INDEX "KioskReturnRequest_kioskId_status_idx" ON "KioskReturnRequest"("kioskId", "status");
+CREATE INDEX IF NOT EXISTS "KioskReturnRequest_kioskId_status_idx" ON "KioskReturnRequest"("kioskId", "status");
 
 -- AddForeignKey
-ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_kioskId_fkey" FOREIGN KEY ("kioskId") REFERENCES "Kiosk"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'KioskReturnRequest_kioskId_fkey') THEN
+    ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_kioskId_fkey" FOREIGN KEY ("kioskId") REFERENCES "Kiosk"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'KioskReturnRequest_organizationId_fkey') THEN
+    ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'KioskReturnRequest_requestedById_fkey') THEN
+    ALTER TABLE "KioskReturnRequest" ADD CONSTRAINT "KioskReturnRequest_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;

@@ -1,16 +1,106 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import React from "react"
+import * as Dialog from "@radix-ui/react-dialog"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Building2, RefreshCw, UsersRound } from "lucide-react"
+import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
-import { fetchDistributors, fetchPartners } from "@/lib/backend-api"
+import { assignKiosks, fetchDistributors, fetchKiosks, fetchPartners } from "@/lib/backend-api"
 import AddPartnerForm from "./AddPartnerForm"
+import PartnerAgreementDialog from "./PartnerAgreementDialog"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 
 const buttonClass = "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
 
+function SendKiosksDialog({ partner }: { partner: { id: string; name: string; agreementStatus?: string | null } }) {
+  const { me } = useMe()
+  const queryClient = useQueryClient()
+  const [open, setOpen] = React.useState(false)
+  const [selected, setSelected] = React.useState<string[]>([])
+  const organizationId = me?.membership?.organizationId
+  const kiosks = useQuery({
+    queryKey: ["partner-transfer-kiosks", organizationId],
+    queryFn: fetchKiosks,
+    enabled: open && !!organizationId,
+    staleTime: 0,
+  })
+  const transfer = useMutation({
+    mutationFn: () => assignKiosks({ organizationId: partner.id, kioskIds: selected }),
+    onSuccess: () => {
+      toast.success(`Kiosk${selected.length === 1 ? "" : "s"} sent to ${partner.name}`)
+      setSelected([])
+      setOpen(false)
+      void queryClient.invalidateQueries({ queryKey: ["partners", organizationId] })
+      void queryClient.invalidateQueries({ queryKey: ["kiosks"] })
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  const available = (kiosks.data ?? []).filter(kiosk =>
+    kiosk.currentOrgId === organizationId &&
+    ["AVAILABLE", "RETURNED", "MAINTENANCE"].includes(kiosk.status),
+  )
+  const canSendKiosks = partner.agreementStatus === "ACTIVE"
+
+  function change(next: boolean) {
+    if (next) {
+      setSelected([])
+      kiosks.refetch()
+    }
+    setOpen(next)
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={change}>
+      <Dialog.Trigger asChild>
+        <button type="button" className={buttonClass} disabled={!organizationId}>
+          Send kiosks
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl sm:p-6">
+          <Dialog.Title className="text-xl font-semibold">Send kiosks to {partner.name}</Dialog.Title>
+          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+            Select available kiosks from your Distributor inventory to transfer to this Partner.
+          </Dialog.Description>
+          <div className="mt-5 space-y-3">
+            {kiosks.isLoading ? (
+              <p role="status" className="text-sm text-muted-foreground">Loading available kiosks…</p>
+            ) : kiosks.isError ? (
+              <p role="alert" className="text-sm text-destructive">Couldn’t load your available kiosks. Close and try again.</p>
+            ) : !available.length ? (
+              <p className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">No available kiosks are currently in your inventory.</p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+                {available.map(kiosk => {
+                  const checked = selected.includes(kiosk.id)
+                  return (
+                    <label key={kiosk.id} className={`flex cursor-pointer items-center gap-3 border-b border-border px-3 py-3 last:border-0 ${checked ? "bg-primary/5" : ""}`}>
+                      <input type="checkbox" aria-label={`Select ${kiosk.machineCode}`} checked={checked} onChange={() => setSelected(ids => checked ? ids.filter(id => id !== kiosk.id) : [...ids, kiosk.id])} />
+                      <span className="font-mono text-sm font-medium">{kiosk.machineCode}</span>
+                      <span className="text-sm text-muted-foreground">{kiosk.model ?? "Unknown model"} · {kiosk.status.replaceAll("_", " ")}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Dialog.Close asChild><button type="button" className={buttonClass} disabled={transfer.isPending}>Cancel</button></Dialog.Close>
+            {!canSendKiosks && <p className="mr-auto text-xs text-amber-700 dark:text-amber-300">Approve the Partner agreement before sending kiosks.</p>}
+            <button type="button" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50" disabled={!selected.length || transfer.isPending || !canSendKiosks} onClick={() => transfer.mutate()}>
+              {transfer.isPending ? "Sending…" : `Send${selected.length ? ` (${selected.length})` : ""}`}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
 export default function PartnersScreen() {
-  const { canViewPartners, canRegisterPartners, canManageDistributors, isCompany, isLoading, me } = useMe()
+  const { canViewPartners, canRegisterPartners, canManageDistributors, canManageAgreements, isCompany, isMasterAdmin, isLoading, me } = useMe()
   const organizationId = me?.membership?.organizationId
   const partners = useQuery({
     queryKey: ["partners", organizationId],
@@ -39,8 +129,11 @@ export default function PartnersScreen() {
       agreementStatus: null,
     })),
   )
+  const directCompanyRows = isCompany
+    ? (partners.data ?? []).map(partner => ({ ...partner, distributorName: null }))
+    : []
   const rows = isCompany
-    ? companyRows
+    ? [...directCompanyRows, ...companyRows.filter(row => !directCompanyRows.some(direct => direct.id === row.id))]
     : (partners.data ?? []).map(partner => ({
         ...partner,
         distributorName: null,
@@ -85,6 +178,7 @@ export default function PartnersScreen() {
                   <th className="px-3 py-3 font-medium">Owner</th>
                   <th className="px-3 py-3 font-medium">Location</th>
                   <th className="px-3 py-3 font-medium">Agreement</th>
+                  {(isMasterAdmin || !isCompany) && <th className="px-3 py-3 text-right font-medium">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -95,6 +189,7 @@ export default function PartnersScreen() {
                     <td className="px-3 py-3">{partner.owner?.email ?? "—"}</td>
                     <td className="px-3 py-3 text-muted-foreground">{[partner.city, partner.state].filter(Boolean).join(", ") || "—"}</td>
                     <td className="px-3 py-3 text-muted-foreground">{partner.agreementStatus?.replaceAll("_", " ") ?? "Not created"}</td>
+                    {(isMasterAdmin || !isCompany) && <td className="px-3 py-3 text-right"><div className="flex flex-wrap justify-end gap-2">{canManageAgreements && organizationId && <PartnerAgreementDialog partner={partner} organizationId={organizationId} />}{!isCompany && <SendKiosksDialog partner={partner} />}</div></td>}
                   </tr>
                 ))}
               </tbody>

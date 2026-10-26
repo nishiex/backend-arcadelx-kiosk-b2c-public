@@ -9,11 +9,13 @@ import {
   getDevices,
   getPricesForDevice,
   resetPricesForDevice,
+  resetPricesForAllDevices,
   updateDeviceGamePrice,
   getDevicePriceRequests,
   approveDevicePriceRequest,
   rejectDevicePriceRequest,
 } from '../../controllers/Admin/device.controller';
+import { getUnpairedKiosks, pairKioskDevice } from '../../controllers/Internal/internal.controller';
 
 /**
  * Device fleet and game pricing, proxied to Mothership.
@@ -33,10 +35,16 @@ const router = Router();
 
 router.use(requireAuth, loadMembership);
 
-// Company master-admin approval queue for Distributor/Partner price requests.
-router.get('/price-requests', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
-router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
-router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
+// Company Owners may pair a business kiosk from the dashboard without exposing
+// the server-to-server internal API secret to the browser.
+router.get('/unpaired-kiosks', requireOrgType('COMPANY'), requireRole('OWNER'), getUnpairedKiosks);
+router.post('/kiosks/:machineCode/pair', requireOrgType('COMPANY'), requireRole('OWNER'), pairKioskDevice);
+
+// Company admins review Distributor requests; Distributor admins review requests from
+// their connected Partners. Partners never receive an approval action.
+router.get('/price-requests', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
+router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
+router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
 
 // The fleet as Mothership reports it (online state, last seen, location).
 router.get(
@@ -56,6 +64,13 @@ router.get(
 
 // Reset price overrides for this device only. It does not change catalog prices or other
 // devices, and is restricted to the same Company OWNER/ADMIN roles as price writes.
+router.post(
+  '/prices/reset-all',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  resetPricesForAllDevices,
+);
+
 router.post(
   '/:deviceId/prices/reset',
   requireOrgType('COMPANY'),

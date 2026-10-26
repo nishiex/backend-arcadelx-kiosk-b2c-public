@@ -28,25 +28,27 @@ type SensitiveGatewayAction = {
  * Payment gateway administration.
  *
  * This manages the live routing order for the payment provider, so the screen is
- * deliberately narrow: COMPANY OWNER/ADMIN only, matching the API route. Every
- * mutation refetches rather than assuming the new local order, because the order is
- * owned by Mothership and a failed write must not look applied.
+ * Company OWNER is the Master Admin and may mutate live gateway routing. Company ADMIN
+ * can inspect the configuration but cannot edit provider payloads or routing. Every
+ * mutation refetches rather than assuming the new order, because the order is owned by
+ * Mothership and a failed write must not look applied.
  */
 export default function GatewaysScreen() {
-  const { me, isLoading, isError, isCompany, role } = useMe()
+  const { me, isLoading, isError, isCompany, isMasterAdmin, role } = useMe()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [securityAction, setSecurityAction] = useState<SensitiveGatewayAction | null>(null)
   const [totpCode, setTotpCode] = useState("")
   const [totpValidation, setTotpValidation] = useState("")
-  const canManage = isCompany && (role === "OWNER" || role === "ADMIN")
+  const canView = isCompany && (role === "OWNER" || role === "ADMIN")
+  const canEdit = isMasterAdmin
   const scope = [me?.id ?? "", me?.membership?.organizationId ?? "", role ?? ""]
   const listKey = ["gateways", ...scope]
 
   const gateways = useQuery({
     queryKey: listKey,
     queryFn: fetchGateways,
-    enabled: canManage,
+    enabled: canView,
     staleTime: 30_000,
     // Gateway state changes outside this screen too, so keep it fairly fresh.
     refetchInterval: 30_000,
@@ -67,6 +69,9 @@ export default function GatewaysScreen() {
       }
       void invalidate()
     },
+    onError: (error, vars) => {
+      toast.error(`Could not ${vars.active ? "enable" : "disable"} ${vars.provider}: ${error.message}`)
+    },
   })
 
   const remove = useMutation({
@@ -79,6 +84,9 @@ export default function GatewaysScreen() {
         setTotpCode("")
       }
       void invalidate()
+    },
+    onError: (error, vars) => {
+      toast.error(`Could not remove ${vars.provider}: ${error.message}`)
     },
   })
 
@@ -132,7 +140,7 @@ export default function GatewaysScreen() {
   }
 
   function move(index: number, direction: -1 | 1) {
-    if (busy) return
+    if (!canEdit || busy) return
     const next = [...sorted]
     const target = index + direction
     if (target < 0 || target >= next.length) return
@@ -159,7 +167,7 @@ export default function GatewaysScreen() {
       <ErrorState message="Unable to verify your access. Refresh the page to try again." />
     )
   }
-  if (!canManage) {
+  if (!canView) {
     return (
       <EmptyState message="Payment gateways are managed by the Company Owner or Admin." />
     )
@@ -176,7 +184,7 @@ export default function GatewaysScreen() {
           </p>
         </div>
         <div className="flex gap-2">
-          {canManage && !editing && (
+          {canEdit && !editing && (
             <button className={buttonClass} onClick={() => setEditing(true)}>
               Add provider
             </button>
@@ -244,7 +252,7 @@ export default function GatewaysScreen() {
         </div>
       )}
 
-      {editing && (
+      {editing && canEdit && (
         <Panel title="Add or update a provider">
           <GatewayEditor
             key={scope.join(":")}
@@ -310,7 +318,7 @@ export default function GatewaysScreen() {
                         <button
                           className="rounded border border-border p-1 hover:bg-muted disabled:opacity-40"
                           aria-label={`Move ${gateway.provider} up`}
-                          disabled={busy || index === 0}
+                          disabled={!canEdit || busy || index === 0}
                           onClick={() => move(index, -1)}
                         >
                           <ArrowUp size={14} />
@@ -318,7 +326,7 @@ export default function GatewaysScreen() {
                         <button
                           className="rounded border border-border p-1 hover:bg-muted disabled:opacity-40"
                           aria-label={`Move ${gateway.provider} down`}
-                          disabled={busy || index === sorted.length - 1}
+                          disabled={!canEdit || busy || index === sorted.length - 1}
                           onClick={() => move(index, 1)}
                         >
                           <ArrowDown size={14} />
@@ -348,24 +356,28 @@ export default function GatewaysScreen() {
                       )}
                     </td>
                     <td className="px-4 py-3.5 align-middle">
-                      <span className="flex flex-wrap items-center gap-3">
-                        <button
-                          className={buttonClass}
-                          disabled={busy}
-                          onClick={() =>
-                            gateway.is_active
-                              ? requestSensitiveAction({ kind: "disable", provider: gateway.provider })
-                              : toggle.mutate({ provider: gateway.provider, active: true })
-                          }
-                        >
-                          {gateway.is_active ? "Disable" : "Enable"}
-                        </button>
-                        <HoldToRemoveButton
-                          provider={gateway.provider}
-                          disabled={busy}
-                          onRemove={() => requestSensitiveAction({ kind: "remove", provider: gateway.provider })}
-                        />
-                      </span>
+                      {canEdit ? (
+                        <span className="flex flex-wrap items-center gap-3">
+                          <button
+                            className={buttonClass}
+                            disabled={busy}
+                            onClick={() =>
+                              gateway.is_active
+                                ? requestSensitiveAction({ kind: "disable", provider: gateway.provider })
+                                : toggle.mutate({ provider: gateway.provider, active: true })
+                            }
+                          >
+                            {gateway.is_active ? "Disable" : "Enable"}
+                          </button>
+                          <HoldToRemoveButton
+                            provider={gateway.provider}
+                            disabled={busy}
+                            onRemove={() => requestSensitiveAction({ kind: "remove", provider: gateway.provider })}
+                          />
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Master Admin only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

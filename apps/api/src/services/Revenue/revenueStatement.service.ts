@@ -42,9 +42,7 @@ export async function processRevenueStatement(
       const settings = await tx.systemSettings.findUnique({
         where: { id: "default" },
       });
-      const gstRate = new Prisma.Decimal(settings?.gstPercentage ?? 18).div(
-        100,
-      );
+      const gstRate = new Prisma.Decimal(0);
       const pgRate = new Prisma.Decimal(settings?.pgFeePercentage ?? 2.5).div(
         100,
       );

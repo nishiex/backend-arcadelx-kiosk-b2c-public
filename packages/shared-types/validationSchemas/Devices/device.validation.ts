@@ -115,6 +115,14 @@ export const ResetDevicePricesResultSchema = z.object({
 
 export type ResetDevicePricesResult = z.infer<typeof ResetDevicePricesResultSchema>;
 
+export const ResetAllDevicePricesResultSchema = z.object({
+  devicesReset: z.number().int().nonnegative(),
+  gamesReset: z.number().int().nonnegative(),
+  scope: z.literal('ALL_DEVICE_OVERRIDES'),
+});
+
+export type ResetAllDevicePricesResult = z.infer<typeof ResetAllDevicePricesResultSchema>;
+
 /** Result returned only after verifying the requested override and unchanged other devices. */
 export const SetDeviceGamePriceResultSchema = z.object({
   deviceId: z.string(),

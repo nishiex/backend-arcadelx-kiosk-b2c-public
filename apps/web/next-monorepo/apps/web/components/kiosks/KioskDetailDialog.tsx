@@ -4,7 +4,9 @@ import React from "react"
 import * as RadixDialog from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 import type { Kiosk } from "@/lib/backend-api"
+import { useMe } from "@/hooks/useMe"
 import { StatusBadge } from "@/components/dashboard/ui"
+import MothershipPairingPanel from "@/components/devices/MothershipPairingPanel"
 
 /**
  * Read-only machine details.
@@ -33,11 +35,13 @@ export default function KioskDetailDialog({
   onOpenChange: (v: boolean) => void
   canEdit?: boolean
 }) {
+  const { isMasterAdmin } = useMe()
+
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-        <RadixDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-xl">
+        <RadixDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-xl">
           {kiosk && (
             <>
               <div className="mb-4 flex items-start justify-between">
@@ -77,6 +81,12 @@ export default function KioskDetailDialog({
                 hardware is paired, and changes as orders are reserved, dispatched and
                 delivered. It cannot be edited here.
               </p>
+
+              {isMasterAdmin && (
+                <div className="mt-5">
+                  <MothershipPairingPanel />
+                </div>
+              )}
             </>
           )}
         </RadixDialog.Content>

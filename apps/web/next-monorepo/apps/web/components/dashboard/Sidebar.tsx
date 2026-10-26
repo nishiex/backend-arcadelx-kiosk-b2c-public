@@ -46,8 +46,6 @@ type NavItem = {
 type NavEntry = { kind: "link"; item: NavItem } | { kind: "network" }
 
 // Only destinations backed by a live API on this deployment are listed.
-// (Settlements, Payments, Reports, Support, Roles and Audit
-// Logs are hidden until their endpoints exist.)
 const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Overview", href: "/", icon: LayoutGrid } },
   { kind: "link", item: { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone } },
@@ -68,19 +66,22 @@ const NAV: NavEntry[] = [
     },
   },
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
-  { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.isMasterAdmin && p.me?.membership?.status === "ACTIVE" } },
+  { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;
   // it is intentionally not a second tab on the Requests page.
   { kind: "network" },
   { kind: "link", item: { name: "Users", href: "/user", icon: UserCog, show: (p) => p.canManageMembers } },
+  { kind: "link", item: { name: "Audit Logs", href: "/audit-logs", icon: ScrollText, show: (p) => p.canManageMembers } },
   { kind: "link", item: { name: "Settings", href: "/settings", icon: Settings } },
 ]
 
 const NETWORK_CHILDREN: NavItem[] = [
   { name: "Networks", href: "/requests", icon: Share2, show: (p) => p.canReviewRequests },
-  { name: "Agreements", href: "/agreements", icon: ScrollText, show: (p) => p.canManageDistributors && p.canReviewRequests },
+  // Active Owners/Admins of every organization type, including Partners, must
+  // be able to review incoming financial agreements.
+  { name: "Agreements", href: "/agreements", icon: ScrollText, show: (p) => p.canReviewRequests },
   { name: "Partners", href: "/partners", icon: UsersRound, show: (p) => p.canViewPartners || p.canManageDistributors },
 ]
 

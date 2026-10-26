@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, X } from "lucide-react"
@@ -10,12 +9,10 @@ import { cn } from "@workspace/ui/lib/utils"
 import {
   createAgreement,
   fetchAgreementsForChild,
-  fetchOrganizationConnections,
-  initiateConnection,
   terminateAgreement,
+  updateAgreement,
   type Agreement,
   type Distributor,
-  type NetworkConnection,
 } from "@/lib/backend-api"
 import { orderDate, orderMoney } from "@/components/orders/order-display"
 
@@ -39,24 +36,6 @@ const AGREEMENT_STATUS_STYLES: Record<Agreement["status"], string> = {
 /** Prisma Decimal arrives as a string; Ints arrive as numbers. */
 const toNumber = (value: number | string | null | undefined) =>
   typeof value === "number" ? value : Number(value ?? NaN)
-
-/**
- * Whether terms can be drafted: the connection must be ACTIVE *and* initiated by
- * this organization, because the API rejects parents that are not the initiator.
- * A later page can hold the current link, so the last matching row wins.
- */
-function activeConnection(connections: NetworkConnection[], distributorId: string, organizationId: string) {
-  return connections
-    .filter(row => row.receiverOrgId === distributorId && row.initiatorOrgId === organizationId && row.status === "ACTIVE")
-    .pop()
-}
-
-/** The latest Company-initiated network request for this distributor, whatever its status. */
-function organizationConnection(connections: NetworkConnection[], distributorId: string, organizationId: string) {
-  return connections
-    .filter(row => row.receiverOrgId === distributorId && row.initiatorOrgId === organizationId)
-    .pop()
-}
 
 /** The newest agreement still occupying the distributor's open slot, if any. */
 function currentAgreement(agreements: Agreement[]) {
@@ -112,26 +91,19 @@ export default function DistributorAgreementDialog({
   const [depositAmount, setDepositAmount] = React.useState("")
   const [nonRefundableAmount, setNonRefundableAmount] = React.useState("")
   const [formError, setFormError] = React.useState<string | null>(null)
+  const [editing, setEditing] = React.useState(false)
   const queryClient = useQueryClient()
 
-  const connections = useQuery({
-    queryKey: ["network-connections", organizationId],
-    queryFn: ({ signal }) => fetchOrganizationConnections(signal),
-    enabled: open,
-  })
   const agreements = useQuery({
     queryKey: ["child-agreements", organizationId, distributor.id],
     queryFn: ({ signal }) => fetchAgreementsForChild(distributor.id, signal),
     enabled: open,
   })
 
-  const connectionRequest = organizationConnection(connections.data ?? [], distributor.id, organizationId)
-  const connection = activeConnection(connections.data ?? [], distributor.id, organizationId)
   const current = currentAgreement(agreements.data ?? [])
 
   const refresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["network-connections"] }),
       queryClient.invalidateQueries({ queryKey: ["child-agreements"] }),
       queryClient.invalidateQueries({ queryKey: ["review-requests"] }),
       queryClient.invalidateQueries({ queryKey: ["networkRequests"] }),
@@ -150,29 +122,41 @@ export default function DistributorAgreementDialog({
     },
     onError: (error: Error) => toast.error(error.message),
   })
-  const sendConnectionRequest = useMutation({
-    mutationFn: () => {
-      const email = distributor.owner?.email
-      if (!email) throw new Error("This distributor does not have an owner email yet.")
-      return initiateConnection(email)
-    },
-    onSuccess: async () => {
-      toast.success("Connection request sent")
-      await refresh()
-    },
-    onError: (error: Error) => toast.error(error.message),
-  })
   const terminate = useMutation({
     mutationFn: () => terminateAgreement(current!.id),
     onSuccess: async () => { toast.success("Agreement terminated"); await refresh() },
     onError: (error: Error) => toast.error(error.message),
   })
+  const update = useMutation({
+    mutationFn: () => updateAgreement(current!.id, {
+      parentSharePct: Number(parentSharePct),
+      childSharePct: Number(childSharePct),
+      depositAmountPerMachine: Number(depositAmount),
+      nonRefundableAmountPerMachine: Number(nonRefundableAmount),
+    }),
+    onSuccess: async (result) => {
+      toast.success(result.cascadedAgreements
+        ? `Agreement updated; ${result.cascadedAgreements} partner agreement(s) synced`
+        : "Agreement updated")
+      setEditing(false)
+      await refresh()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
 
-  const busy = draft.isPending || sendConnectionRequest.isPending || terminate.isPending
+  const busy = draft.isPending || terminate.isPending || update.isPending
+
+  React.useEffect(() => {
+    if (!open || !current) return
+    setParentSharePct(String(toNumber(current.parentSharePct)))
+    setChildSharePct(String(toNumber(current.childSharePct)))
+    setDepositAmount(String(toNumber(current.depositAmountPerMachine)))
+    setNonRefundableAmount(String(toNumber(current.nonRefundableAmountPerMachine)))
+  }, [open, current?.id])
 
   const submitTerms = (event: React.FormEvent) => {
     event.preventDefault()
-    if (busy || !connection) return
+    if (busy) return
     const [parentShare, childShare] = [Number(parentSharePct), Number(childSharePct)]
     const deposit = Number(depositAmount)
     const nonRefundable = Number(nonRefundableAmount)
@@ -191,7 +175,6 @@ export default function DistributorAgreementDialog({
     setFormError(null)
     draft.mutate({
       childOrgId: distributor.id,
-      networkConnectionId: connection.id,
       parentSharePct: parentShare,
       childSharePct: childShare,
       depositAmountPerMachine: deposit,
@@ -199,7 +182,29 @@ export default function DistributorAgreementDialog({
     })
   }
 
-  const showForm = Boolean(connection) && !current
+  const submitUpdate = (event: React.FormEvent) => {
+    event.preventDefault()
+    if (busy || !current) return
+    const [parentShare, childShare] = [Number(parentSharePct), Number(childSharePct)]
+    const deposit = Number(depositAmount)
+    const nonRefundable = Number(nonRefundableAmount)
+    if ([parentShare, childShare].some(share => !Number.isInteger(share) || share < 0 || share > 100)) {
+      setFormError("Enter whole percentages from 0 to 100.")
+      return
+    }
+    if (parentShare + childShare !== 100) {
+      setFormError("Supplier and recipient shares must total 100.")
+      return
+    }
+    if (!Number.isInteger(deposit) || deposit < 0 || !Number.isInteger(nonRefundable) || nonRefundable < 0) {
+      setFormError("Enter whole amounts of 0 or more for both per-kiosk charges.")
+      return
+    }
+    setFormError(null)
+    update.mutate()
+  }
+
+  const showForm = !current
 
   return (
     <Dialog.Root
@@ -208,8 +213,9 @@ export default function DistributorAgreementDialog({
         if (busy) return
         if (value) {
           draft.reset()
-          sendConnectionRequest.reset()
           terminate.reset()
+          update.reset()
+          setEditing(false)
           setFormError(null)
         }
         setOpen(value)
@@ -240,11 +246,11 @@ export default function DistributorAgreementDialog({
           </Dialog.Close>
 
           <div className="mt-5 space-y-5">
-            {connections.isLoading || agreements.isLoading ? (
+            {agreements.isLoading ? (
               <p role="status" className="text-sm text-muted-foreground">
                 Loading agreement details…
               </p>
-            ) : connections.isError || agreements.isError ? (
+            ) : agreements.isError ? (
               <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
                 <p role="alert" className="text-destructive">
                   Couldn&apos;t load this distributor&apos;s agreement details.
@@ -252,7 +258,6 @@ export default function DistributorAgreementDialog({
                 <button
                   type="button"
                   onClick={() => {
-                    if (connections.isError) void connections.refetch()
                     if (agreements.isError) void agreements.refetch()
                   }}
                   className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
@@ -282,9 +287,19 @@ export default function DistributorAgreementDialog({
                 {current?.status === "ACTIVE" && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      These terms stay in force until the agreement is terminated. Termination closes the agreement for both
-                      organizations and cannot be undone here.
+                      Updates create a new effective version for future orders. Existing Partner agreements keep their
+                      own terms, and historical orders keep their original terms.
                     </p>
+                    {!editing && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => { setEditing(true); setFormError(null) }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        Update agreement terms
+                      </button>
+                    )}
                     {terminate.isError && (
                       <p role="alert" className="text-sm text-destructive">
                         {terminate.error.message}
@@ -302,37 +317,46 @@ export default function DistributorAgreementDialog({
                   </div>
                 )}
 
-                {!connection && !current && !connectionRequest && (
-                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
-                    <p role="status" className="text-muted-foreground">
-                      No active network connection exists yet. Send a request to {distributor.owner?.email ?? "this distributor's Owner"} before drafting agreement terms.
-                    </p>
-                    {distributor.owner?.email ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => sendConnectionRequest.mutate()}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                      >
-                        {sendConnectionRequest.isPending && <Loader2 size={16} className="animate-spin" />}
-                        {sendConnectionRequest.isPending ? "Sending…" : "Send connection request"}
-                      </button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">The distributor owner email is unavailable.</p>
+                {editing && current?.status === "ACTIVE" && (
+                  <form onSubmit={submitUpdate} className="space-y-4 border-t border-border pt-5">
+                    <div>
+                      <h3 className="text-sm font-semibold">Update agreement terms</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        The current agreement will be closed historically and these terms will apply to future orders.
+                        Active Partner agreements under this distributor are not changed.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor={`edit-parentShare-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Supplier share (%)</label>
+                        <input id={`edit-parentShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={parentSharePct} onChange={event => setParentSharePct(event.target.value)} />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-childShare-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Recipient share (%)</label>
+                        <input id={`edit-childShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={childSharePct} onChange={event => setChildSharePct(event.target.value)} />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-deposit-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Total collection per kiosk</label>
+                        <input id={`edit-deposit-${distributor.id}`} inputMode="numeric" className={inputCls} value={depositAmount} onChange={event => setDepositAmount(event.target.value)} />
+                      </div>
+                      <div>
+                        <label htmlFor={`edit-nonRefundable-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Non-refundable per kiosk</label>
+                        <input id={`edit-nonRefundable-${distributor.id}`} inputMode="numeric" className={inputCls} value={nonRefundableAmount} onChange={event => setNonRefundableAmount(event.target.value)} />
+                      </div>
+                    </div>
+                    {(formError || update.isError) && (
+                      <p role="alert" className="text-sm text-destructive">{formError ?? update.error?.message}</p>
                     )}
-                  </div>
-                )}
-
-                {!connection && !current && connectionRequest?.status === "PENDING" && (
-                  <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                    A connection request is awaiting this distributor&apos;s decision. <Link href="/requests" className="font-medium underline underline-offset-2">Track it in Requests</Link>
-                  </p>
-                )}
-
-                {!connection && !current && connectionRequest?.status === "REJECTED" && (
-                  <p role="status" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-                    This distributor declined the previous connection request.
-                  </p>
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+                        {update.isPending && <Loader2 size={16} className="animate-spin" />}
+                        {update.isPending ? "Updating…" : "Save updated terms"}
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => { setEditing(false); setFormError(null) }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
                 )}
 
                 {showForm && (
@@ -341,7 +365,7 @@ export default function DistributorAgreementDialog({
                       <h3 className="text-sm font-semibold">Draft agreement terms</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
                         The distributor&apos;s Owner must approve these terms before they take effect. Any partner they later
-                        register is charged the same per-kiosk amounts as this agreement defines.
+                        works with can have its own Distributor-to-Partner terms.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -371,7 +395,7 @@ export default function DistributorAgreementDialog({
                       </div>
                       <div>
                         <label htmlFor={`deposit-${distributor.id}`} className="mb-1.5 block text-sm font-medium">
-                          Deposit per kiosk
+                          Total collection per kiosk
                         </label>
                         <input
                           id={`deposit-${distributor.id}`}

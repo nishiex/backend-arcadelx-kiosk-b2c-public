@@ -11,9 +11,9 @@ export const UpdateKioskStatusSchema = z.object({
 });
 
 export const ManualOverrideExternalIdSchema = z.object({
-  externalDeviceId: z.string().min(1).nullable()
+  externalDeviceId: z.string().length(36).uuid().nullable()
 });
 
 export const PairDeviceSchema = z.object({
-  externalDeviceId: z.string().min(1)
+  externalDeviceId: z.string().length(36).uuid()
 });

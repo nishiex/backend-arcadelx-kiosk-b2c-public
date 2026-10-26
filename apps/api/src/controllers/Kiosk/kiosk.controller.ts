@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { z } from "zod";
 import type { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../utils/db";
 import { ApiError } from "../../utils/ApiError";
@@ -9,6 +10,11 @@ import {
   UpdateKioskStatusSchema,
 } from "@shared-types/validationSchemas/Kiosk/kiosk.validation";
 import { recordOpeningAssignmentsByCode } from "../../services/kiosk-ownership";
+
+const AssignKiosksSchema = z.object({
+  organizationId: z.string().uuid(),
+  kioskIds: z.array(z.string().uuid()).min(1).max(200),
+});
 
 // Display-only organization references; do not expose contact or invite details.
 const kioskDisplaySelect = {
@@ -162,6 +168,71 @@ export const getKioskById = asyncHandler(
       );
   },
 );
+
+/** Transfer available machines from the acting organization to its direct child. */
+export const assignKiosks = asyncHandler(async (req: Request, res: Response) => {
+  const { organizationId, kioskIds } = AssignKiosksSchema.parse(req.body);
+  const sourceOrgId = req.membership!.organizationId;
+  const sourceType = req.membership!.type;
+
+  if (!["COMPANY", "DISTRIBUTOR"].includes(sourceType)) {
+    throw new ApiError(403, "Only Master Admins and Distributors can assign kiosks");
+  }
+
+  const target = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, type: true, parentOrgId: true, isActive: true },
+  });
+  if (!target || !target.isActive) throw new ApiError(404, "Target organization not found");
+
+  const expectedTargetType = sourceType === "COMPANY" ? "DISTRIBUTOR" : "PARTNER";
+  if (target.type !== expectedTargetType || target.parentOrgId !== sourceOrgId) {
+    throw new ApiError(403, "Kiosks can only be assigned to your direct network children");
+  }
+
+  const activeAgreement = await prisma.agreement.findFirst({
+    where: { parentOrgId: sourceOrgId, childOrgId: organizationId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!activeAgreement) {
+    throw new ApiError(409, "An active agreement is required before kiosks can be assigned");
+  }
+
+  const assigned = await prisma.$transaction(async (tx) => {
+    const kiosks = await tx.kiosk.findMany({
+      where: {
+        id: { in: kioskIds },
+        currentOrgId: sourceOrgId,
+        status: { in: ["AVAILABLE", "RETURNED", "MAINTENANCE"] },
+        reservedOrderId: null,
+      },
+      select: { id: true, machineCode: true, model: true },
+    });
+    if (kiosks.length !== kioskIds.length) {
+      throw new ApiError(409, "One or more selected kiosks are no longer available");
+    }
+
+    const now = new Date();
+    await tx.kioskAssignment.updateMany({
+      where: { kioskId: { in: kioskIds }, assignedTo: null },
+      data: { assignedTo: now },
+    });
+    await tx.kioskAssignment.createMany({
+      data: kioskIds.map(kioskId => ({
+        kioskId,
+        organizationId,
+        assignedById: req.user!.id,
+      })),
+    });
+    await tx.kiosk.updateMany({
+      where: { id: { in: kioskIds } },
+      data: { currentOrgId: organizationId, status: "AVAILABLE", reservedOrderId: null },
+    });
+    return kiosks;
+  });
+
+  res.status(200).json(new ApiResponse(200, { kiosks: assigned, organization: target }, "Kiosks assigned successfully"));
+});
 
 export const updateKioskStatus = asyncHandler(
   async (req: Request, res: Response) => {

@@ -11,6 +11,7 @@ import StatGrid from "./StatGrid"
 import RevenueTrendChart from "./RevenueTrendChart"
 import InventoryBreakdown from "./InventoryBreakdown"
 import RecentKiosks from "./RecentKiosks"
+import MachineActivityLog from "./MachineActivityLog"
 
 export default function DashboardScreen() {
   const router = useRouter()
@@ -66,6 +67,7 @@ export default function DashboardScreen() {
               <RecentKiosks />
             </div>
           </div>
+          <MachineActivityLog />
         </>
       )}
     </div>

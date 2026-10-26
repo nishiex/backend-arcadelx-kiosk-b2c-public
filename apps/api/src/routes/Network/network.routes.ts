@@ -14,7 +14,7 @@ router.get("/requests",requireRole("OWNER","ADMIN"),getPendingNetworkRequests)
 
 // Company-only listing of distributor organizations for the dashboard.
 router.get('/distributors', requireOrgType('COMPANY'), getDistributors);
-router.get('/partners', requireOrgType('DISTRIBUTOR'), requireRole('OWNER', 'ADMIN', 'MANAGER'), getPartners);
+router.get('/partners', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN', 'MANAGER'), getPartners);
 
 router.post('/:connectionId/accept', requireRole('OWNER', 'ADMIN'), acceptConnection);
 

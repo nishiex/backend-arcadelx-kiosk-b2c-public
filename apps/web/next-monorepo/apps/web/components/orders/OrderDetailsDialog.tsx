@@ -2,27 +2,79 @@
 
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Download, Eye, X } from "lucide-react"
-import { fetchOrderDetails, type KioskOrder } from "@/lib/backend-api"
+import { toast } from "sonner"
+import { fetchOrderDetails, updateOrderPricing, type KioskOrder, type KioskOrderDetails } from "@/lib/backend-api"
 import { ErrorState, Skeleton } from "@/components/dashboard/ui"
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, orderDate, orderMoney, orderPerspective } from "./order-display"
+import CashPaymentButton from "./CashPaymentButton"
 
-export default function OrderDetailsDialog({ order, organizationId }: { order: KioskOrder; organizationId: string }) {
+export default function OrderDetailsDialog({
+  order,
+  organizationId,
+  canPay = false,
+  canEditPricing = false,
+  actionsDisabled = false,
+  onChanged,
+}: {
+  order: KioskOrder
+  organizationId: string
+  canPay?: boolean
+  canEditPricing?: boolean
+  actionsDisabled?: boolean
+  onChanged?: () => void
+}) {
   const [open, setOpen] = React.useState(false)
+  const [editingPricing, setEditingPricing] = React.useState(false)
+  const [depositPerMachine, setDepositPerMachine] = React.useState("")
+  const [nonRefundablePerMachine, setNonRefundablePerMachine] = React.useState("")
+  const queryClient = useQueryClient()
+  const detailsKey = ["orders", organizationId, "detail", order.id]
   const details = useQuery({
-    queryKey: ["orders", organizationId, "detail", order.id],
+    queryKey: detailsKey,
     queryFn: ({ signal }) => fetchOrderDetails(order.id, signal),
     enabled: open,
     staleTime: 0,
     refetchInterval: open ? 30000 : false,
   })
   const data = details.data
+  const usesInclusivePricing = !!data && data.grandTotal === data.totalDeposit
+  const refundableDeposit = data
+    ? data.totalDeposit - data.totalNonRefundable
+    : 0
+  const handleOrderChanged = (updated: KioskOrder) => {
+    queryClient.setQueryData<KioskOrderDetails>(detailsKey, current => current ? { ...current, ...updated } : current)
+    onChanged?.()
+  }
+  const updatePricing = useMutation({
+    mutationFn: () => updateOrderPricing(order.id, {
+      depositPerMachine: Number(depositPerMachine),
+      nonRefundablePerMachine: Number(nonRefundablePerMachine),
+    }),
+    onSuccess: updated => {
+      setEditingPricing(false)
+      handleOrderChanged(updated)
+      toast.success("Order pricing updated")
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't update order pricing"),
+  })
+  const canEditCurrentPricing = canEditPricing && data &&
+    ["UNDER_REVIEW", "APPROVED"].includes(data.status) &&
+    data.paymentStatus === "PENDING" &&
+    !data.paymentMethod &&
+    !data.cashPaymentRequestedAt
+  const openPricingEditor = () => {
+    if (!data) return
+    setDepositPerMachine(String(data.depositPerMachine))
+    setNonRefundablePerMachine(String(data.nonRefundablePerMachine))
+    setEditingPricing(true)
+  }
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button type="button" aria-label={`View order ${order.orderNumber}`} className="inline-flex items-center gap-2 rounded-md px-2.5 py-2 font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
+        <button type="button" aria-label={`View order ${order.orderNumber}`} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
           <Eye size={16} /> View
         </button>
       </Dialog.Trigger>
@@ -43,18 +95,7 @@ export default function OrderDetailsDialog({ order, organizationId }: { order: K
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><p className="font-medium">{orderPerspective(data, organizationId).counterparty.name}</p><p className="mt-1 text-sm text-muted-foreground">{orderPerspective(data, organizationId).flow}</p></div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[data.status]}`}>{ORDER_STATUS_LABELS[data.status]}</span>
-                    {data.status === "DELIVERED" && (
-                      <a
-                        href={`/api/orders/${encodeURIComponent(data.id)}/invoice`}
-                        download={`${data.orderNumber}-invoice.pdf`}
-                        className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
-                      >
-                        <Download size={15} /> Download invoice PDF
-                      </a>
-                    )}
-                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[data.status]}`}>{ORDER_STATUS_LABELS[data.status]}</span>
                 </div>
                 <dl className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/20 p-4 text-sm sm:grid-cols-5">
                   <div><dt className="text-muted-foreground">Type</dt><dd className="mt-1 font-medium">{data.type === "REQUEST" ? "Machine request" : "Machine allocation"}</dd></div>
@@ -63,6 +104,34 @@ export default function OrderDetailsDialog({ order, organizationId }: { order: K
                   <div><dt className="text-muted-foreground">Payment</dt><dd className="mt-1 font-medium">{data.paymentStatus.charAt(0) + data.paymentStatus.slice(1).toLowerCase()}</dd></div>
                   <div><dt className="text-muted-foreground">Created</dt><dd className="mt-1 font-medium">{orderDate(data.createdAt)}</dd></div>
                 </dl>
+                {((canPay && data.status === "APPROVED" && data.paymentStatus === "PENDING") || data.status === "DELIVERED") && (
+                  <section aria-label="Order actions" className="rounded-xl border border-border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold">Available actions</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">Complete the next step for this order.</p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canPay && data.status === "APPROVED" && data.paymentStatus === "PENDING" && (
+                          data.paymentMethod === "CASH" && data.cashPaymentRequestedAt ? (
+                            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">Cash requested</span>
+                          ) : (
+                            <CashPaymentButton order={data} disabled={actionsDisabled} onChanged={handleOrderChanged} />
+                          )
+                        )}
+                        {data.status === "DELIVERED" && (
+                          <a
+                            href={`/api/orders/${encodeURIComponent(data.id)}/invoice`}
+                            download={`${data.orderNumber}-invoice.pdf`}
+                            className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            <Download size={15} /> Download invoice PDF
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
                 <section aria-label="Linked kiosks">
                   <h3 className="mb-3 text-sm font-semibold">Linked kiosks ({data.dispatchedKiosks.length})</h3>
                   {!["UNDER_REVIEW", "REJECTED"].includes(data.status) && data.dispatchedKiosks.length !== data.quantity && (
@@ -78,12 +147,39 @@ export default function OrderDetailsDialog({ order, organizationId }: { order: K
                   ) : <p className="text-sm text-muted-foreground">No kiosks are linked to this order yet.</p>}
                 </section>
                 <section aria-label="Order totals" className="border-t border-border pt-4">
-                  <h3 className="mb-3 text-sm font-semibold">Order totals</h3>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">Order totals</h3>
+                    {canEditCurrentPricing && !editingPricing && (
+                      <button type="button" className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted" onClick={openPricingEditor}>
+                        Edit pricing
+                      </button>
+                    )}
+                  </div>
+                  {editingPricing && canEditCurrentPricing && (
+                    <form
+                      className="mb-4 grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2"
+                      onSubmit={event => {
+                        event.preventDefault()
+                        if (!Number.isInteger(Number(depositPerMachine)) || Number(depositPerMachine) < 0 || !Number.isInteger(Number(nonRefundablePerMachine)) || Number(nonRefundablePerMachine) < 0) {
+                          toast.error("Enter valid non-negative whole-number prices")
+                          return
+                        }
+                        updatePricing.mutate()
+                      }}
+                    >
+                      <label className="text-xs font-medium">Total collection per kiosk<input value={depositPerMachine} onChange={event => setDepositPerMachine(event.target.value)} inputMode="numeric" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
+                      <label className="text-xs font-medium">Non-refundable fee per kiosk<input value={nonRefundablePerMachine} onChange={event => setNonRefundablePerMachine(event.target.value)} inputMode="numeric" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button type="submit" disabled={updatePricing.isPending} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{updatePricing.isPending ? "Saving…" : "Save pricing"}</button>
+                        <button type="button" disabled={updatePricing.isPending} className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted" onClick={() => setEditingPricing(false)}>Cancel</button>
+                      </div>
+                    </form>
+                  )}
                   <dl className="space-y-2 text-sm">
-                    <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Deposit</dt><dd>{orderMoney(data.totalDeposit)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{usesInclusivePricing ? "Total collected" : "Deposit"}</dt><dd>{orderMoney(data.totalDeposit)}</dd></div>
                     <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Non-refundable fee</dt><dd>{orderMoney(data.totalNonRefundable)}</dd></div>
-                    <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Tax</dt><dd>{orderMoney(data.taxAmount)}</dd></div>
-                    <div className="flex justify-between gap-4 border-t border-border pt-3 font-semibold"><dt>Grand total</dt><dd>{orderMoney(data.grandTotal)}</dd></div>
+                    {usesInclusivePricing && <div className="flex justify-between gap-4 border-t border-border pt-3 font-semibold"><dt>Refundable deposit balance</dt><dd>{orderMoney(refundableDeposit)}</dd></div>}
+                    <div className={`flex justify-between gap-4 font-semibold ${usesInclusivePricing ? "" : "border-t border-border pt-3"}`}><dt>{usesInclusivePricing ? "Amount due" : "Grand total"}</dt><dd>{orderMoney(data.grandTotal)}</dd></div>
                   </dl>
                 </section>
               </div>

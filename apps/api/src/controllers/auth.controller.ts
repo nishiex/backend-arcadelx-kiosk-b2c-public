@@ -163,6 +163,20 @@ export const registerOrganization = asyncHandler(
         },
       });
 
+      // A Company-created Distributor/Partner is already the parent's direct
+      // child. Record that relationship as active during registration so the
+      // Company can send the first agreement immediately, without requiring a
+      // second connection request from an account that has just been created.
+      if (validatedData.orgType === "DISTRIBUTOR" || validatedData.orgType === "PARTNER") {
+        await tx.networkConnection.create({
+          data: {
+            initiatorOrgId: req.membership!.organizationId,
+            receiverOrgId: newOrg.id,
+            status: "ACTIVE",
+          },
+        });
+      }
+
       await queueCredentials(tx, req.membership!.organizationId, newOrg.id, {
         email: newUser.email,
         name: newUser.name,
@@ -449,6 +463,23 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
               id: true,
               name: true,
               type: true,
+                parentOrg: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    phone: true,
+                    city: true,
+                    state: true,
+                    address: true,
+                    owner: {
+                      select: {
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
             },
           },
         },

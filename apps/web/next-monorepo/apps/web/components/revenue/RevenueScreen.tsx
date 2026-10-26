@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowDownWideNarrow, ArrowUpWideNarrow, Download, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -31,6 +31,7 @@ const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 const selectClass = `${inputClass} sm:w-auto sm:min-w-36`
 const PAGE_SIZE = 10
+const PAYMENT_SYNC_INTERVAL_MS = 60_000
 type RevenuePeriod = "today" | "thisMonth" | "totalRevenue"
 function istDateKey(value: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value))
@@ -38,7 +39,6 @@ function istDateKey(value: string) {
   return `${part("year")}-${part("month")}-${part("day")}`
 }
 const rateFields = [
-  ["gstPercentage", "GST (%)"],
   ["pgFeePercentage", "Payment gateway fee (%)"],
   ["tdsPercentage", "TDS (%)"],
 ] as const
@@ -86,14 +86,6 @@ function RateEditor({
       )
     ) {
       setValidation("Enter rates from 0 to 100 with up to two decimal places.")
-      return
-    }
-    if (
-      Math.round(next.gstPercentage * 100) +
-        Math.round(next.pgFeePercentage * 100) >
-      10000
-    ) {
-      setValidation("GST plus payment gateway fees cannot exceed 100%.")
       return
     }
     setValidation("")
@@ -193,7 +185,11 @@ export default function RevenueScreen() {
     staleTime: 30_000,
     retry: 1,
   })
-  const syncPayments = useMutation({
+  const {
+    mutate: syncPaymentsMutate,
+    isPending: syncPaymentsPending,
+    isError: syncPaymentsIsError,
+  } = useMutation({
     mutationFn: syncMothershipPayments,
     onSuccess: (result) => {
       setPaymentsPage(1)
@@ -201,9 +197,24 @@ export default function RevenueScreen() {
       void queryClient.invalidateQueries({ queryKey: ["revenue-series", ...scope] })
       void queryClient.invalidateQueries({ queryKey: ["mothership-payments", ...scope] })
       const linked = result.devices?.newKiosksCreated ?? 0
-      toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported${linked ? `; ${linked} device${linked === 1 ? "" : "s"} linked` : ""}`)
+      if (result.transactions.newRecordsInserted > 0 || linked > 0) {
+        toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported${linked ? `; ${linked} device${linked === 1 ? "" : "s"} linked` : ""}`)
+      }
     },
   })
+  const syncPendingRef = React.useRef(syncPaymentsPending)
+  React.useEffect(() => {
+    syncPendingRef.current = syncPaymentsPending
+  }, [syncPaymentsPending])
+  const runAutomaticPaymentSync = React.useCallback(() => {
+    if (!syncPendingRef.current) syncPaymentsMutate()
+  }, [syncPaymentsMutate])
+  React.useEffect(() => {
+    if (!canEdit) return
+    runAutomaticPaymentSync()
+    const interval = window.setInterval(runAutomaticPaymentSync, PAYMENT_SYNC_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [canEdit, runAutomaticPaymentSync])
   if (isLoading)
     return (
       <div aria-label="Loading revenue" className="space-y-4">
@@ -223,11 +234,10 @@ export default function RevenueScreen() {
   const periodMetrics = (["today", "thisMonth", "totalRevenue"] as const).map((key) => {
     const gross = rows.reduce((sum, row) => sum + Math.round(row[key] * 100), 0) / 100
     if (!rates.data) return { gross, estimatedNet: null, deductions: null }
-    const gst = Math.round(gross * rates.data.gstPercentage) / 100
     const gateway = Math.round(gross * rates.data.pgFeePercentage) / 100
-    const beforeTds = gross - gst - gateway
+    const beforeTds = gross - gateway
     const tds = Math.round(beforeTds * rates.data.tdsPercentage) / 100
-    return { gross, estimatedNet: beforeTds - tds, deductions: gst + gateway + tds }
+    return { gross, estimatedNet: beforeTds - tds, deductions: gateway + tds }
   })
   const periodRows = selectedPeriod
     ? rows.filter((row) => row[selectedPeriod] > 0)
@@ -250,7 +260,7 @@ export default function RevenueScreen() {
   const visiblePayments = filteredPayments.slice((paymentsPage - 1) * PAGE_SIZE, paymentsPage * PAGE_SIZE)
   const resetPaymentFilters = () => { setPaymentSearch(""); setPaymentStatus(""); setPaymentDevice(""); setPaymentGame(""); setPaymentProvider(""); setPaymentFrom(""); setPaymentTo(""); setPaymentsPage(1) }
   const refreshing =
-    revenue.isFetching || rates.isFetching || payments.isFetching || syncPayments.isPending
+    revenue.isFetching || rates.isFetching || payments.isFetching || syncPaymentsPending
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -260,20 +270,6 @@ export default function RevenueScreen() {
           <p className="mt-1 text-sm text-muted-foreground">Fleet performance and payment activity · Figures use India Standard Time (IST)</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canEdit && (
-            <button
-              className={buttonClass}
-              disabled={refreshing || editing}
-              onClick={() => {
-                syncPayments.mutate()
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <Download size={16} className={syncPayments.isPending ? "animate-pulse" : ""} />
-                {syncPayments.isPending ? "Syncing payments…" : "Sync latest payments"}
-              </span>
-            </button>
-          )}
           <button
             className={buttonClass}
             disabled={refreshing || editing}
@@ -328,7 +324,7 @@ export default function RevenueScreen() {
               )
             })}
           </div>
-          {rates.isSuccess && <p className="-mt-3 text-xs text-muted-foreground">Estimate applies GST and gateway rates to gross, then estimates TDS on the remaining amount. Actual TDS and payouts vary by distributor/partner agreements; finalized statements are authoritative.</p>}
+          {rates.isSuccess && <p className="-mt-3 text-xs text-muted-foreground">Estimate applies gateway fees to gross, then estimates TDS on the remaining amount. GST is not charged. Actual TDS and payouts vary by distributor/partner agreements; finalized statements are authoritative.</p>}
           <RevenueTrendChart />
           <Panel title="Machine revenue" subtitle={`${filtered.length} ${selectedPeriod ? `${selectedPeriod === "today" ? "today" : selectedPeriod === "thisMonth" ? "this-month" : "all-time"} revenue machines` : "machines"} · gross recognized revenue by assignment window`}>
             <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -408,8 +404,8 @@ export default function RevenueScreen() {
         </>
       )}
       {canEdit && (
-        <Panel title="Mothership payment feed" subtitle="Latest 50 upstream records · Read-only feed; synchronization is a separate, explicit action" className="border-primary/20">
-          {syncPayments.isError && (
+        <Panel title="Mothership payment feed" subtitle="Latest 50 upstream records · Automatically synchronized every 60 seconds" className="border-primary/20">
+          {syncPaymentsIsError && (
             <p role="alert" className="mb-4 text-sm text-destructive">
               Payment synchronization failed. The local ledger was not confirmed as updated; retry when the service is available.
             </p>
@@ -538,7 +534,7 @@ export default function RevenueScreen() {
               <div key={key} className={`rounded-lg border border-border/70 bg-background/60 p-4 ${index === 0 ? "sm:border-l-2 sm:border-l-primary" : ""}`}>
                 <dt className="text-sm font-medium">{label.replace(" (%)", "")}</dt>
                 <dd className="mt-2 text-2xl font-semibold tabular-nums">{rates.data[key]}<span className="ml-0.5 text-base text-muted-foreground">%</span></dd>
-                <p className="mt-1 text-xs text-muted-foreground">{key === "gstPercentage" ? "Goods and Services Tax rate" : key === "pgFeePercentage" ? "Payment gateway fee rate" : "Tax Deducted at Source rate"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{key === "pgFeePercentage" ? "Payment gateway fee rate" : "Tax Deducted at Source rate"}</p>
               </div>
             ))}
           </dl>

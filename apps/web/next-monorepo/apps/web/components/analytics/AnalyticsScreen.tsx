@@ -9,15 +9,37 @@ import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/
 const number = new Intl.NumberFormat("en-IN")
 const dateTime = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" })
 const buttonClass = "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+const eventColumnOrder = ["id", "category", "device_id", "game_id", "error_code", "event_timestamp", "received_at"]
+const groupColumnOrder = ["key", "count"]
 
 function formatTimestamp(value: string) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : dateTime.format(date)
 }
 
+function columnLabel(key: string) {
+  return key.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function formatCellValue(key: string, value: unknown) {
+  if (value === null || value === undefined || value === "") return "—"
+  if ((key.endsWith("_at") || key.endsWith("_timestamp")) && typeof value === "string") {
+    return formatTimestamp(value)
+  }
+  if (typeof value === "object") return JSON.stringify(value)
+  return String(value)
+}
+
+function columnsForRows(rows: Array<Record<string, unknown>>, preferred: string[]) {
+  const keys = new Set(rows.flatMap((row) => Object.keys(row)))
+  return [
+    ...preferred.filter((key) => keys.has(key)),
+    ...[...keys].filter((key) => !preferred.includes(key)).sort(),
+  ]
+}
+
 export default function AnalyticsScreen() {
-  const { isMasterAdmin, me, isLoading, isError } = useMe()
-  const canViewAnalytics = isMasterAdmin && me?.membership?.status === "ACTIVE"
+  const { canViewAnalytics, isLoading, isError, isDistributor } = useMe()
   const analytics = useQuery({
     queryKey: ["analytics-summary"],
     queryFn: ({ signal }) => fetchAnalyticsSummary(signal),
@@ -25,10 +47,12 @@ export default function AnalyticsScreen() {
     staleTime: 30_000,
     retry: 1,
   })
+  const eventColumns = columnsForRows(analytics.data?.events ?? [], eventColumnOrder)
+  const groupColumns = columnsForRows(analytics.data?.groups ?? [], groupColumnOrder)
 
   if (isLoading) return <Skeleton className="h-64 w-full" />
   if (isError) return <ErrorState message="Unable to verify your access. Refresh the page to try again." />
-  if (!canViewAnalytics) return <EmptyState message="Analytics is available to the active Company Master Admin only." />
+  if (!canViewAnalytics) return <EmptyState message="Analytics is available to active Company or Distributor Owners/Admins." />
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -36,7 +60,7 @@ export default function AnalyticsScreen() {
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">ArcadeLX · Operations</p>
           <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Live event and device activity from Mothership.</p>
+          <p className="mt-1 text-sm text-muted-foreground">{isDistributor ? "Live activity for machines currently under your control." : "Live event and device activity from Mothership."}</p>
         </div>
         <button className={buttonClass} disabled={analytics.isFetching} onClick={() => void analytics.refetch()}>
           <RefreshCw size={16} className={analytics.isFetching ? "animate-spin" : ""} />
@@ -65,8 +89,8 @@ export default function AnalyticsScreen() {
             {analytics.data.groups.length === 0 ? <EmptyState message="No analytics events are available yet." /> : (
               <div className="overflow-x-auto rounded-lg border border-border/70">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground"><th className="px-3 py-3 font-medium">Category</th><th className="px-3 py-3 text-right font-medium">Events</th></tr></thead>
-                  <tbody>{analytics.data.groups.map((group) => <tr key={group.key} className="border-b border-border/60 last:border-0"><td className="px-3 py-3">{group.key}</td><td className="px-3 py-3 text-right tabular-nums">{number.format(group.count)}</td></tr>)}</tbody>
+                  <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">{groupColumns.map((column) => <th key={column} className="px-3 py-3 font-medium">{columnLabel(column)}</th>)}</tr></thead>
+                  <tbody>{analytics.data.groups.map((group, index) => <tr key={`${String(group.key)}-${index}`} className="border-b border-border/60 last:border-0">{groupColumns.map((column) => <td key={column} className="px-3 py-3">{formatCellValue(column, group[column])}</td>)}</tr>)}</tbody>
                 </table>
               </div>
             )}
@@ -75,22 +99,8 @@ export default function AnalyticsScreen() {
             {analytics.data.events.length === 0 ? <EmptyState message="No event records are available yet." /> : (
               <div className="overflow-x-auto rounded-lg border border-border/70">
                 <table className="w-full min-w-[980px] text-sm">
-                  <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
-                    <th className="px-3 py-3 font-medium">Category</th>
-                    <th className="px-3 py-3 font-medium">Device</th>
-                    <th className="px-3 py-3 font-medium">Game</th>
-                    <th className="px-3 py-3 font-medium">Code</th>
-                    <th className="px-3 py-3 font-medium">Event time</th>
-                    <th className="px-3 py-3 font-medium">Received</th>
-                  </tr></thead>
-                  <tbody>{analytics.data.events.map((event) => <tr key={event.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-3 py-3">{event.category}</td>
-                    <td className="px-3 py-3 font-mono text-xs">{event.device_id}</td>
-                    <td className="px-3 py-3">{event.game_id}</td>
-                    <td className="px-3 py-3">{event.error_code}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">{formatTimestamp(event.event_timestamp)}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">{formatTimestamp(event.received_at)}</td>
-                  </tr>)}</tbody>
+                  <thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">{eventColumns.map((column) => <th key={column} className="px-3 py-3 font-medium whitespace-nowrap">{columnLabel(column)}</th>)}</tr></thead>
+                  <tbody>{analytics.data.events.map((event, index) => <tr key={`${String(event.id)}-${index}`} className="border-b border-border/60 last:border-0">{eventColumns.map((column) => <td key={column} className={`px-3 py-3 ${column === "id" || column === "device_id" ? "font-mono text-xs" : ""} ${(column.endsWith("_at") || column.endsWith("_timestamp")) ? "whitespace-nowrap" : ""}`}>{formatCellValue(column, event[column])}</td>)}</tr>)}</tbody>
                 </table>
               </div>
             )}

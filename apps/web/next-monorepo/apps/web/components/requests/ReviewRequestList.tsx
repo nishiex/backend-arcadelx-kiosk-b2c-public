@@ -3,11 +3,45 @@
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Inbox } from "lucide-react"
-import { fetchReviewRequests } from "@/lib/backend-api"
+import { fetchReviewRequests, type NetworkKioskRef } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import { orderDate, orderMoney } from "@/components/orders/order-display"
 import DecisionDialog from "./DecisionDialog"
+
+function AssignedKioskInventory({ kiosks }: { kiosks?: NetworkKioskRef[] }) {
+  if (!kiosks) return null
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">Assigned kiosk inventory</p>
+        <span className="text-xs text-muted-foreground">{kiosks.length} kiosk{kiosks.length === 1 ? "" : "s"}</span>
+      </div>
+      {kiosks.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="pb-2 pr-4 font-medium">Machine Code</th>
+                <th className="pb-2 font-medium">Model</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {kiosks.map((kiosk) => (
+                <tr key={kiosk.machineCode}>
+                  <td className="py-2 pr-4 font-mono font-medium">{kiosk.machineCode}</td>
+                  <td className="py-2">{kiosk.model ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No kiosks are currently held by this organization.</p>
+      )}
+    </div>
+  )
+}
 
 /**
  * The network-connection / agreement review list.
@@ -37,6 +71,10 @@ export default function ReviewRequestList({
 }) {
   const { me, role, canReviewRequests } = useMe()
   const organizationId = me?.membership?.organizationId
+  const isMasterAdmin = me?.membership?.status === "ACTIVE" &&
+    me.membership.organization.type === "COMPANY" && me.membership.role === "OWNER"
+  const canViewNetworkInventory = isMasterAdmin ||
+    (me?.membership?.status === "ACTIVE" && me.membership.organization.type === "DISTRIBUTOR")
   const query = useQuery({
     queryKey: ["review-requests", organizationId, kind, page],
     queryFn: () => fetchReviewRequests(kind, page),
@@ -88,6 +126,7 @@ export default function ReviewRequestList({
               const pending = request.status === "PENDING" || request.status === "PENDING_APPROVAL"
               const canDecide = incoming && pending && (kind === "network" || role === "OWNER")
               const subject = `${kind === "network" ? "Connection" : "Agreement"} from ${request.from.name}`
+              const counterparty = request.from.id === organizationId ? request.to : request.from
               return (
                 <li key={request.id} className="space-y-4 p-4 sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -122,7 +161,7 @@ export default function ReviewRequestList({
                         <dd>{request.childSharePct}%</dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-muted-foreground">Deposit / kiosk</dt>
+                        <dt className="text-xs text-muted-foreground">Total collection / kiosk</dt>
                         <dd>{orderMoney(request.depositAmountPerMachine ?? 0)}</dd>
                       </div>
                       <div>
@@ -130,6 +169,9 @@ export default function ReviewRequestList({
                         <dd>{orderMoney(request.nonRefundableAmountPerMachine ?? 0)}</dd>
                       </div>
                     </dl>
+                  )}
+                  {kind === "network" && canViewNetworkInventory && (
+                    <AssignedKioskInventory kiosks={counterparty.kiosks} />
                   )}
                   {canDecide && (
                     <div className="flex justify-end gap-2">

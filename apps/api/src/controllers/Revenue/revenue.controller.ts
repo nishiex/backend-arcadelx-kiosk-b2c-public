@@ -87,7 +87,7 @@ export const getMachineWiseRevenue = asyncHandler(async (req, res) => {
   }
   res.json(new ApiResponse(200, { kiosks: [...rows.values()] }, 'Machine-wise revenue fetched successfully'));
 });
-const defaults = { id: 'default', gstPercentage: 18, pgFeePercentage: 2.5, tdsPercentage: 2 };
+const defaults = { id: 'default', gstPercentage: 0, pgFeePercentage: 2.5, tdsPercentage: 2 };
 /**
  * Revenue trend for the dashboard chart.
  *
@@ -144,8 +144,7 @@ export const updateSystemSettings = asyncHandler(async (req, res) => {
   const settings = await prisma.$transaction(async tx => {
     await tx.$queryRawUnsafe('SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext($1))', 'revenue-system-settings');
     const current = await tx.systemSettings.findUnique({ where: { id: 'default' } });
-    const rates = { gstPercentage: input.gstPercentage ?? Number(current?.gstPercentage ?? 18), pgFeePercentage: input.pgFeePercentage ?? Number(current?.pgFeePercentage ?? 2.5), tdsPercentage: input.tdsPercentage ?? Number(current?.tdsPercentage ?? 2) };
-    if (new Prisma.Decimal(rates.gstPercentage).plus(rates.pgFeePercentage).gt(100)) throw new ApiError(400, 'GST plus payment gateway fees cannot exceed 100%');
+    const rates = { gstPercentage: 0, pgFeePercentage: input.pgFeePercentage ?? Number(current?.pgFeePercentage ?? 2.5), tdsPercentage: input.tdsPercentage ?? Number(current?.tdsPercentage ?? 2) };
     return tx.systemSettings.upsert({ where: { id: 'default' }, update: rates, create: { id: 'default', ...rates } });
   });
   res.json(new ApiResponse(200, { settings }, 'System financial settings updated successfully'));

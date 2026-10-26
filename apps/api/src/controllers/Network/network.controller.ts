@@ -201,13 +201,32 @@ export const acceptConnection = asyncHandler(
 export const getConnections = asyncHandler(async (req, res) => {
   const { page, limit } = PaginationQuerySchema.parse(req.query);
   const organizationId = req.membership!.organizationId;
+  // Inventory is safe to expose to the two sides that manage the relationship:
+  // the Company Owner (Master Admin) and the Distributor. The query is still
+  // restricted to organizations in this user's network below.
+  const canViewNetworkInventory =
+    (req.membership!.type === "COMPANY" && req.membership!.role === "OWNER") ||
+    req.membership!.type === "DISTRIBUTOR";
   const where = { OR: [{ initiatorOrgId: organizationId }, { receiverOrgId: organizationId }] };
   const org = { select: { id: true, name: true, type: true } } as const;
+  const orgWithInventory = {
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      kiosks: {
+        select: { machineCode: true, model: true },
+        orderBy: { machineCode: "asc" as const },
+      },
+    },
+  } as const;
+  const initiator = canViewNetworkInventory ? orgWithInventory : org;
+  const reciever = canViewNetworkInventory ? orgWithInventory : org;
   const [total, requests] = await prisma.$transaction([
     prisma.networkConnection.count({ where }),
     prisma.networkConnection.findMany({ where, skip: (page - 1) * limit, take: limit,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      include: { initiator: org, reciever: org } }),
+      include: { initiator, reciever } }),
   ], { isolationLevel: 'RepeatableRead' });
   res.json(new ApiResponse(200, { requests, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } }));
 });

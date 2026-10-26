@@ -11,6 +11,7 @@ class SeedError extends Error {}
 const fields = z.object({
   SEED_OWNER_NAME: z.string().trim().min(2).max(100),
   SEED_OWNER_EMAIL: z.string().trim().toLowerCase().email().max(254),
+  SEED_OWNER_CONTACT: z.string().regex(/^\d{10}$/, 'must be a 10-digit contact number'),
   // bcrypt supports at most 72 bytes; reject silent password truncation.
   SEED_OWNER_PASSWORD: z.string().min(8).refine(value => Buffer.byteLength(value, 'utf8') <= 72),
   SEED_COMPANY_NAME: z.string().trim().min(2).max(100),
@@ -70,6 +71,7 @@ async function main() {
         data: {
           name: values.SEED_OWNER_NAME,
           email: values.SEED_OWNER_EMAIL,
+          contact: values.SEED_OWNER_CONTACT,
           passwordHash: await bcrypt.hash(values.SEED_OWNER_PASSWORD, 12),
         },
         select: { id: true },

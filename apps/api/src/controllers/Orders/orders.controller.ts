@@ -17,9 +17,41 @@ import {
   DeliverOrderSchema,
   OrderQuerySchema,
   OrderParamsSchema,
+  UpdateOrderPricingSchema,
 } from "@shared-types/validationSchemas/Orders/order.validation";
 
 const REQUESTABLE_KIOSK_STATUSES = ["AVAILABLE", "INSTALLED"] as const;
+
+/**
+ * The agreed per-kiosk amount is the complete amount collected from the customer.
+ * The non-refundable fee is deducted from that collection; GST is not charged.
+ * `totalDeposit` retains its existing database name but stores the gross collection
+ * for newly created or repriced orders.
+ */
+function calculateInclusiveOrderPricing(
+  totalCollectionPerMachine: number,
+  nonRefundablePerMachine: number,
+  quantity: number,
+) {
+  const totalCollection = totalCollectionPerMachine * quantity;
+  const totalNonRefundable = nonRefundablePerMachine * quantity;
+  const taxAmount = 0;
+  const refundableDeposit = totalCollection - totalNonRefundable - taxAmount;
+
+  if (refundableDeposit < 0) {
+    throw new ApiError(
+      400,
+      "Total collection must cover the non-refundable fee",
+    );
+  }
+
+  return {
+    totalCollection,
+    totalNonRefundable,
+    taxAmount,
+    refundableDeposit,
+  };
+}
 
 const reserveKiosks = async (
   tx: Prisma.TransactionClient,
@@ -322,16 +354,11 @@ export const createOrder = asyncHandler(async (req, res) => {
     >`INSERT INTO "OrderSequence" (year,value) VALUES (${year},1) ON CONFLICT (year) DO UPDATE SET value="OrderSequence".value+1 RETURNING value`;
     const depositPerMachine = agreement.depositAmountPerMachine;
     const nonRefundablePerMachine = agreement.nonRefundableAmountPerMachine;
-    const totalDeposit = depositPerMachine * parsed.quantity;
-    const totalNonRefundable = nonRefundablePerMachine * parsed.quantity;
-    // GST is configuration, not a constant: read the shared rate so a change in
-    // System Settings applies to new orders without a code change. Falls back to
-    // the schema default (18%) if the settings row is absent.
-    const settings = await tx.systemSettings.findUnique({
-      where: { id: 'default' },
-    });
-    const gstRate = settings ? Number(settings.gstPercentage) / 100 : 0.18;
-    const taxAmount = Math.round(totalNonRefundable * gstRate * 100) / 100;
+    const pricing = calculateInclusiveOrderPricing(
+      depositPerMachine,
+      nonRefundablePerMachine,
+      parsed.quantity,
+    );
     const row = await tx.order.create({
       data: {
         orderNumber: `ORD-${year}-${String(sequence[0].value).padStart(5, '0')}`,
@@ -344,10 +371,12 @@ export const createOrder = asyncHandler(async (req, res) => {
         requestedModel: parsed.type === "REQUEST" ? parsed.model : parsed.model ?? null,
         depositPerMachine,
         nonRefundablePerMachine,
-        totalDeposit,
-        totalNonRefundable,
-        taxAmount,
-        grandTotal: totalDeposit + totalNonRefundable + taxAmount,
+        // The historical column names remain for compatibility. For inclusive
+        // pricing, grandTotal is the fixed collection and not an additional sum.
+        totalDeposit: pricing.totalCollection,
+        totalNonRefundable: pricing.totalNonRefundable,
+        taxAmount: pricing.taxAmount,
+        grandTotal: pricing.totalCollection,
       },
     });
     if (parsed.type === 'ALLOCATION') {
@@ -377,6 +406,72 @@ export const createOrder = asyncHandler(async (req, res) => {
       'Order created; invoice delivery queued',
     ),
   );
+});
+
+async function findCompanyOrderForPricing(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+  companyId: string,
+) {
+  await tx.$queryRaw`SELECT id FROM "Order" WHERE id=${orderId} FOR UPDATE`;
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    include: {
+      parentOrg: { select: { id: true, type: true, parentOrgId: true } },
+      childOrg: { select: { id: true, type: true } },
+    },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+
+  // A Company Master Admin may edit orders supplied directly by the Company, or
+  // orders belonging to a registered Distributor beneath that Company. This keeps
+  // the edit scoped to the Company's network and never trusts an org id from input.
+  const isCompanyOrder = order.parentOrgId === companyId;
+  const isCompanyDistributorOrder = order.parentOrg.parentOrgId === companyId &&
+    order.parentOrg.type === "DISTRIBUTOR";
+  if (!isCompanyOrder && !isCompanyDistributorOrder) {
+    throw new ApiError(403, "This order is outside the Company Master Admin scope");
+  }
+  return order;
+}
+
+export const updateOrderPricing = asyncHandler(async (req, res) => {
+  const { orderId } = OrderParamsSchema.parse(req.params);
+  const input = UpdateOrderPricingSchema.parse(req.body);
+  const companyId = req.membership!.organizationId;
+
+  const order = await prisma.$transaction(async (tx) => {
+    const current = await findCompanyOrderForPricing(tx, orderId, companyId);
+    if (!["UNDER_REVIEW", "APPROVED"].includes(current.status) || current.paymentStatus !== "PENDING") {
+      throw new ApiError(409, "Only unpaid orders before dispatch can be repriced");
+    }
+    if (current.paymentMethod || current.cashPaymentRequestedAt) {
+      throw new ApiError(409, "Pricing cannot be changed after payment has started");
+    }
+    if (current.invoiceFilename) {
+      throw new ApiError(409, "Pricing cannot be changed after the invoice is issued");
+    }
+
+    const pricing = calculateInclusiveOrderPricing(
+      input.depositPerMachine,
+      input.nonRefundablePerMachine,
+      current.quantity,
+    );
+
+    return tx.order.update({
+      where: { id: current.id },
+      data: {
+        depositPerMachine: input.depositPerMachine,
+        nonRefundablePerMachine: input.nonRefundablePerMachine,
+        totalDeposit: pricing.totalCollection,
+        totalNonRefundable: pricing.totalNonRefundable,
+        taxAmount: pricing.taxAmount,
+        grandTotal: pricing.totalCollection,
+      },
+    });
+  });
+
+  res.json(new ApiResponse(200, { order }, "Order pricing updated successfully"));
 });
 
 export const approveOrder = asyncHandler(async (req, res) => {
@@ -456,7 +551,7 @@ export const markOrderAsPaid = asyncHandler(async (req, res) => {
     const current = await lockedOrder(tx, id, req.membership!.organizationId);
     if (current.status !== "APPROVED" || current.paymentStatus === "PAID")
       throw new ApiError(400, "Order must be approved and not already paid");
-    return tx.order.update({ where: { id }, data: { paymentStatus: "PAID" } });
+    return tx.order.update({ where: { id }, data: { paymentStatus: "PAID", paymentMethod: current.paymentMethod ?? "CASH", paidAt: new Date() } });
   });
   res
     .status(200)
@@ -467,6 +562,23 @@ export const markOrderAsPaid = asyncHandler(async (req, res) => {
         "Payment verified. Order is ready for dispatch.",
       ),
     );
+});
+
+export const requestCashPayment = asyncHandler(async (req, res) => {
+  const { orderId } = OrderParamsSchema.parse(req.params);
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, childOrgId: req.membership!.organizationId },
+    select: { id: true, status: true, paymentStatus: true },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  if (order.status !== "APPROVED" || order.paymentStatus !== "PENDING") {
+    throw new ApiError(409, "Only an approved, unpaid order can use cash payment");
+  }
+  const updated = await prisma.order.update({
+    where: { id: order.id },
+    data: { paymentMethod: "CASH", cashPaymentRequestedAt: new Date() },
+  });
+  res.status(200).json(new ApiResponse(200, { order: updated }, "Cash payment request sent to the supplier"));
 });
 
 export const dispatchOrder = asyncHandler(async (req, res) => {

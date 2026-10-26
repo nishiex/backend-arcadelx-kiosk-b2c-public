@@ -3,19 +3,25 @@
 BEGIN;
 
 ALTER TABLE "Organization"
-  ADD COLUMN "gstNumber" VARCHAR(30),
-  ADD COLUMN "phone" VARCHAR(32),
-  ADD COLUMN "country" VARCHAR(100);
+  ADD COLUMN IF NOT EXISTS "gstNumber" VARCHAR(30),
+  ADD COLUMN IF NOT EXISTS "phone" VARCHAR(32),
+  ADD COLUMN IF NOT EXISTS "country" VARCHAR(100);
 
-CREATE UNIQUE INDEX "NetworkConnection_pair_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "NetworkConnection_pair_key"
   ON "NetworkConnection" (LEAST("initiatorOrgId", "receiverOrgId"), GREATEST("initiatorOrgId", "receiverOrgId"));
-ALTER TABLE "NetworkConnection" ADD CONSTRAINT "network_distinct_parties" CHECK ("initiatorOrgId" <> "receiverOrgId");
-ALTER TABLE "Agreement" ADD CONSTRAINT "agreement_distinct_parties" CHECK ("parentOrgId" <> "childOrgId");
-CREATE UNIQUE INDEX "Agreement_open_pair_key" ON "Agreement" ("parentOrgId", "childOrgId")
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'network_distinct_parties') THEN
+    ALTER TABLE "NetworkConnection" ADD CONSTRAINT "network_distinct_parties" CHECK ("initiatorOrgId" <> "receiverOrgId");
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agreement_distinct_parties') THEN
+    ALTER TABLE "Agreement" ADD CONSTRAINT "agreement_distinct_parties" CHECK ("parentOrgId" <> "childOrgId");
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS "Agreement_open_pair_key" ON "Agreement" ("parentOrgId", "childOrgId")
   WHERE status IN ('PENDING_APPROVAL', 'ACTIVE');
-CREATE UNIQUE INDEX "KioskAssignment_one_open_key" ON "KioskAssignment" ("kioskId") WHERE "assignedTo" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "KioskAssignment_one_open_key" ON "KioskAssignment" ("kioskId") WHERE "assignedTo" IS NULL;
 
-ALTER TABLE "Kiosk" ADD COLUMN "reservedOrderId" TEXT;
+ALTER TABLE "Kiosk" ADD COLUMN IF NOT EXISTS "reservedOrderId" TEXT;
 DO $$
 BEGIN
   IF EXISTS (
@@ -40,15 +46,22 @@ BEGIN
       OR (o.status='DISPATCHED' AND k.status<>'ASSIGNED')
   ) THEN RAISE EXCEPTION 'Kiosk ownership/status conflicts with its active order; reconcile before migrating'; END IF;
 END $$;
-ALTER TABLE "Kiosk" ADD CONSTRAINT "Kiosk_reservedOrderId_fkey" FOREIGN KEY ("reservedOrderId") REFERENCES "Order"(id) ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "Kiosk" ADD CONSTRAINT "kiosk_reservation_state" CHECK ((status IN ('RESERVED','ASSIGNED')) = ("reservedOrderId" IS NOT NULL));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Kiosk_reservedOrderId_fkey') THEN
+    ALTER TABLE "Kiosk" ADD CONSTRAINT "Kiosk_reservedOrderId_fkey" FOREIGN KEY ("reservedOrderId") REFERENCES "Order"(id) ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'kiosk_reservation_state') THEN
+    ALTER TABLE "Kiosk" ADD CONSTRAINT "kiosk_reservation_state" CHECK ((status IN ('RESERVED','ASSIGNED')) = ("reservedOrderId" IS NOT NULL));
+  END IF;
+END $$;
 
-CREATE TABLE "OrderSequence" (year INTEGER PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS "OrderSequence" (year INTEGER PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0);
 INSERT INTO "OrderSequence" (year, value)
   SELECT split_part("orderNumber",'-',2)::integer, max(split_part("orderNumber",'-',3)::integer)
-  FROM "Order" WHERE "orderNumber" ~ '^ORD-[0-9]{4}-[0-9]+$' GROUP BY 1;
+  FROM "Order" WHERE "orderNumber" ~ '^ORD-[0-9]{4}-[0-9]+$' GROUP BY 1
+  ON CONFLICT (year) DO UPDATE SET value = GREATEST("OrderSequence".value, EXCLUDED.value);
 
-CREATE TABLE "EmailDelivery" (
+CREATE TABLE IF NOT EXISTS "EmailDelivery" (
   id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
   "ownerOrganizationId" TEXT NOT NULL REFERENCES "Organization"(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   payload TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, "leaseId" TEXT,

@@ -33,6 +33,16 @@ export const CreateOrderSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+/**
+ * The complete amount collected per kiosk and its non-refundable portion. GST is
+ * deducted from the collection with that fee; the API rejects a total that cannot
+ * cover both deductions.
+ */
+export const UpdateOrderPricingSchema = z.object({
+  depositPerMachine: z.number().int().min(0).max(10_000_000),
+  nonRefundablePerMachine: z.number().int().min(0).max(10_000_000),
+}).strict();
+
 export const OrderQuerySchema = z.object({
   status: z
     .enum(["UNDER_REVIEW", "APPROVED", "DISPATCHED", "DELIVERED", "REJECTED"])

@@ -1,4 +1,4 @@
-import { beginMutationToast } from "./mutation-toast"
+import { sessionApiFetch, setSigningOut, waitForSessionRefresh } from "./session-api"
 
 export type ApiResponse<T> = {
   statusCode: number;
@@ -69,11 +69,13 @@ export type AnalyticsEvent = {
   event_timestamp: string;
   game_id: string;
   received_at: string;
+  [key: string]: unknown;
 }
 
 export type AnalyticsGroup = {
   key: string;
   count: number;
+  [key: string]: unknown;
 }
 
 export type AnalyticsSummaryResponse = {
@@ -103,7 +105,21 @@ export async function fetchAnalyticsSummary(signal?: AbortSignal): Promise<Analy
 export type OrgType = 'COMPANY' | 'DISTRIBUTOR' | 'PARTNER';
 export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF';
 
-export type Organization = { id: string; name: string; type: OrgType };
+export type Organization = {
+  id: string;
+  name: string;
+  type: OrgType;
+  parentOrg?: {
+    id: string;
+    name: string;
+    type: OrgType;
+    phone: string | null;
+    city: string | null;
+    state: string | null;
+    address: string | null;
+    owner: { name: string; email: string } | null;
+  } | null;
+};
 export type Membership = {
   organizationId: string;
   status: string;
@@ -133,6 +149,8 @@ export type KioskStatus = (typeof KIOSK_STATUSES)[number];
 
 /** Minimal, non-sensitive org reference returned alongside a kiosk. */
 export type OrgRef = { id: string; name: string; type: OrgType };
+export type NetworkKioskRef = { machineCode: string; model: string | null };
+export type NetworkOrgRef = OrgRef & { kiosks?: NetworkKioskRef[] };
 
 export type Kiosk = {
   id: string;
@@ -152,6 +170,26 @@ export type Kiosk = {
   /** Sub-org from the open assignment ledger row, when a holder placed it further. */
   assignedOrg: OrgRef | null;
 };
+
+export type UnpairedKiosk = {
+  id: string;
+  machineCode: string;
+  model: string | null;
+};
+
+export async function fetchUnpairedKiosks(): Promise<UnpairedKiosk[]> {
+  const res = await apiFetch('/api/devices/unpaired-kiosks', { cache: 'no-store' });
+  return (await handleRes<{ unpairedKiosks: UnpairedKiosk[] }>(res)).unpairedKiosks;
+}
+
+export async function pairKioskDevice(machineCode: string, externalDeviceId: string) {
+  const res = await apiFetch(`/api/devices/kiosks/${encodeURIComponent(machineCode)}/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ externalDeviceId }),
+  });
+  return handleRes<{ kiosk: { machineCode: string; externalDeviceId: string; model: string | null } }>(res);
+}
 
 export type RegisterKioskInput = {
   model: string;
@@ -185,34 +223,17 @@ const handleRes = async <T,>(res: Response): Promise<T> => {
 // returns 401; we transparently hit the refresh endpoint once (single-flighted
 // so concurrent calls share one refresh) and replay the original request. If
 // refresh fails the user is genuinely logged out and the 401 propagates.
-let refreshing: Promise<boolean> | null = null;
-let signingOut = false;
-
-function refreshSession(): Promise<boolean> {
-  if (signingOut) return Promise.resolve(false);
-  if (!refreshing) {
-    refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15000) })
-      .then((r) => r.ok)
-      .catch(() => false)
-      .finally(() => {
-        refreshing = null;
-      });
-  }
-  return refreshing;
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  return sessionApiFetch(input, init);
 }
 
-async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const opts: RequestInit = { credentials: 'include', ...init };
-  const mutationToast = beginMutationToast(opts);
-  try {
-    const res = await fetch(input, opts);
-    // Don't try to refresh the auth calls themselves (would loop / mask bad creds).
-    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) return res;
-    const ok = await refreshSession();
-    return ok ? await fetch(input, opts) : res;
-  } finally {
-    mutationToast?.finish();
-  }
+export async function wipeLiveDatabase(confirmation: string): Promise<{ tablesCleared: number }> {
+  const res = await apiFetch('/api/admin/database/wipe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmation }),
+  });
+  return handleRes<{ tablesCleared: number }>(res);
 }
 
 export async function fetchInventorySummary(): Promise<InventorySummaryResponse> {
@@ -229,6 +250,10 @@ export type KioskOrder = {
   type: 'REQUEST' | 'ALLOCATION';
   status: OrderStatus;
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  // RAZORPAY is retained here only to display historical orders created before
+  // the checkout integration was removed. New orders use the cash workflow.
+  paymentMethod?: 'RAZORPAY' | 'CASH' | null;
+  cashPaymentRequestedAt?: string | null;
   parentOrgId: string;
   childOrgId: string;
   parentOrg: OrgRef;
@@ -261,6 +286,18 @@ export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): 
   return (await handleRes<{ order: KioskOrderDetails }>(res)).order;
 }
 
+export async function updateOrderPricing(orderId: string, payload: {
+  depositPerMachine: number;
+  nonRefundablePerMachine: number;
+}): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/pricing`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
 /**
  * Post-approval lifecycle steps. Each is supplier-side (the API requires the caller
  * to be the order's parent organization) and strictly ordered by the API:
@@ -270,6 +307,11 @@ export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): 
  */
 export async function markOrderAsPaid(orderId: string): Promise<KioskOrder> {
   const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/paid`, { method: 'PATCH' });
+  return (await handleRes<{ order: KioskOrder }>(res)).order;
+}
+
+export async function requestCashPayment(orderId: string): Promise<KioskOrder> {
+  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/payment/cash-request`, { method: 'POST' });
   return (await handleRes<{ order: KioskOrder }>(res)).order;
 }
 
@@ -359,14 +401,14 @@ export async function fetchWorkflowReadiness(): Promise<WorkflowReadiness> {
   return handleRes<WorkflowReadiness>(await apiFetch('/api/workflows'));
 }
 export type ReviewRequest = {
-  id: string; status: string; from: OrgRef; to: OrgRef; createdAt: string;
+  id: string; status: string; from: NetworkOrgRef; to: NetworkOrgRef; createdAt: string;
   parentSharePct?: string | number; childSharePct?: string | number;
   depositAmountPerMachine?: number; nonRefundableAmountPerMachine?: number;
 };
 export async function fetchReviewRequests(kind: 'network' | 'agreements', page = 1, signal?: AbortSignal): Promise<{ requests: ReviewRequest[]; meta: PaginationMeta }> {
   const res = await apiFetch(`/api/${kind}?page=${page}&limit=20`, { signal, cache: 'no-store' });
   if (kind === 'network') {
-    const data = await handleRes<{ requests: Array<Omit<ReviewRequest, 'from' | 'to'> & { initiator: OrgRef; reciever: OrgRef }>; meta: PaginationMeta }>(res);
+    const data = await handleRes<{ requests: Array<Omit<ReviewRequest, 'from' | 'to'> & { initiator: NetworkOrgRef; reciever: NetworkOrgRef }>; meta: PaginationMeta }>(res);
     return { meta: data.meta, requests: data.requests.map(row => ({ ...row, from: row.initiator, to: row.reciever })) };
   }
   const data = await handleRes<{ agreements: Array<Omit<ReviewRequest, 'from' | 'to'> & { parentOrg: OrgRef; childOrg: OrgRef }>; meta: PaginationMeta }>(res);
@@ -514,16 +556,16 @@ export async function fetchPartners(): Promise<Partner[]> {
 }
 
 export async function logout(): Promise<void> {
-  signingOut = true;
+  setSigningOut(true);
   try {
     // Finish any refresh already in flight before revoking its resulting token.
-    if (refreshing) await refreshing;
+    await waitForSessionRefresh();
     const res = await fetch('/api/auth/refresh/logout', {
       method: 'POST', credentials: 'include', signal: AbortSignal.timeout(15000),
     });
     await handleRes<null>(res);
   } catch (error) {
-    signingOut = false;
+    setSigningOut(false);
     throw error;
   }
 }
@@ -618,6 +660,34 @@ export async function fetchKiosks(): Promise<Kiosk[]> {
   const res = await apiFetch('/api/kiosks', { credentials: 'include' });
   const json = await handleRes<{ kiosks: Kiosk[] }>(res);
   return json.kiosks;
+}
+
+export async function assignKiosks(input: { organizationId: string; kioskIds: string[] }) {
+  const res = await apiFetch('/api/kiosks/assign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(input),
+  });
+  return handleRes<{ kiosks: Kiosk[] }>(res);
+}
+
+export type MachineActivity = {
+  id: string;
+  action: 'MACHINE_ADDED' | 'MACHINE_ASSIGNED';
+  machineCode: string;
+  model: string | null;
+  status: KioskStatus;
+  organization: OrgRef;
+  assignedBy: string | null;
+  assignedFrom: string;
+  assignedTo: string | null;
+  orderNumber: string | null;
+};
+
+export async function fetchMachineActivity(): Promise<{ activity: MachineActivity[] }> {
+  const res = await apiFetch('/api/reports/machine-activity', { credentials: 'include', cache: 'no-store' });
+  return handleRes<{ activity: MachineActivity[] }>(res);
 }
 
 export async function createKioskBatch(input: { count: number; model: string }) {
@@ -1176,13 +1246,13 @@ export async function fetchAgreementsForChild(childOrgId: string, signal?: Abort
 }
 
 /**
- * Terms are required when a Company is the parent. A Distributor drafting for a
- * Partner omits them and inherits its own Company agreement amounts, so they stay
- * optional here; the Company dashboard always sends explicit terms.
+ * Company and Distributor agreement flows may provide their own per-kiosk terms.
+ * The API requires both amounts together when they are supplied.
  */
 export type CreateAgreementInput = {
   childOrgId: string;
-  networkConnectionId: string;
+  /** Optional: the API creates/activates the direct relationship when omitted. */
+  networkConnectionId?: string;
   parentSharePct?: number;
   childSharePct?: number;
   depositAmountPerMachine?: number;
@@ -1196,6 +1266,25 @@ export async function createAgreement(input: CreateAgreementInput): Promise<Agre
     body: JSON.stringify(input),
   });
   return (await handleRes<{ agreement: Agreement }>(res)).agreement;
+}
+
+export type UpdateAgreementInput = {
+  parentSharePct?: number;
+  childSharePct?: number;
+  depositAmountPerMachine?: number;
+  nonRefundableAmountPerMachine?: number;
+};
+
+export async function updateAgreement(
+  id: string,
+  input: UpdateAgreementInput,
+): Promise<{ agreement: Agreement; cascadedAgreements: number }> {
+  const res = await apiFetch(`/api/agreements/${encodeURIComponent(id)}/update`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleRes<{ agreement: Agreement; cascadedAgreements: number }>(res);
 }
 
 export async function terminateAgreement(id: string): Promise<void> {

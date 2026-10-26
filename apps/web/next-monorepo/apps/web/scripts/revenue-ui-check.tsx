@@ -105,14 +105,11 @@ try {
   assert.equal(document.querySelector('a[href="/revenue"]')?.getAttribute('aria-current'), 'page')
   assert.equal(count('machine-wise'), 1); assert.equal(count('deduction-rates'), 1)
   await render(false); await render(true)
-  assert.equal(count('machine-wise'), 1, 'Navigating back reuses fresh revenue cache')
+  assert.equal(count('machine-wise'), 2, 'Automatic sync refreshes the revenue ledger when new payments are found')
   assert.equal(count('deduction-rates'), 1)
-  assert.ok(button('Sync latest payments'), 'Company owner can sync the payment feed')
-  assert.ok(text().includes('Read-only feed'))
-  assert.equal(count('payments'), 1, 'Opening Revenue fetches payment feed without syncing')
-  assert.equal(count('sync', 'POST'), 0, 'Reading the feed does not import payments')
-  await click(button('Sync latest payments'))
-  assert.equal(count('sync', 'POST'), 1, 'Button imports the payment feed')
+  assert.ok(!button('Sync latest payments'), 'Payment sync is no longer manually exposed')
+  assert.ok(text().includes('Automatically synchronized every 60 seconds'))
+  assert.ok(count('payments/sync', 'POST') >= 1, 'Opening Revenue automatically imports the payment feed')
   assert.ok(count('payments') >= 2, 'Sync refreshes the visible payment feed')
   assert.ok(text().includes('txn-001'))
   assert.ok(text().includes('pending'))
@@ -120,7 +117,7 @@ try {
   await fill('revenue-search', 'missing'); assert.ok(text().includes('No machines match'))
   await fill('revenue-search', 'partner b'); assert.ok(document.querySelector('tbody')?.textContent?.includes('K-001'))
   await fill('revenue-search', '')
-  console.log('PASS loading, real totals, machine search, read-only payment fetch, explicit sync, active navigation and cached remount')
+  console.log('PASS loading, real totals, machine search, automatic sync, active navigation and cached remount')
 
   await click(button('Edit rates'))
   assert.equal((document.getElementById('pgFeePercentage') as HTMLInputElement).value, '2.5')
@@ -144,7 +141,7 @@ try {
       assert.equal(!!document.querySelector('a[href="/revenue"]'), role !== 'STAFF', `${type} ${role} revenue navigation`)
       assert.equal(!!document.querySelector('table'), role !== 'STAFF', `${type} ${role} revenue table`)
       assert.equal(!!button('Edit rates'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} edit-rate access`)
-      assert.equal(!!button('Sync latest payments'), type === 'COMPANY' && ['OWNER', 'ADMIN'].includes(role), `${type} ${role} payment-sync access`)
+      assert.equal(!!button('Sync latest payments'), false, `${type} ${role} has no manual payment-sync button`)
     }
   }
   const requestsBefore = calls.length

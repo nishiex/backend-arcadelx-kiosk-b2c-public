@@ -8,6 +8,7 @@ import {
   DeviceGameParamsSchema,
   DeviceParamsSchema,
   ResetDevicePricesResultSchema,
+  ResetAllDevicePricesResultSchema,
   SetDeviceGamePriceSchema,
   SetDeviceGamePriceResultSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
@@ -15,8 +16,10 @@ import {
   getDevicePrices,
   listDevices,
   resetDevicePrices,
+  resetAllDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
+import { BUSINESS_TIMEZONE, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
 
 /**
  * Device fleet and per-device game pricing.
@@ -54,9 +57,10 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
 
   await assertDeviceVisible(req, parsed.data.deviceId);
   const games = await getDevicePrices(parsed.data.deviceId);
+  const eod = await Promise.all(games.map(async game => ({ gameId: game.gameId, update: await pricingStatus(parsed.data.deviceId, game.gameId) })));
   res
     .status(200)
-    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games }, 'Prices fetched successfully'));
+    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
 });
 
 export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {
@@ -81,6 +85,16 @@ export const resetPricesForDevice = asyncHandler(async (req: Request, res: Respo
     );
 });
 
+export const resetPricesForAllDevices = asyncHandler(async (req: Request, res: Response) => {
+  assertCompanyAdmin(req);
+  const result = ResetAllDevicePricesResultSchema.parse(await resetAllDevicePrices());
+  res.status(200).json(new ApiResponse(
+    200,
+    result,
+    result.gamesReset > 0 ? 'All device price overrides reset successfully' : 'No device price overrides to reset',
+  ));
+});
+
 export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {
   const params = DeviceGameParamsSchema.safeParse(req.params);
   if (!params.success) throw new ApiError(400, 'Invalid device or game id', params.error.issues);
@@ -92,6 +106,19 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   if (req.membership!.type !== 'COMPANY') {
     if (body.data.scope === 'GAME_CATALOG') {
       throw new ApiError(403, 'Only Company master admins can apply catalog-wide prices');
+    }
+    if (req.membership!.type === 'PARTNER') {
+      const distributorAgreement = await prisma.agreement.findFirst({
+        where: {
+          childOrgId: req.membership!.organizationId,
+          parentOrg: { type: 'DISTRIBUTOR' },
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      if (!distributorAgreement) {
+        throw new ApiError(403, 'An active Distributor agreement is required to request a price change');
+      }
     }
     const games = await getDevicePrices(params.data.deviceId);
     const game = games.find((item) => item.gameId === params.data.gameId);
@@ -113,11 +140,22 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   }
   assertCompanyAdmin(req);
 
-  const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(
-    params.data.deviceId,
-    params.data.gameId,
-    body.data,
-  ));
+  const games = await getDevicePrices(params.data.deviceId);
+  const game = games.find((item) => item.gameId === params.data.gameId);
+  if (!game) throw new ApiError(404, 'Game was not found on the selected device');
+  if (body.data.scope === 'DEVICE') {
+    const update = await scheduleEodDevicePrice({
+      deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
+      price: body.data.price, replayPrice: body.data.replay_price ?? game.effectiveReplayPrice, createdById: req.user!.id,
+    });
+    return res.status(202).json(new ApiResponse(202, {
+      deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
+      currentPrice: game.effectivePrice, currentReplayPrice: game.effectiveReplayPrice,
+      price: Number(update.price), replayPrice: Number(update.replayPrice), status: update.status,
+      scheduledFor: nextEod(), timezone: BUSINESS_TIMEZONE, updateId: update.id,
+    }, 'Device game price scheduled for EOD application'));
+  }
+  const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));
   res
     .status(200)
     .json(
@@ -186,7 +224,7 @@ function serializePriceRequest(request: {
 }
 
 export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Response) => {
-  assertCompanyAdmin(req);
+  assertPriceRequestReviewer(req);
   // A crashed approval must not leave a request invisible forever.
   await prisma.devicePriceRequest.updateMany({
     where: {
@@ -203,17 +241,21 @@ export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Res
       reviewedBy: { select: { id: true, name: true } },
     },
   });
+  const visibleRequests = [];
+  for (const request of requests) {
+    if (await canReviewPriceRequest(req, request.requesterOrg.type, request.requesterOrg.id)) visibleRequests.push(request);
+  }
   res.json(new ApiResponse(200, {
-    requests: requests.map((request) => ({ ...serializePriceRequest(request), requesterOrg: request.requesterOrg, requestedBy: request.requestedBy, reviewedBy: request.reviewedBy })),
+    requests: visibleRequests.map((request) => ({ ...serializePriceRequest(request), requesterOrg: request.requesterOrg, requestedBy: request.requestedBy, reviewedBy: request.reviewedBy })),
   }, 'Device price requests fetched successfully'));
 });
 
 export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: Response) => {
-  assertCompanyAdmin(req);
   const params = requestParamsSchema.safeParse(req.params);
   if (!params.success) throw new ApiError(400, 'Invalid price request id', params.error.issues);
   const request = await prisma.devicePriceRequest.findUnique({ where: { id: params.data.requestId } });
   if (!request) throw new ApiError(404, 'Price request not found');
+  await assertCanReviewPriceRequest(req, request.requesterOrgId);
   const claimed = await prisma.devicePriceRequest.updateMany({
     where: { id: request.id, status: 'PENDING' },
     data: { status: 'PROCESSING', processingAt: new Date() },
@@ -230,9 +272,7 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
     if (!ownedKiosk) {
       throw new ApiError(409, 'The requested device is no longer assigned to that organization');
     }
-    await setDeviceGamePrice(request.deviceId, request.gameId, {
-      price: Number(request.price), replay_price: Number(request.replayPrice), scope: 'DEVICE',
-    });
+    await scheduleEodDevicePrice({ deviceId: request.deviceId, gameId: request.gameId, displayName: request.displayName, price: Number(request.price), replayPrice: Number(request.replayPrice), createdById: request.requestedById });
     const approved = await prisma.devicePriceRequest.update({
       where: { id: request.id },
       data: { status: 'APPROVED', processingAt: null, reviewedById: req.user!.id, reviewedAt: new Date(), reviewNote: null },
@@ -248,9 +288,11 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
 });
 
 export const rejectDevicePriceRequest = asyncHandler(async (req: Request, res: Response) => {
-  assertCompanyAdmin(req);
   const params = requestParamsSchema.safeParse(req.params);
   if (!params.success) throw new ApiError(400, 'Invalid price request id', params.error.issues);
+  const existing = await prisma.devicePriceRequest.findUnique({ where: { id: params.data.requestId }, select: { requesterOrgId: true } });
+  if (!existing) throw new ApiError(404, 'Price request not found');
+  await assertCanReviewPriceRequest(req, existing.requesterOrgId);
   const body = reviewBodySchema.safeParse(req.body);
   if (!body.success) throw new ApiError(400, 'A rejection reason is required', body.error.issues);
   const rejected = await prisma.devicePriceRequest.updateMany({
@@ -261,3 +303,27 @@ export const rejectDevicePriceRequest = asyncHandler(async (req: Request, res: R
   const request = await prisma.devicePriceRequest.findUniqueOrThrow({ where: { id: params.data.requestId } });
   res.json(new ApiResponse(200, { request: serializePriceRequest(request) }, 'Price request rejected'));
 });
+
+function assertPriceRequestReviewer(req: Request) {
+  if (!req.membership || !['COMPANY', 'DISTRIBUTOR'].includes(req.membership.type) || !['OWNER', 'ADMIN'].includes(req.membership.role)) {
+    throw new ApiError(403, 'Only Company or Distributor admins can review price requests');
+  }
+}
+
+async function canReviewPriceRequest(req: Request, requesterType: string, requesterOrgId: string) {
+  if (req.membership!.type === 'COMPANY') return requesterType === 'DISTRIBUTOR' || requesterType === 'PARTNER';
+  if (requesterType !== 'PARTNER') return false;
+  const agreement = await prisma.agreement.findFirst({
+    where: { parentOrgId: req.membership!.organizationId, childOrgId: requesterOrgId, status: 'ACTIVE' },
+    select: { id: true },
+  });
+  return Boolean(agreement);
+}
+
+async function assertCanReviewPriceRequest(req: Request, requesterOrgId: string) {
+  assertPriceRequestReviewer(req);
+  const requester = await prisma.organization.findUnique({ where: { id: requesterOrgId }, select: { type: true } });
+  if (!requester || !(await canReviewPriceRequest(req, requester.type, requesterOrgId))) {
+    throw new ApiError(403, 'This price request is not assigned to your organization');
+  }
+}

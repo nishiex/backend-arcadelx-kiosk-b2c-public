@@ -110,7 +110,11 @@ export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
       text(data.parentOrgName, left, namesY, partyWidth, 13, colors.ink, true);
       text(data.childOrgName, billX, namesY, partyWidth, 13, colors.ink, true);
 
-      // Show both financial components with their saved quantities, rates and totals.
+      // Orders created with inclusive pricing store the fixed customer collection in
+      // totalDeposit/grandTotal. Older orders keep their original additive totals, so
+      // preserve their historical invoice wording when rendering them again.
+      const usesInclusivePricing = Math.abs(data.grandTotal - data.totalDeposit) < 0.005;
+      const refundableDeposit = data.totalDeposit - data.totalNonRefundable;
       const sectionY = namesY + namesHeight + 28;
       text('Order summary', left, sectionY, 220, 15, colors.ink, true);
       text('ALL AMOUNTS IN INR', right - 180, sectionY + 5, 180, 8, colors.muted, false, 'right');
@@ -132,21 +136,34 @@ export const renderInvoicePDF = (data: InvoiceData): Promise<Buffer> =>
         fitted(money(total), amountX, y + 22, right - amountX - 14, 10, colors.ink, true);
         line(y + 63);
       }
-      charge(tableY + 34, 'Deposit', data.depositPerMachine, data.totalDeposit);
-      charge(tableY + 98, 'Non-refundable fee', data.nonRefundablePerMachine, data.totalNonRefundable);
+      charge(
+        tableY + 34,
+        usesInclusivePricing ? 'Total collection' : 'Deposit',
+        data.depositPerMachine,
+        data.totalDeposit,
+      );
+      charge(
+        tableY + 98,
+        usesInclusivePricing ? 'Non-refundable fee (deducted)' : 'Non-refundable fee',
+        data.nonRefundablePerMachine,
+        data.totalNonRefundable,
+      );
 
       const totalsY = tableY + 186;
-      text('TAX DETAILS', left, totalsY + 2, 180, 8, colors.muted, true);
-      text('18% GST applies to the\nnon-refundable fee only.', left, totalsY + 20, 190, 9, colors.muted);
       const summaryX = 305;
-      text('Subtotal', summaryX, totalsY, 100, 10, colors.muted);
-      fitted(money(data.totalDeposit + data.totalNonRefundable), 405, totalsY, right - 405, 10, colors.ink, true);
-      text('GST (18%)', summaryX, totalsY + 27, 100, 10, colors.muted);
-      fitted(money(data.taxAmount), 405, totalsY + 27, right - 405, 10, colors.ink, true);
-      const totalBoxY = totalsY + 56;
+      if (usesInclusivePricing) {
+        text('Total collected', summaryX, totalsY, 100, 10, colors.muted);
+        fitted(money(data.totalDeposit), 405, totalsY, right - 405, 10, colors.ink, true);
+        text('Less fee', summaryX, totalsY + 24, 100, 10, colors.muted);
+        fitted('-' + money(data.totalNonRefundable), 405, totalsY + 24, right - 405, 10, colors.ink, true);
+      } else {
+        text('Subtotal', summaryX, totalsY, 100, 10, colors.muted);
+        fitted(money(data.totalDeposit + data.totalNonRefundable), 405, totalsY, right - 405, 10, colors.ink, true);
+      }
+      const totalBoxY = totalsY + (usesInclusivePricing ? 54 : 32);
       doc.roundedRect(summaryX - 14, totalBoxY, right - summaryX + 14, 82, 8).fill(colors.lavender);
-      text('GRAND TOTAL', summaryX + 2, totalBoxY + 15, 200, 8, colors.violet, true);
-      fitted(money(data.grandTotal), summaryX + 2, totalBoxY + 36, right - summaryX - 18, 24, colors.violet, true);
+      text(usesInclusivePricing ? 'REFUNDABLE DEPOSIT' : 'GRAND TOTAL', summaryX + 2, totalBoxY + 15, 200, 8, colors.violet, true);
+      fitted(money(usesInclusivePricing ? refundableDeposit : data.grandTotal), summaryX + 2, totalBoxY + 36, right - summaryX - 18, 24, colors.violet, true);
 
       let footerY = 765;
       if (data.kiosks.length > 0) {

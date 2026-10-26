@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ClipboardList, Download, RefreshCw, Search } from "lucide-react"
+import { ClipboardList, RefreshCw, Search } from "lucide-react"
 import { fetchOrders, fetchWorkflowReadiness, ORDER_STATUSES, type OrderStatus } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
@@ -15,7 +15,7 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_STATUS_LABELS, PAYMEN
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
 export default function OrdersScreen() {
-  const { me, role, orgType, isLoading: loadingMe, isError: identityError } = useMe()
+  const { me, role, orgType, isMasterAdmin, isLoading: loadingMe, isError: identityError } = useMe()
   const organizationId = me?.membership?.organizationId
   const canDecide = me?.membership?.status === "ACTIVE" && (role === "OWNER" || role === "ADMIN")
   const canApproveOrders = canDecide && (orgType === "COMPANY" || orgType === "DISTRIBUTOR")
@@ -74,41 +74,46 @@ export default function OrdersScreen() {
           <EmptyState className="py-14" icon={<ClipboardList size={28} />} message={hasFilters ? "No orders match your filters." : "No orders yet. Orders will appear here when a machine request or allocation is created."} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1020px] text-left text-sm">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <caption className="sr-only">Orders and requests involving your organization</caption>
-              <thead className="bg-muted/30 text-xs text-muted-foreground"><tr>{["Order number", "Direction", "Counterparty", "Qty", "Order status", "Payment status", "Date", "Actions"].map(label => <th key={label} scope="col" className={`px-4 py-3 font-medium ${label === "Actions" ? "text-right" : ""}`}>{label}</th>)}</tr></thead>
+              <thead className="bg-muted/30 text-xs text-muted-foreground"><tr>{["Order number", "Direction", "Counterparty", "Qty", "Order status", "Payment status", "Date", "Actions"].map(label => <th key={label} scope="col" className={`px-3 py-2.5 font-medium ${label === "Actions" ? "w-44 text-center" : ""}`}>{label}</th>)}</tr></thead>
               <tbody>{filtered.map(order => {
                 const view = orderPerspective(order, organizationId)
+                const canApproveThisOrder = canApproveOrders && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING"
+                const canAdvanceThisOrder = canApproveOrders && order.parentOrgId === organizationId
+                const canPayThisOrder = canDecide && (orgType === "DISTRIBUTOR" || orgType === "PARTNER") && order.childOrgId === organizationId && order.status === "APPROVED" && order.paymentStatus === "PENDING"
+                const hasPrimaryAction = canApproveThisOrder || canAdvanceThisOrder
                 return (
                   <tr key={order.id} className="border-t border-border transition-colors hover:bg-muted/30">
-                    <td className="whitespace-nowrap px-4 py-4"><p className="font-mono font-semibold">{order.orderNumber}</p><p className="mt-1 text-xs text-muted-foreground">{order.type === "REQUEST" ? "Machine request" : "Machine allocation"}</p></td>
-                    <td className="px-4 py-4"><span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{view.flow}</span></td>
-                    <td className="px-4 py-4"><p className="font-medium">{view.counterparty.name}</p><p className="mt-1 text-xs text-muted-foreground">{view.description}</p></td>
-                    <td className="px-4 py-4 tabular-nums">{order.quantity}</td>
-                    <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[order.status]}`}>{ORDER_STATUS_LABELS[order.status]}</span></td>
-                    <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${PAYMENT_STATUS_STYLES[order.paymentStatus] ?? "bg-muted text-muted-foreground"}`}>{PAYMENT_STATUS_LABELS[order.paymentStatus] ?? "Unknown"}</span></td>
-                    <td className="whitespace-nowrap px-4 py-4 text-muted-foreground">{orderDate(order.createdAt)}</td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        {canApproveOrders && order.parentOrgId === organizationId && order.type === "REQUEST" && order.status === "UNDER_REVIEW" && order.paymentStatus === "PENDING" && (
-                          <DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} />
+                    <td className="whitespace-nowrap px-3 py-3"><p className="font-mono font-semibold">{order.orderNumber}</p><p className="mt-1 text-xs text-muted-foreground">{order.type === "REQUEST" ? "Machine request" : "Machine allocation"}</p></td>
+                    <td className="px-3 py-3"><span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{view.flow}</span></td>
+                    <td className="px-3 py-3"><p className="whitespace-nowrap font-medium">{view.counterparty.name}</p><p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">{view.description}</p></td>
+                    <td className="px-3 py-3 tabular-nums">{order.quantity}</td>
+                    <td className="px-3 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${ORDER_STATUS_STYLES[order.status]}`}>{ORDER_STATUS_LABELS[order.status]}</span></td>
+                    <td className="px-3 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${PAYMENT_STATUS_STYLES[order.paymentStatus] ?? "bg-muted text-muted-foreground"}`}>{PAYMENT_STATUS_LABELS[order.paymentStatus] ?? "Unknown"}</span></td>
+                    <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">{orderDate(order.createdAt)}</td>
+                    <td className="w-44 px-3 py-3 align-middle">
+                      <div className="flex w-full flex-col gap-2">
+                        {hasPrimaryAction && (
+                          <>
+                            {canApproveThisOrder && (
+                              <DecisionDialog kind="orders" id={order.id} subject={order.orderNumber} action="approve" disabled={orderActionsDisabled} />
+                            )}
+                            {/* Supplier-only lifecycle steps. The API independently
+                                requires the caller to be the parent organization. */}
+                            {canAdvanceThisOrder && (
+                              <OrderStatusDialog order={order} disabled={orderActionsDisabled} />
+                            )}
+                          </>
                         )}
-                        {/* Supplier-only lifecycle steps. The API independently
-                            requires the caller to be the parent organization. */}
-                        {canApproveOrders && order.parentOrgId === organizationId && (
-                          <OrderStatusDialog order={order} disabled={orderActionsDisabled} />
-                        )}
-                        {order.status === "DELIVERED" && (
-                          <a
-                            href={`/api/orders/${encodeURIComponent(order.id)}/invoice`}
-                            download={`${order.orderNumber}-invoice.pdf`}
-                            aria-label={`Download invoice for ${order.orderNumber}`}
-                            className="inline-flex items-center gap-2 rounded-md border border-primary px-2.5 py-2 font-medium text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
-                          >
-                            <Download size={16} /> Invoice
-                          </a>
-                        )}
-                        <OrderDetailsDialog order={order} organizationId={organizationId} />
+                        <OrderDetailsDialog
+                          order={order}
+                          organizationId={organizationId}
+                          canPay={canPayThisOrder}
+                          canEditPricing={isMasterAdmin}
+                          actionsDisabled={orderActionsDisabled}
+                          onChanged={() => void orders.refetch()}
+                        />
                       </div>
                     </td>
                   </tr>

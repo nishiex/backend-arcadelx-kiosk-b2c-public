@@ -41,6 +41,14 @@ const RECORD_PAYMENT: Step = {
   confirm: "Only confirm once payment has actually been received: this records it as settled. No payment is taken by this action.",
 }
 
+const CONFIRM_CASH_PAYMENT: Step = {
+  run: markOrderAsPaid,
+  button: "Confirm cash received",
+  title: "Confirm cash payment?",
+  description: "Confirms that the supplier has physically received the cash for this order.",
+  confirm: "Only confirm after the cash has actually been received. This makes the order ready for dispatch.",
+}
+
 const DISPATCH: Step = {
   run: dispatchOrder,
   button: "Dispatch",
@@ -70,7 +78,8 @@ const DELIVER: Step = {
  */
 export function nextStep(order: KioskOrder): Step | null {
   if (order.status === "APPROVED") {
-    return order.paymentStatus === "PAID" ? DISPATCH : RECORD_PAYMENT
+    if (order.paymentStatus === "PAID") return DISPATCH
+    return order.paymentMethod === "CASH" && order.cashPaymentRequestedAt ? CONFIRM_CASH_PAYMENT : RECORD_PAYMENT
   }
   if (order.status === "DISPATCHED") return DELIVER
   return null
@@ -145,7 +154,7 @@ export default function OrderStatusDialog({
             disabled={disabled}
             aria-label={`${action.button} ${order.orderNumber}`}
             onClick={() => setSelected(action)}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             {action.button}
           </button>

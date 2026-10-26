@@ -21,6 +21,8 @@ export type Permissions = {
   isCompany: boolean
   /** The Company OWNER is the highest-level Master Admin. */
   isMasterAdmin: boolean
+  /** Active Company or Distributor OWNER/ADMIN members may view scoped analytics. */
+  canViewAnalytics: boolean
   isDistributor: boolean
   /** COMPANY or DISTRIBUTOR — the two org types that transact. */
   canTransact: boolean
@@ -43,6 +45,7 @@ export type Permissions = {
   canViewDevices: boolean
   /** Company master admins may apply prices; other orgs may submit requests. */
   canManageDevicePrices: boolean
+  canReviewDevicePriceRequests: boolean
   canRequestDevicePrices: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
   permissions: string[]
@@ -70,6 +73,7 @@ export function useMe(): Permissions {
   const isDistributor = orgType === "DISTRIBUTOR"
   const canTransact = isCompany || isDistributor
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
+  const canViewAnalytics = !isError && me?.membership?.status === "ACTIVE" && (isCompany || isDistributor) && isOwnerOrAdmin
 
   const permissions = me?.permissions ?? []
   const permSet = new Set(permissions)
@@ -85,6 +89,7 @@ export function useMe(): Permissions {
     orgName,
     isCompany,
     isMasterAdmin,
+    canViewAnalytics,
     isDistributor,
     canTransact,
     canManageMembers: isCompany && isOwnerOrAdmin,
@@ -93,9 +98,9 @@ export function useMe(): Permissions {
     canManageAgreements: canTransact && role === "OWNER",
     /** Only a company admin/super-admin (OWNER/ADMIN) may add distributors. */
     canManageDistributors: isCompany && isOwnerOrAdmin,
-    canViewPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor &&
-      (isOwnerOrAdmin || role === "MANAGER"),
-    canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && isDistributor && isOwnerOrAdmin,
+    canViewPartners: !isError && me?.membership?.status === "ACTIVE" &&
+      ((isCompany && isMasterAdmin) || (isDistributor && (isOwnerOrAdmin || role === "MANAGER"))),
+    canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && ((isCompany && isMasterAdmin) || (isDistributor && isOwnerOrAdmin)),
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
       (isOwnerOrAdmin || role === "MANAGER") &&
@@ -116,6 +121,8 @@ export function useMe(): Permissions {
      */
     canManageDevicePrices:
       !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
+    canReviewDevicePriceRequests:
+      !isError && me?.membership?.status === "ACTIVE" && (isCompany || isDistributor) && isOwnerOrAdmin,
     canRequestDevicePrices:
       !isError && me?.membership?.status === "ACTIVE" && !isCompany &&
       (isOwnerOrAdmin || role === "MANAGER"),

@@ -16,9 +16,9 @@ import {
 /**
  * Payment-gateway administration, proxied to Mothership.
  *
- * Access follows the same shape as the revenue rate editing: only the Company's
- * OWNER/ADMIN. A gateway change alters live payment routing, so it is deliberately
- * narrower than the read-only revenue endpoints.
+ * Gateway configuration is sensitive payment infrastructure. Company OWNER is the
+ * application's Master Admin and is the only role allowed to mutate provider payloads;
+ * Company ADMIN may only read the current configuration.
  *
  * Note the path prefix is `/api/admin`, not Mothership's `/api/v1/admin`: this is our
  * own surface, and keeping our versioning out of the path avoids implying we mirror
@@ -26,21 +26,21 @@ import {
  */
 const router = Router();
 
-router.use(requireAuth, loadMembership, requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'));
+router.use(requireAuth, loadMembership, requireOrgType('COMPANY'));
 
 // Current gateway configuration (priority order and active state).
-router.get('/', getGateways);
+router.get('/', requireRole('OWNER', 'ADMIN'), getGateways);
 
-// Create or update one provider's configuration.
-router.post('/', createOrUpdateGateway);
+// Only the Company OWNER (Master Admin) may create or update provider credentials.
+router.post('/', requireRole('OWNER'), createOrUpdateGateway);
 
-// Set the routing priority order.
-router.post('/reorder', reorderGatewayPriorities);
+// Only the Company OWNER (Master Admin) may change the routing priority order.
+router.post('/reorder', requireRole('OWNER'), reorderGatewayPriorities);
 
-// Enable or disable one provider.
-router.post('/toggle', toggleGatewayState);
+// Only the Company OWNER (Master Admin) may enable or disable a provider.
+router.post('/toggle', requireRole('OWNER'), toggleGatewayState);
 
-// Remove one provider's override.
-router.delete('/', removeGateway);
+// Only the Company OWNER (Master Admin) may remove a provider override.
+router.delete('/', requireRole('OWNER'), removeGateway);
 
 export default router;

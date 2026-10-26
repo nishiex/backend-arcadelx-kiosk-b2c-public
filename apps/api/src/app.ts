@@ -17,9 +17,13 @@ import orderRoutes from './routes/Orders/order.route'
 import revenueRoutes from './routes/Revenue/revenue.routes';
 import adminGatewayRoutes from './routes/Admin/gateway.routes';
 import deviceRoutes from './routes/Admin/device.routes';
+import reportsRoutes from './routes/Reports/reports.routes';
+import databaseRoutes from './routes/Admin/database.routes';
+import auditRoutes from './routes/Audit/audit.routes';
 import { requireAuth, loadMembership, requireOrgType, requireRole } from './middlewares/auth';
 import { asyncHandler } from './utils/asyncHandler';
 import { workflowReadiness } from './services/workflow-readiness';
+import { writeAuditLog } from './services/audit-log.service';
 const app = express();
 
 app.use(cors())
@@ -28,6 +32,16 @@ app.use(helmet());
 app.use(express.json());
 app.use(urlencoded({extended:true}))
 app.use(cookieParser());
+// Capture completed write requests after authentication/membership middleware has
+// populated the request context, while never recording audit-log reads themselves.
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    void writeAuditLog(req, res).catch((error) => {
+      console.error('[audit-log] write failed:', error instanceof Error ? error.message : String(error));
+    });
+  });
+  next();
+});
 app.get('/api/workflows', requireAuth, loadMembership, asyncHandler(async (_req, res) => {
   res.json(new ApiResponse(200, await workflowReadiness()));
 }));
@@ -41,15 +55,58 @@ app.use('/api/kiosks', kioskRoutes);
 
 // Same-origin proxy for the Mothership analytics feed. Keeping the upstream call
 // server-side avoids browser CORS failures and prevents exposing upstream details.
-app.get('/api/analytics/summary', requireAuth, loadMembership, requireOrgType('COMPANY'), requireRole('OWNER'), asyncHandler(async (_req, res) => {
-    const upstream = await fetch('https://main.arcadelx.games/api/v1/analytics/summary', {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(15000),
+app.get('/api/analytics/summary', requireAuth, loadMembership, requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), asyncHandler(async (req, res) => {
+    const fetchPage = async (page: number) => {
+        const upstream = await fetch(`https://main.arcadelx.games/api/v1/analytics/summary?page=${page}&limit=50&group_by=category`, {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!upstream.ok) throw new ApiError(502, `Analytics upstream returned ${upstream.status}`);
+        return await upstream.json() as {
+            status: string;
+            group_by: string;
+            total_events: number;
+            error_events: number;
+            unique_devices: number;
+            events: Array<Record<string, unknown>>;
+            groups: Array<Record<string, unknown>>;
+            limit: number;
+            page: number;
+            total_pages: number;
+        };
+    };
+
+    const firstPage = await fetchPage(1);
+    if (req.membership!.type === 'COMPANY') return res.status(200).json(new ApiResponse(200, firstPage));
+
+    // Analytics is scoped to devices currently controlled by this Distributor. The
+    // upstream event feed uses both machine codes and external device ids in practice,
+    // so accept either identifier while never exposing another organization's events.
+    const kiosks = await prisma.kiosk.findMany({
+        where: { currentOrgId: req.membership!.organizationId },
+        select: { machineCode: true, externalDeviceId: true },
     });
-    if (!upstream.ok) {
-        throw new ApiError(502, `Analytics upstream returned ${upstream.status}`);
+    const visibleDeviceIds = new Set(kiosks.flatMap((kiosk) => [kiosk.machineCode, kiosk.externalDeviceId].filter((value): value is string => Boolean(value))));
+    const pages = [firstPage];
+    for (let page = 2; page <= Math.min(firstPage.total_pages || 1, 100); page += 1) pages.push(await fetchPage(page));
+    const events = pages.flatMap((page) => page.events).filter((event) => visibleDeviceIds.has(String(event.device_id ?? '')));
+    const groupCounts = new Map<string, number>();
+    for (const event of events) {
+        const key = String(event.category ?? 'unknown');
+        groupCounts.set(key, (groupCounts.get(key) ?? 0) + 1);
     }
-    const data = await upstream.json();
+    const data = {
+        status: firstPage.status,
+        group_by: 'category',
+        total_events: events.length,
+        error_events: events.filter((event) => String(event.error_code ?? '').toUpperCase() !== 'NONE').length,
+        unique_devices: new Set(events.map((event) => String(event.device_id ?? ''))).size,
+        events,
+        groups: [...groupCounts.entries()].map(([key, count]) => ({ key, count })),
+        limit: events.length || firstPage.limit,
+        page: 1,
+        total_pages: 1,
+    };
     return res.status(200).json(new ApiResponse(200, data));
 }));
 
@@ -61,10 +118,13 @@ app.use('/api/revenue', revenueRoutes);
 // Payment-gateway administration (proxied to Mothership). Session-authenticated and
 // limited to COMPANY OWNER/ADMIN inside the router.
 app.use('/api/admin/gateways', adminGatewayRoutes);
+app.use('/api/admin/database', databaseRoutes);
 // Device fleet and per-device game pricing (proxied to Mothership). Reads are open to
 // COMPANY/DISTRIBUTOR/PARTNER; the price write is limited to COMPANY OWNER/ADMIN inside
 // the router, because it changes what a live kiosk charges.
 app.use('/api/devices', deviceRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/audit-logs', auditRoutes);
 //Health Endpoints
 app.get("/health",(req:Request,res:Response)=>
 {

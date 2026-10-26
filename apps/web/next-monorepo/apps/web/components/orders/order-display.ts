@@ -32,7 +32,12 @@ export const PAYMENT_STATUS_STYLES: Record<KioskOrder["paymentStatus"], string> 
 
 const orgLabels: Record<OrgType, string> = { COMPANY: "Company", DISTRIBUTOR: "Distributor", PARTNER: "Partner" }
 export const orderDate = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value))
-export const orderMoney = (value: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value)
+export const orderMoney = (value: number) => new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+}).format(value)
 
 export function orderPerspective(order: KioskOrder, organizationId: string) {
   const sender = order.type === "REQUEST" ? order.childOrg : order.parentOrg

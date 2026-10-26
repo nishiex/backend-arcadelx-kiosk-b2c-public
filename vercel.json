@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm install --include=dev",
-  "buildCommand": "cd apps/api && npx prisma migrate deploy --schema prisma/schema.prisma && npx prisma generate --schema prisma/schema.prisma && node scripts/build-vercel.mjs",
+  "buildCommand": "cd apps/api && npx prisma generate --schema prisma/schema.prisma && node scripts/build-vercel.mjs",
   "outputDirectory": "api/public",
   "functions": {
     "api/index.mjs": {

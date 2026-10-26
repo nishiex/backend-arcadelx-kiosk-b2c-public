@@ -15,40 +15,10 @@
  */
 
 import type { KioskOrder } from "./backend-api"
-import { beginMutationToast } from "./mutation-toast"
-
-let refreshing: Promise<boolean> | null = null
-
-function refreshSession(): Promise<boolean> {
-  if (!refreshing) {
-    refreshing = fetch("/api/auth/refresh", {
-      method: "POST",
-      credentials: "include",
-      signal: AbortSignal.timeout(15000),
-    })
-      .then((r) => r.ok)
-      .catch(() => false)
-      .finally(() => {
-        refreshing = null
-      })
-  }
-  return refreshing
-}
+import { sessionApiFetch } from "./session-api"
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const opts: RequestInit = { credentials: "include", ...init }
-  const mutationToast = beginMutationToast(opts)
-  try {
-    const res = await fetch(input, opts)
-    // Never refresh the auth calls themselves: that would loop or mask bad credentials.
-    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
-      return res
-    }
-    const ok = await refreshSession()
-    return ok ? await fetch(input, opts) : res
-  } finally {
-    mutationToast?.finish()
-  }
+  return sessionApiFetch(input, init)
 }
 
 async function handleRes<T>(res: Response): Promise<T> {

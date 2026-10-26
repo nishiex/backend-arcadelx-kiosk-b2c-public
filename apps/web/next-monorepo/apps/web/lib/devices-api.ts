@@ -9,37 +9,8 @@
  * a type definition rather than credentials). The request helper mirrors the one there.
  */
 
-let refreshing: Promise<boolean> | null = null
-
-function refreshSession(): Promise<boolean> {
-  if (!refreshing) {
-    refreshing = fetch("/api/auth/refresh", {
-      method: "POST",
-      credentials: "include",
-      signal: AbortSignal.timeout(15000),
-    })
-      .then((r) => r.ok)
-      .catch(() => false)
-      .finally(() => {
-        refreshing = null
-      })
-  }
-  return refreshing
-}
-
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const opts: RequestInit = { credentials: "include", ...init }
-  const mutationToast = beginMutationToast(opts)
-  try {
-    const res = await fetch(input, opts)
-    if (res.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) {
-      return res
-    }
-    const ok = await refreshSession()
-    return ok ? await fetch(input, opts) : res
-  } finally {
-    mutationToast?.finish()
-  }
+  return sessionApiFetch(input, init)
 }
 
 function describeDevicePriceVerification(errors: unknown): string | null {
@@ -143,17 +114,25 @@ export async function fetchDevices(): Promise<{
 
 export async function fetchDevicePrices(
   deviceId: string
-): Promise<{ deviceId: string; games: GamePriceView[] }> {
+): Promise<{ deviceId: string; games: GamePriceView[]; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }> {
   const res = await apiFetch(`/api/devices/${encodeURIComponent(deviceId)}/prices`, {
     cache: "no-store",
   })
-  return handleRes<{ deviceId: string; games: GamePriceView[] }>(res)
+  return handleRes<{ deviceId: string; games: GamePriceView[]; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }>(res)
 }
+
+export type EodPriceUpdate = { id: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
 
 export type ResetDevicePricesResult = {
   deviceId: string
   gamesReset: number
   scope: "DEVICE_OVERRIDES"
+}
+
+export type ResetAllDevicePricesResult = {
+  devicesReset: number
+  gamesReset: number
+  scope: "ALL_DEVICE_OVERRIDES"
 }
 
 export type SetDeviceGamePriceResult = {
@@ -163,6 +142,10 @@ export type SetDeviceGamePriceResult = {
   price: number
   replayPrice: number
   scope: "DEVICE_GAME_OVERRIDE" | "GAME_CATALOG"
+  status?: "PENDING"
+  scheduledFor?: string
+  timezone?: string
+  updateId?: string
 }
 
 export type DevicePriceRequest = {
@@ -251,5 +234,10 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
   )
   return handleRes<ResetDevicePricesResult>(res)
 }
-import { beginMutationToast } from "./mutation-toast"
+
+export async function resetAllDevicePrices(): Promise<ResetAllDevicePricesResult> {
+  const res = await apiFetch("/api/devices/prices/reset-all", { method: "POST" })
+  return handleRes<ResetAllDevicePricesResult>(res)
+}
+import { sessionApiFetch } from "./session-api"
 

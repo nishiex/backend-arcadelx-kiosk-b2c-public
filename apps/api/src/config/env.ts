@@ -27,6 +27,11 @@ const envSchema = z.object({
   // Base32 secret provisioned in Google Authenticator for destructive gateway actions.
   // Sensitive gateway mutations fail closed when this is not configured.
   GATEWAY_TOTP_SECRET: z.string().trim().min(16).optional(),
+  // The database wipe endpoint is deliberately disabled unless this is explicitly
+  // enabled in the deployed API environment.
+  DATABASE_WIPE_ENABLED: z.enum(['true', 'false']).default('false'),
+  BUSINESS_TIMEZONE: z.string().default('Asia/Kolkata'),
+  EOD_PRICE_JOBS_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 const productionSchema = envSchema.extend({

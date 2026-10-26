@@ -1,8 +1,12 @@
+import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../utils/db";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
-import { CreateAgreementSchema } from "@shared-types/validationSchemas/agreement.validation";
+import {
+  CreateAgreementSchema,
+  UpdateAgreementSchema,
+} from "@shared-types/validationSchemas/agreement.validation";
 import { PaginationQuerySchema } from "@shared-types/validationSchemas/member.validation";
 import { requireWorkflow } from '../../services/workflow-readiness';
 import {
@@ -14,13 +18,55 @@ export const createAgreement = asyncHandler(async (req, res) => {
   const input = CreateAgreementSchema.parse(req.body);
   const parentOrgId = req.membership!.organizationId;
   const agreement = await prisma.$transaction(async (tx) => {
+    let networkConnectionId = input.networkConnectionId;
+    if (!networkConnectionId) {
+      // Sending an agreement is the relationship-creation action. Serialize on
+      // the child so concurrent sends cannot create competing connections.
+      await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${input.childOrgId} FOR UPDATE`;
+      const [parent, child] = await Promise.all([
+        tx.organization.findUnique({ where: { id: parentOrgId }, select: { id: true, type: true } }),
+        tx.organization.findUnique({ where: { id: input.childOrgId }, select: { id: true, type: true, parentOrgId: true } }),
+      ]);
+      if (!parent || !child) throw new ApiError(404, "Organization not found");
+      if (
+        parentOrgId === child.id ||
+        !((parent.type === "COMPANY" && ["DISTRIBUTOR", "PARTNER"].includes(child.type)) ||
+          (parent.type === "DISTRIBUTOR" && child.type === "PARTNER"))
+      ) {
+        throw new ApiError(400, "Invalid parent/child organization relationship");
+      }
+      const existing = await tx.networkConnection.findFirst({
+        where: { initiatorOrgId: parentOrgId, receiverOrgId: child.id },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      });
+      if (existing) {
+        networkConnectionId = existing.id;
+        if (existing.status !== "ACTIVE") {
+          await tx.networkConnection.update({ where: { id: existing.id }, data: { status: "ACTIVE" } });
+        }
+      } else {
+        const connection = await tx.networkConnection.create({
+          data: { initiatorOrgId: parentOrgId, receiverOrgId: child.id, status: "ACTIVE" },
+        });
+        networkConnectionId = connection.id;
+      }
+    }
     const { parent } = await lockAgreementParties(
       tx,
       parentOrgId,
       input.childOrgId,
-      input.networkConnectionId,
+      networkConnectionId,
     );
     await requireAgreementSlot(tx, parentOrgId, input.childOrgId, parent.type);
+    const childOrganization = await tx.organization.findUnique({
+      where: { id: input.childOrgId },
+      select: { type: true, parentOrgId: true },
+    });
+    if (!childOrganization) throw new ApiError(404, "Organization not found");
+    const childIsDirectCompanyPartner =
+      parent.type === "COMPANY" &&
+      childOrganization.type === "PARTNER" &&
+      childOrganization.parentOrgId === parentOrgId;
     let parentSharePct: number,
       childSharePct: number,
       depositAmountPerMachine: number,
@@ -38,10 +84,16 @@ export const createAgreement = asyncHandler(async (req, res) => {
           400,
           "Distributor must have an active Company agreement",
         );
-      parentSharePct = 60;
-      childSharePct = 40;
-      depositAmountPerMachine = upstream.depositAmountPerMachine;
-      nonRefundableAmountPerMachine = upstream.nonRefundableAmountPerMachine;
+      if (
+        (input.parentSharePct === undefined) !== (input.childSharePct === undefined) ||
+        (input.depositAmountPerMachine === undefined) !== (input.nonRefundableAmountPerMachine === undefined)
+      ) {
+        throw new ApiError(400, "Distributor agreements require both shares and both per-kiosk amounts");
+      }
+      parentSharePct = input.parentSharePct ?? 60;
+      childSharePct = input.childSharePct ?? 40;
+      depositAmountPerMachine = input.depositAmountPerMachine ?? upstream.depositAmountPerMachine;
+      nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine ?? upstream.nonRefundableAmountPerMachine;
     } else {
       if (
         input.parentSharePct === undefined ||
@@ -60,16 +112,21 @@ export const createAgreement = asyncHandler(async (req, res) => {
       depositAmountPerMachine = input.depositAmountPerMachine;
       nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine;
     }
+    const activatesImmediately =
+      parent.type === "DISTRIBUTOR" ||
+      (parent.type === "COMPANY" && childIsDirectCompanyPartner);
     return tx.agreement.create({
       data: {
-        networkConnectionId: input.networkConnectionId,
+        networkConnectionId,
         parentOrgId,
         childOrgId: input.childOrgId,
         parentSharePct,
         childSharePct,
         depositAmountPerMachine,
         nonRefundableAmountPerMachine,
-        status: "PENDING_APPROVAL",
+        // Distributor-to-Partner terms and direct Company-created Partner terms
+        // are controlled by the creating master organization and activate immediately.
+        status: activatesImmediately ? "ACTIVE" : "PENDING_APPROVAL",
         effectiveFrom: new Date(),
       },
     });
@@ -80,7 +137,7 @@ export const createAgreement = asyncHandler(async (req, res) => {
       new ApiResponse(
         201,
         { agreement },
-        "Agreement drafted and sent for approval",
+        agreement.status === "ACTIVE" ? "Agreement created and activated" : "Agreement drafted and sent for approval",
       ),
     );
 });
@@ -121,6 +178,136 @@ export const approveAgreement = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(200, { agreement }, "Agreement approved and now active"),
     );
+});
+
+/**
+ * Replace an active agreement without rewriting its history. The old row is
+ * closed at the same instant the new row becomes effective, so revenue
+ * statements can resolve the terms that were active for each transaction.
+ */
+async function replaceActiveAgreement(
+  tx: Prisma.TransactionClient,
+  current: {
+    id: string;
+    networkConnectionId: string;
+    parentOrgId: string;
+    childOrgId: string;
+  },
+  effectiveAt: Date,
+  terms: {
+    parentSharePct: number;
+    childSharePct: number;
+    depositAmountPerMachine: number;
+    nonRefundableAmountPerMachine: number;
+  },
+) {
+  await tx.agreement.update({
+    where: { id: current.id },
+    data: { status: "TERMINATED", effectiveTo: effectiveAt },
+  });
+  return tx.agreement.create({
+    data: {
+      networkConnectionId: current.networkConnectionId,
+      parentOrgId: current.parentOrgId,
+      childOrgId: current.childOrgId,
+      parentSharePct: terms.parentSharePct,
+      childSharePct: terms.childSharePct,
+      depositAmountPerMachine: terms.depositAmountPerMachine,
+      nonRefundableAmountPerMachine: terms.nonRefundableAmountPerMachine,
+      status: "ACTIVE",
+      effectiveFrom: effectiveAt,
+    },
+  });
+}
+
+export const updateAgreement = asyncHandler(async (req, res) => {
+  const id = req.params.agreementId;
+  if (typeof id !== "string") throw new ApiError(400, "Invalid agreement ID");
+  const input = UpdateAgreementSchema.parse(req.body);
+  const parentOrgId = req.membership!.organizationId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Agreement" WHERE id=${id} FOR UPDATE`;
+    const current = await tx.agreement.findUnique({
+      where: { id },
+      include: {
+        parentOrg: { select: { id: true, type: true } },
+        childOrg: { select: { id: true, type: true } },
+      },
+    });
+    if (!current || current.parentOrgId !== parentOrgId || current.status !== "ACTIVE") {
+      throw new ApiError(404, "Active agreement not found or unauthorized");
+    }
+
+    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${current.childOrgId} FOR UPDATE`;
+    const effectiveAt = new Date();
+    let terms: {
+      parentSharePct: number;
+      childSharePct: number;
+      depositAmountPerMachine: number;
+      nonRefundableAmountPerMachine: number;
+    };
+
+    if (current.parentOrg.type === "COMPANY") {
+      if (
+        input.parentSharePct === undefined ||
+        input.childSharePct === undefined ||
+        input.depositAmountPerMachine === undefined ||
+        input.nonRefundableAmountPerMachine === undefined
+      ) {
+        throw new ApiError(
+          400,
+          "Company agreement updates require both shares and both per-kiosk amounts",
+        );
+      }
+      terms = {
+        parentSharePct: input.parentSharePct,
+        childSharePct: input.childSharePct,
+        depositAmountPerMachine: input.depositAmountPerMachine,
+        nonRefundableAmountPerMachine: input.nonRefundableAmountPerMachine,
+      };
+    } else {
+      const upstream = await tx.agreement.findFirst({
+        where: {
+          parentOrg: { is: { type: "COMPANY" } },
+          childOrgId: current.parentOrgId,
+          status: "ACTIVE",
+        },
+      });
+      if (!upstream) {
+        throw new ApiError(409, "Distributor has no active Company agreement");
+      }
+      if (
+        (input.depositAmountPerMachine === undefined) !==
+        (input.nonRefundableAmountPerMachine === undefined)
+      ) {
+        throw new ApiError(400, "Distributor agreements require both per-kiosk amounts");
+      }
+      terms = {
+        parentSharePct: input.parentSharePct ?? Number(current.parentSharePct),
+        childSharePct: input.childSharePct ?? Number(current.childSharePct),
+        depositAmountPerMachine:
+          input.depositAmountPerMachine ?? Number(current.depositAmountPerMachine),
+        nonRefundableAmountPerMachine:
+          input.nonRefundableAmountPerMachine ?? Number(current.nonRefundableAmountPerMachine),
+      };
+    }
+
+    const agreement = await replaceActiveAgreement(tx, current, effectiveAt, terms);
+    let cascadedAgreements = 0;
+
+    return { agreement, cascadedAgreements };
+  });
+
+  res.json(
+    new ApiResponse(
+      200,
+      result,
+      result.cascadedAgreements
+        ? `Agreement updated; ${result.cascadedAgreements} Partner agreement(s) also updated`
+        : "Agreement updated successfully",
+    ),
+  );
 });
 
 export const terminateAgreement = asyncHandler(async (req, res) => {

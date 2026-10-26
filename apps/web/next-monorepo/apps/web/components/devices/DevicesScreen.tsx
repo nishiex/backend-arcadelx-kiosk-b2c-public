@@ -13,12 +13,15 @@ import {
   rejectDevicePriceRequest,
   requestDeviceGamePrice,
   type DevicePriceRequest,
+  resetAllDevicePrices,
   resetDevicePrices,
   setDeviceGamePrice,
   type DeviceView,
   type GamePriceView,
+  type EodPriceUpdate,
 } from "@/lib/devices-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
+import MothershipPairingPanel from "./MothershipPairingPanel"
 
 const buttonClass =
   "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
@@ -40,6 +43,12 @@ function gameHasOverride(game: GamePriceView): boolean {
     Math.abs(game.effectivePrice - game.basePrice) >= 0.001 ||
     Math.abs(game.effectiveReplayPrice - game.baseReplayPrice) >= 0.001
   )
+}
+
+function EodStatus({ update }: { update: EodPriceUpdate }) {
+  const label = update.status === "PENDING" ? "Scheduled" : update.status === "PROCESSING" ? "Applying" : update.status === "APPLIED" ? "Applied" : "Failed"
+  const tone = update.status === "FAILED" ? "text-destructive" : update.status === "APPLIED" ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"
+  return <span className={`text-xs font-medium ${tone}`} title={update.lastError ?? undefined}>{label}: {inr.format(update.price)}</span>
 }
 
 const TABS = [
@@ -65,7 +74,7 @@ type TabId = (typeof TABS)[number]["id"]
  * OWNER/ADMIN, matching the API route.
  */
 export default function DevicesScreen() {
-  const { me, isLoading, canViewDevices, canManageDevicePrices, canRequestDevicePrices } = useMe()
+  const { me, isLoading, isMasterAdmin, canViewDevices, canManageDevicePrices, canRequestDevicePrices, canReviewDevicePriceRequests } = useMe()
   const qc = useQueryClient()
   const [tab, setTab] = useState<TabId>("fleet")
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
@@ -78,7 +87,7 @@ export default function DevicesScreen() {
     staleTime: 30_000,
     retry: 1,
   })
-  const prices = useQuery({
+  const prices = useQuery<Awaited<ReturnType<typeof fetchDevicePrices>>>({
     queryKey: ["device-prices", selectedDevice, ...scope],
     queryFn: () => fetchDevicePrices(selectedDevice!),
     enabled: !!selectedDevice,
@@ -88,7 +97,7 @@ export default function DevicesScreen() {
   const requests = useQuery({
     queryKey: ["device-price-requests", ...scope],
     queryFn: fetchDevicePriceRequests,
-    enabled: canManageDevicePrices,
+    enabled: canReviewDevicePriceRequests,
     staleTime: 15_000,
   })
 
@@ -125,7 +134,7 @@ export default function DevicesScreen() {
         </button>
       </header>
 
-      {canManageDevicePrices && (
+      {canReviewDevicePriceRequests && (
         <PriceRequestQueue
           requests={requests.data?.requests ?? []}
           loading={requests.isLoading}
@@ -150,6 +159,8 @@ export default function DevicesScreen() {
           </button>
         ))}
       </div>
+
+      {isMasterAdmin && <MothershipPairingPanel onPaired={() => devices.refetch()} />}
 
       {devices.isError ? (
         <ErrorState message="Couldn't load the device fleet." onRetry={() => devices.refetch()} />
@@ -219,7 +230,7 @@ function PriceRequestQueue({
       <div className="space-y-3">
         <div>
           <h2 className="font-semibold">Pending price requests</h2>
-          <p className="text-sm text-muted-foreground">Review requests from distributors and partners before they reach a kiosk.</p>
+          <p className="text-sm text-muted-foreground">Review incoming price requests before they reach a kiosk.</p>
         </div>
         <div className="divide-y divide-border">
           {pending.map(request => (
@@ -367,7 +378,7 @@ function PricingTab({
   devices: DeviceView[]
   selectedDevice: string | null
   onSelectDevice: (deviceId: string | null) => void
-  prices: ReturnType<typeof useQuery<{ deviceId: string; games: GamePriceView[] }>>
+  prices: ReturnType<typeof useQuery<Awaited<ReturnType<typeof fetchDevicePrices>>>>
   canWrite: boolean
   canRequest: boolean
   onSaved: () => Promise<void>
@@ -416,6 +427,8 @@ function PricingTab({
         <GamePriceTable
           deviceId={selectedDevice}
           games={prices.data.games}
+          eod={prices.data.eod}
+          eodMeta={prices.data.eodMeta}
           canWrite={canWrite}
           canRequest={canRequest}
           onSaved={onSaved}
@@ -428,12 +441,16 @@ function PricingTab({
 function GamePriceTable({
   deviceId,
   games,
+  eod,
+  eodMeta,
   canWrite,
   canRequest,
   onSaved,
 }: {
   deviceId: string
   games: GamePriceView[]
+  eod: Record<string, EodPriceUpdate | null>
+  eodMeta: { timezone: string; nextExecutionAt: string }
   canWrite: boolean
   canRequest: boolean
   onSaved: () => Promise<void>
@@ -455,6 +472,19 @@ function GamePriceTable({
     onError: (error: unknown) =>
       toast.error(error instanceof Error ? error.message : "Couldn't reset device prices"),
   })
+  const resetAllMutation = useMutation({
+    mutationFn: resetAllDevicePrices,
+    onSuccess: async result => {
+      toast.success(
+        result.gamesReset > 0
+          ? `Reset ${result.gamesReset} overrides across ${result.devicesReset} kiosks`
+          : "No device price overrides to reset",
+      )
+      await onSaved()
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Couldn't reset fleet device prices"),
+  })
 
   return (
     <div className="space-y-4">
@@ -465,24 +495,39 @@ function GamePriceTable({
           {overrides > 0 && ` · ${overrides} with a price override`}
         </p>
         {canWrite && (
-          <button
-            type="button"
-            onClick={() => setConfirmingReset(true)}
-            disabled={resetMutation.isPending || overrides === 0}
-            title={overrides === 0 ? "This device has no price overrides" : undefined}
-            className={buttonClass}
-          >
-            Reset device overrides
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(true)}
+              disabled={resetMutation.isPending || resetAllMutation.isPending || overrides === 0}
+              title={overrides === 0 ? "This device has no price overrides" : undefined}
+              className={buttonClass}
+            >
+              Reset device overrides
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Reset device overrides across all kiosks? Catalog prices will not change.")) {
+                  resetAllMutation.mutate()
+                }
+              }}
+              disabled={resetMutation.isPending || resetAllMutation.isPending}
+              className={buttonClass}
+            >
+              {resetAllMutation.isPending ? "Resetting all…" : "Reset all kiosk overrides"}
+            </button>
+          </div>
         )}
       </div>
       {(canWrite || canRequest) && (
         <p role="status" className="text-sm text-muted-foreground">
           {canRequest
             ? "Price changes are sent to the Company master admin for approval."
-            : "Price changes apply only to the selected device by default, and each save is read back and checked."}
+            : `Device changes are scheduled for midnight (${eodMeta.timezone}) and verified after application.`}
         </p>
       )}
+      {(canWrite || canRequest) && <p role="status" className="text-xs text-muted-foreground">Next EOD run: {new Date(eodMeta.nextExecutionAt).toLocaleString("en-IN", { timeZone: eodMeta.timezone })}</p>}
       {confirmingReset && (
         <div
           role="alertdialog"
@@ -533,6 +578,7 @@ function GamePriceTable({
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Replay price</th>
               <th className="px-4 py-3 font-medium">Source</th>
+              <th className="px-4 py-3 font-medium">Update Price</th>
               {(canWrite || canRequest) && <th className="px-4 py-3 text-right font-medium">Change</th>}
             </tr>
           </thead>
@@ -557,6 +603,7 @@ function GamePriceTable({
                       <span className="text-xs text-muted-foreground">Default</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">{eod[game.gameId] ? <EodStatus update={eod[game.gameId]!} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   {(canWrite || canRequest) && (
                     <td className="px-4 py-3 text-right">
                       <button
@@ -573,10 +620,12 @@ function GamePriceTable({
                 </tr>
                 {editingGame?.gameId === game.gameId && (
                   <tr>
-                    <td colSpan={canWrite || canRequest ? 5 : 4} className="p-3">
+                    <td colSpan={canWrite || canRequest ? 6 : 5} className="p-3">
                       <DeviceGamePriceEditor
                         deviceId={deviceId}
                         game={game}
+                        scheduledUpdate={eod[game.gameId] ?? null}
+                        eodMeta={eodMeta}
                         requestOnly={canRequest && !canWrite}
                         onCancel={() => setEditingGame(null)}
                         onSaved={async () => {
@@ -599,18 +648,22 @@ function GamePriceTable({
 function DeviceGamePriceEditor({
   deviceId,
   game,
+  scheduledUpdate,
+  eodMeta,
   requestOnly,
   onCancel,
   onSaved,
 }: {
   deviceId: string
   game: GamePriceView
+  scheduledUpdate: EodPriceUpdate | null
+  eodMeta: { timezone: string; nextExecutionAt: string }
   requestOnly: boolean
   onCancel: () => void
   onSaved: () => Promise<void>
 }) {
-  const [price, setPrice] = React.useState(String(game.effectivePrice))
-  const [replayPrice, setReplayPrice] = React.useState(String(game.effectiveReplayPrice))
+  const [price, setPrice] = React.useState(String(scheduledUpdate?.price ?? game.effectivePrice))
+  const [replayPrice, setReplayPrice] = React.useState(String(scheduledUpdate?.replayPrice ?? game.effectiveReplayPrice))
   const [confirmingCatalog, setConfirmingCatalog] = React.useState(false)
   const requestMutation = useMutation({
     mutationFn: () => requestDeviceGamePrice(deviceId, game.gameId, {
@@ -618,7 +671,7 @@ function DeviceGamePriceEditor({
       replay_price: Number(replayPrice),
     }),
     onSuccess: async () => {
-      toast.success("Price change request sent to the Company master admin")
+      toast.success("Price change request sent to the reviewing administrator")
       await onSaved()
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't send price request"),
@@ -646,7 +699,9 @@ function DeviceGamePriceEditor({
       }),
     onSuccess: async result => {
       toast.success(
-        `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+        result.status === "PENDING"
+          ? `${result.displayName} scheduled for midnight on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+          : `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
       )
       await onSaved()
     },
@@ -685,8 +740,9 @@ function DeviceGamePriceEditor({
         <p className="text-sm text-muted-foreground">
           {requestOnly
             ? "Your request will be sent to the Company master admin for approval."
-            : <>Only <span className="font-mono text-xs">{deviceId}</span> will be updated by default.</>}
+            : <>Current live price: <span className="font-medium text-foreground">{inr.format(game.effectivePrice)}</span> / replay {inr.format(game.effectiveReplayPrice)}. The price below is the scheduled EOD price; it will apply to only <span className="font-mono text-xs">{deviceId}</span> at midnight ({eodMeta.timezone}).</>}
         </p>
+        {!requestOnly && <p role="note" className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">Until then, the current live price remains active. After the upstream device update is verified, this row will show <strong>Applied</strong>. Failed updates remain visible for retry.</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">

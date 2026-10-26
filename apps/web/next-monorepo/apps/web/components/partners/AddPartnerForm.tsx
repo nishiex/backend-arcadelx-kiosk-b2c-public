@@ -67,7 +67,7 @@ function PartnerForm({ modal }: { modal: boolean }) {
         </div>
       ) : (
         <form onSubmit={event => { void handleSubmit(submit)(event) }} className="space-y-5 rounded-xl border border-border bg-card p-6">
-          <p className="text-sm text-muted-foreground">We’ll email the partner a generated password so they can sign in.</p>
+          <p className="text-sm text-muted-foreground">We’ll email the partner a generated password so they can sign in. The Company Master Admin can register Partners directly.</p>
           <fieldset disabled={create.isPending} className="grid gap-4 sm:grid-cols-2">
             {fields.map(field => (
               <div key={field.name}>
@@ -130,9 +130,9 @@ function PartnerForm({ modal }: { modal: boolean }) {
               {errors.pincode && <p id="pincode-error" className="mt-1 text-xs text-destructive">{errors.pincode.message}</p>}
             </div>
             <div>
-              <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number<span className="ml-1 text-destructive" aria-hidden="true">*</span></label>
+              <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number <span className="text-xs font-normal text-muted-foreground">(optional)</span></label>
               <input id="gstNumber" maxLength={30} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                {...register("gstNumber", { required: "GST number is required", setValueAs: (value: string) => value.trim(), maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
+                {...register("gstNumber", { setValueAs: (value: string) => value.trim() || undefined, maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
               {errors.gstNumber && <p className="mt-1 text-xs text-destructive">{errors.gstNumber.message}</p>}
             </div>
           </fieldset>
@@ -157,7 +157,7 @@ function PartnerForm({ modal }: { modal: boolean }) {
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-xl sm:p-6">
           <Dialog.Title className="pr-10 text-xl font-semibold">Register Partner</Dialog.Title>
-          <Dialog.Description className="mb-5 mt-2 text-sm text-muted-foreground">Create a partner account from your distributor dashboard.</Dialog.Description>
+          <Dialog.Description className="mb-5 mt-2 text-sm text-muted-foreground">Create a partner account from your dashboard.</Dialog.Description>
           <Dialog.Close disabled={create.isPending || retry.isPending} aria-label="Close partner registration" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted disabled:opacity-50"><X size={18} /></Dialog.Close>
           {content}
         </Dialog.Content>

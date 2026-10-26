@@ -14,10 +14,12 @@ import {
   getOrderRequests,
   getOrderDetails,
   markOrderAsPaid,
+  requestCashPayment,
   dispatchOrder,
   deliverOrder,
   retryOrderInvoice,
   getRequestModelAvailability,
+  updateOrderPricing,
 } from "../../controllers/Orders/orders.controller";
 
 const router = Router();
@@ -42,6 +44,14 @@ router.post(
   createOrder,
 );
 
+// Existing order pricing is editable only by the Company Master Admin (COMPANY OWNER).
+router.patch(
+  "/:orderId/pricing",
+  requireOrgType("COMPANY"),
+  requireRole("OWNER"),
+  updateOrderPricing,
+);
+
 //Only Company can approve order request as only that org type can recuive Order requests , Not the distributor
 router.patch(
   "/:orderId/approve",
@@ -50,6 +60,12 @@ router.patch(
   approveOrder,
 );
 
+router.post(
+  "/:orderId/payment/cash-request",
+  requireOrgType("DISTRIBUTOR", "PARTNER"),
+  requireRole("OWNER", "ADMIN"),
+  requestCashPayment,
+);
 router.patch('/:orderId/reject', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), rejectOrder);
 
 //Mark Order as Paid

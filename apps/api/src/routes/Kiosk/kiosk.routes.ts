@@ -3,6 +3,7 @@ import {
   batchCreateKiosks,
   getKiosks,
   getKioskById,
+  assignKiosks,
   updateKioskStatus,
   getInventorySummary,
 } from "../../controllers/Kiosk/kiosk.controller";
@@ -27,6 +28,12 @@ router.post(
 
 router.get("/", getKiosks);
 router.get("/summary", getInventorySummary); // Place before /:id so 'summary' isn't treated as an ID
+router.post(
+  "/assign",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  assignKiosks,
+);
 router.get("/:id", getKioskById);
 router.patch(
   "/:id/status",

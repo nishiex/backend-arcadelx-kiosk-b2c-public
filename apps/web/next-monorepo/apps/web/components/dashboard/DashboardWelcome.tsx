@@ -146,6 +146,9 @@ export default function DashboardWelcome() {
   const firstName = me?.name?.split(" ")[0] ?? "there"
   // Display branding only; COMPANY/OWNER remain the authoritative API values.
   const isMasterAdmin = orgType === "COMPANY" && role === "OWNER" && me?.membership?.status === "ACTIVE"
+  const parentDistributor = orgType === "PARTNER" && me?.membership?.organization.parentOrg?.type === "DISTRIBUTOR"
+    ? me.membership.organization.parentOrg
+    : null
 
   return (
     <div
@@ -191,9 +194,23 @@ export default function DashboardWelcome() {
               <span className="leading-tight">
                 <span className="block text-sm font-medium">{isMasterAdmin ? "ArcadeLX" : orgName}</span>
                 <span className="block text-[11px] tracking-wide text-muted-foreground">
-                  {isMasterAdmin ? "Master Admin" : `${orgType ?? ""}${role ? ` · ${role}` : ""}`}
+                  {isMasterAdmin ? "Master Admin" : (orgType ?? "")}
                 </span>
               </span>
+            </div>
+          )}
+
+          {parentDistributor && (
+            <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 text-sm backdrop-blur">
+              <p className="font-semibold">Your Distributor</p>
+              <p className="mt-1 font-medium">{parentDistributor.name}</p>
+              <div className="mt-2 space-y-1 text-muted-foreground">
+                {parentDistributor.owner?.email && <p>Email: {parentDistributor.owner.email}</p>}
+                {parentDistributor.phone && <p>Phone: {parentDistributor.phone}</p>}
+                {(parentDistributor.address || parentDistributor.city || parentDistributor.state) && (
+                  <p>Address: {[parentDistributor.address, parentDistributor.city, parentDistributor.state].filter(Boolean).join(", ")}</p>
+                )}
+              </div>
             </div>
           )}
         </div>

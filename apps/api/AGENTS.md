@@ -104,6 +104,23 @@ devices stayed unchanged. A device that does not confirm the requested prices st
 502 rather than success. `audits/devices/device-price-readback-check.ts` covers the sparse
 response shape with mocked upstream requests and performs no live writes.
 
+## Device game pricing updates
+
+Whenever any device game pricing is updated, ensure the changes are reflected in the
+corresponding device game pricing records. Verify that all related pricing updates are
+applied correctly and consistently whenever changes are made.
+
+EOD deadline: all device game prices for the current business day must be finalized, updated,
+saved, and verified by 12:00 AM (midnight) at the end of that day, before the next day begins.
+
+Device-scoped Company edits are persisted in `EodDevicePriceUpdate` keyed by device, game and
+business date; repeated edits replace the same day's intent. Enable `EOD_PRICE_JOBS_ENABLED=true`
+with `REDIS_URL` to run the durable BullMQ scheduler at `BUSINESS_TIMEZONE` midnight (default
+`Asia/Kolkata`). The worker claims updates atomically, retries upstream failures, recovers stale
+claims after restart, and only records `APPLIED` after the Mothership service verifies read-back.
+The device prices response includes current-day EOD status, unresolved prior failures, timezone,
+and the next execution instant for the UI.
+
 ## Reservation ordering and company allocation (2026-10-07)
 
 `reserveKiosks` used to select stock with `ORDER BY "createdAt", id LIMIT n`. Since

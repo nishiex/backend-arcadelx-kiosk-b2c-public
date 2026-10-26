@@ -6,6 +6,7 @@ import {
   type DeviceView,
   type GamePriceView,
   type ResetDevicePricesResult,
+  type ResetAllDevicePricesResult,
   type SetDeviceGamePriceInput,
   type SetDeviceGamePriceResult,
   type UpstreamCatalogGame,
@@ -344,16 +345,23 @@ function sameCatalogPrices(
 export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePricesResult> {
   const [{ devices }, catalogBefore] = await Promise.all([listDevices(), getGameCatalog()]);
   const deviceIds = [...new Set(devices.map((device) => device.deviceId))];
-  if (!deviceIds.includes(deviceId)) {
+  // Callers may use either Mothership's machine code (`device_id`) or the
+  // external hardware UUID (`hardware_uuid`). Reset always uses the canonical
+  // machine code when calling the upstream endpoint.
+  const selectedDevice = devices.find(
+    (device) => device.deviceId === deviceId || device.hardwareUuid === deviceId,
+  );
+  if (!selectedDevice) {
     throw new ApiError(404, 'Mothership device was not found', { deviceId });
   }
+  const canonicalDeviceId = selectedDevice.deviceId;
 
   const before = new Map(
     await Promise.all(
       deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogBefore)] as const),
     ),
   );
-  const targetBefore = before.get(deviceId);
+  const targetBefore = before.get(canonicalDeviceId);
   if (!targetBefore) {
     throw new ApiError(502, 'Could not read selected device prices before reset', { deviceId });
   }
@@ -365,7 +373,7 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
   }
 
   await callMothership(
-    `/api/v1/devices/${encodeURIComponent(deviceId)}/prices/reset`,
+    `/api/v1/devices/${encodeURIComponent(canonicalDeviceId)}/prices/reset`,
     { method: 'POST' },
   );
 
@@ -378,7 +386,7 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
       deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogAfter)] as const),
     ),
   );
-  const targetAfter = after.get(deviceId);
+  const targetAfter = after.get(canonicalDeviceId);
   if (!targetAfter) {
     throw new ApiError(502, 'Could not verify selected device prices after reset', { deviceId });
   }
@@ -394,7 +402,7 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
 
   const changedDevices: string[] = [];
   for (const id of deviceIds) {
-    if (id === deviceId) continue;
+    if (id === canonicalDeviceId) continue;
     const beforePrices = before.get(id);
     const afterPrices = after.get(id);
     if (!beforePrices || !afterPrices) {
@@ -413,6 +421,53 @@ export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePr
   }
 
   return { deviceId, gamesReset, scope: 'DEVICE_OVERRIDES' };
+}
+
+/** Reset device-scoped overrides across the entire Mothership fleet. */
+export async function resetAllDevicePrices(): Promise<ResetAllDevicePricesResult> {
+  const [{ devices }, catalogBefore] = await Promise.all([listDevices(), getGameCatalog()]);
+  const deviceIds = [...new Set(devices.map((device) => device.deviceId))];
+  const before = new Map(
+    await Promise.all(
+      deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogBefore)] as const),
+    ),
+  );
+  const targets = deviceIds.filter((id) => (before.get(id) ?? []).some(hasPriceOverride));
+  if (targets.length === 0) {
+    return { devicesReset: 0, gamesReset: 0, scope: 'ALL_DEVICE_OVERRIDES' };
+  }
+
+  for (const id of targets) {
+    await callMothership(`/api/v1/devices/${encodeURIComponent(id)}/prices/reset`, { method: 'POST' });
+  }
+
+  const catalogAfter = await getGameCatalog();
+  if (!sameCatalogPrices(catalogBefore, catalogAfter)) {
+    throw new ApiError(502, 'Fleet reset changed catalog prices');
+  }
+  const after = new Map(
+    await Promise.all(
+      deviceIds.map(async (id) => [id, await getDevicePrices(id, catalogAfter)] as const),
+    ),
+  );
+  const remaining = targets.flatMap((id) =>
+    (after.get(id) ?? []).filter(hasPriceOverride).map((game) => `${id}:${game.gameId}`),
+  );
+  if (remaining.length > 0) {
+    throw new ApiError(502, 'Mothership did not reset all fleet device overrides', { remaining });
+  }
+  const changedOthers = deviceIds
+    .filter((id) => !targets.includes(id))
+    .filter((id) => !sameDevicePrices(before.get(id) ?? [], after.get(id) ?? []));
+  if (changedOthers.length > 0) {
+    throw new ApiError(502, 'Fleet reset changed devices that had no overrides', { changedOthers });
+  }
+
+  return {
+    devicesReset: targets.length,
+    gamesReset: targets.reduce((total, id) => total + (before.get(id) ?? []).filter(hasPriceOverride).length, 0),
+    scope: 'ALL_DEVICE_OVERRIDES',
+  };
 }
 
 /**
