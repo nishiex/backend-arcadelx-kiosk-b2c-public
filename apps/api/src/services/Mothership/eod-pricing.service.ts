@@ -21,7 +21,18 @@ export function nextEod(now = new Date()): string {
   return new Date(guess.getTime() - (renderedAsUtc - guess.getTime())).toISOString();
 }
 
+export async function assertDeviceNotRetired(deviceId: string) {
+  const kiosk = await prisma.kiosk.findFirst({
+    where: { OR: [{ externalDeviceId: deviceId }, { machineCode: deviceId }] },
+    select: { status: true },
+  });
+  if (kiosk?.status === 'RETIRED') {
+    throw new Error('Retired kiosks cannot receive game price changes');
+  }
+}
+
 export async function scheduleEodDevicePrice(input: { deviceId: string; gameId: string; displayName: string; price: number; replayPrice: number; createdById: string }) {
+  await assertDeviceNotRetired(input.deviceId);
   const day = new Date(`${businessDate()}T00:00:00.000Z`);
   return prisma.eodDevicePriceUpdate.upsert({
     where: { deviceId_gameId_businessDate: { deviceId: input.deviceId, gameId: input.gameId, businessDate: day } },
@@ -39,6 +50,7 @@ export async function processEodUpdate(id: string) {
   if (claimed.count !== 1) return { skipped: true };
   const row = await prisma.eodDevicePriceUpdate.findUniqueOrThrow({ where: { id } });
   try {
+    await assertDeviceNotRetired(row.deviceId);
     const result = await setDeviceGamePrice(row.deviceId, row.gameId, { price: Number(row.price), replay_price: Number(row.replayPrice), scope: 'DEVICE' });
     await prisma.eodDevicePriceUpdate.update({ where: { id }, data: { status: 'APPLIED', processingAt: null, appliedAt: new Date(), lastError: null, verifiedPrice: result.price, verifiedReplayPrice: result.replayPrice } });
     return { skipped: false, result };

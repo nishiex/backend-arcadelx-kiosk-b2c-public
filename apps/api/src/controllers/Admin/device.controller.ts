@@ -19,7 +19,7 @@ import {
   resetAllDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
-import { BUSINESS_TIMEZONE, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
+import { assertDeviceNotRetired, BUSINESS_TIMEZONE, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
 
 /**
  * Device fleet and per-device game pricing.
@@ -103,6 +103,14 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   if (!body.success) throw new ApiError(400, 'Invalid price payload', body.error.issues);
 
   await assertDeviceVisible(req, params.data.deviceId);
+  try {
+    await assertDeviceNotRetired(params.data.deviceId);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Retired kiosks cannot receive game price changes') {
+      throw new ApiError(409, error.message);
+    }
+    throw error;
+  }
 
   const games = await getDevicePrices(params.data.deviceId);
   const game = games.find((item) => item.gameId === params.data.gameId);
@@ -257,10 +265,13 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
         currentOrgId: request.requesterOrgId,
         OR: [{ externalDeviceId: request.deviceId }, { machineCode: request.deviceId }],
       },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!ownedKiosk) {
       throw new ApiError(409, 'The requested device is no longer assigned to that organization');
+    }
+    if (ownedKiosk.status === 'RETIRED') {
+      throw new ApiError(409, 'Retired kiosks cannot receive game price changes');
     }
     await scheduleEodDevicePrice({ deviceId: request.deviceId, gameId: request.gameId, displayName: request.displayName, price: Number(request.price), replayPrice: Number(request.replayPrice), createdById: request.requestedById });
     const approved = await prisma.devicePriceRequest.update({
