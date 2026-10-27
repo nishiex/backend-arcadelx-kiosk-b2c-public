@@ -199,7 +199,7 @@ export const registerOrganization = asyncHandler(
     // Do NOT generate access/refresh tokens here.
     // The parent organization user is already logged in.
 
-    // Don't send the temporary password in the API response ,password should go through email service.
+    // Do not send the temporary password in the API response; credentials are delivered by email.
     res.status(201).json(
       new ApiResponse(
         201,

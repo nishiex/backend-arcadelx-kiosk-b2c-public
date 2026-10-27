@@ -527,6 +527,7 @@ export type DistributorPartner = {
   state: string | null;
   city: string | null;
   owner: { id: string; name: string; email: string } | null;
+  agreementStatus: 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED' | null;
 };
 
 export async function fetchDistributors(): Promise<Distributor[]> {
@@ -983,10 +984,11 @@ export type AuditLogsResponse = {
 export async function fetchAuditLogs(
   page = 1,
   limit = 20,
-  filters: { actorOrgType?: OrgType; entity?: string; action?: string } = {}
+  filters: { actorOrgType?: OrgType; search?: string; entity?: string; action?: string } = {}
 ): Promise<AuditLogsResponse> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (filters.actorOrgType) params.set('actorOrgType', filters.actorOrgType);
+  if (filters.search) params.set('search', filters.search);
   if (filters.entity) params.set('entity', filters.entity);
   if (filters.action) params.set('action', filters.action);
   const res = await apiFetch(`/api/audit-logs?${params.toString()}`, { credentials: 'include' });

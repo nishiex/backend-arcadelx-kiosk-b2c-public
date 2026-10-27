@@ -9,6 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import {
   createAgreement,
   fetchAgreementsForChild,
+  fetchKiosks,
   terminateAgreement,
   updateAgreement,
   type Agreement,
@@ -99,6 +100,12 @@ export default function DistributorAgreementDialog({
     queryFn: ({ signal }) => fetchAgreementsForChild(distributor.id, signal),
     enabled: open,
   })
+  const kiosks = useQuery({
+    queryKey: ["distributor-agreement-kiosks", distributor.id],
+    queryFn: fetchKiosks,
+    enabled: open,
+    staleTime: 10_000,
+  })
 
   const current = currentAgreement(agreements.data ?? [])
 
@@ -115,7 +122,7 @@ export default function DistributorAgreementDialog({
   const draft = useMutation({
     mutationFn: (terms: Parameters<typeof createAgreement>[0]) => createAgreement(terms),
     onSuccess: async () => {
-      toast.success("Agreement submitted for approval")
+      toast.success("Agreement saved")
       await refresh()
       setDepositAmount("")
       setNonRefundableAmount("")
@@ -268,6 +275,29 @@ export default function DistributorAgreementDialog({
             ) : (
               <>
                 {current && <AgreementSummary agreement={current} />}
+
+                <section className="rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Assigned machines</p>
+                    <span className="text-xs text-muted-foreground">
+                      {(kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === distributor.id).length} machines
+                    </span>
+                  </div>
+                  {kiosks.isLoading ? (
+                    <p role="status" className="text-xs text-muted-foreground">Loading assigned machines…</p>
+                  ) : kiosks.isError ? (
+                    <p role="alert" className="text-xs text-destructive">Couldn&apos;t load assigned machines.</p>
+                  ) : !(kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === distributor.id).length ? (
+                    <p className="text-xs text-muted-foreground">No machines are currently assigned to this distributor.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="text-muted-foreground"><tr><th className="pb-2 pr-3 font-medium">Machine code</th><th className="pb-2 pr-3 font-medium">Model</th><th className="pb-2 pr-3 font-medium">Status</th><th className="pb-2 font-medium">Location</th></tr></thead>
+                        <tbody className="divide-y divide-border/60">{(kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === distributor.id).map(kiosk => <tr key={kiosk.id}><td className="py-2 pr-3 font-mono font-medium">{kiosk.machineCode}</td><td className="py-2 pr-3">{kiosk.model ?? "—"}</td><td className="py-2 pr-3">{kiosk.status.replaceAll("_", " ")}</td><td className="py-2 text-muted-foreground">{kiosk.location ?? "—"}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
 
                 {/* Termination frees the relationship's open slot, so the summary
                     disappears; confirm the outcome explicitly. */}
@@ -431,14 +461,14 @@ export default function DistributorAgreementDialog({
                       className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                     >
                       {draft.isPending && <Loader2 size={16} className="animate-spin" />}
-                      {draft.isPending ? "Sending for approval…" : "Send for approval"}
+                      {draft.isPending ? "Saving…" : "Save agreement"}
                     </button>
                   </form>
                 )}
 
                 {draft.isSuccess && (
                   <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                    Agreement drafted and sent to {distributor.name}&apos;s Owner for approval.
+                    Agreement saved for {distributor.name}. Approval can be handled separately.
                   </p>
                 )}
               </>

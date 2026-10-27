@@ -35,7 +35,7 @@ app.use(cookieParser());
 // Capture completed write requests after authentication/membership middleware has
 // populated the request context, while never recording audit-log reads themselves.
 app.use((req, res, next) => {
-  res.on('finish', () => {
+  res.once('finish', () => {
     void writeAuditLog(req, res).catch((error) => {
       console.error('[audit-log] write failed:', error instanceof Error ? error.message : String(error));
     });

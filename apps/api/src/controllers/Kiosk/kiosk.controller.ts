@@ -16,6 +16,12 @@ const AssignKiosksSchema = z.object({
   kioskIds: z.array(z.string().uuid()).min(1).max(200),
 });
 
+let retiredStatusReady: Promise<void> | null = null;
+function ensureRetiredKioskStatus() {
+  retiredStatusReady ??= prisma.$executeRawUnsafe(`ALTER TYPE "KioskStatus" ADD VALUE IF NOT EXISTS 'RETIRED'`).then(() => undefined);
+  return retiredStatusReady;
+}
+
 // Display-only organization references; do not expose contact or invite details.
 const kioskDisplaySelect = {
   id: true,
@@ -111,8 +117,18 @@ export const getKiosks = asyncHandler(async (req: Request, res: Response) => {
   const currentOrgId = req.membership!.organizationId;
   const orgType = req.membership!.type;
 
-  // Company sees all machines (or can filter). Distributors/Partners strictly see their current inventory.
-  const query = orgType === "COMPANY" ? {} : { currentOrgId };
+  // Company sees all machines. Distributors see their own inventory plus direct Partners'
+  // inventory so they can review what was transferred down their network.
+  let query: Prisma.KioskWhereInput = { currentOrgId };
+  if (orgType === "COMPANY") {
+    query = {};
+  } else if (orgType === "DISTRIBUTOR") {
+    const partners = await prisma.organization.findMany({
+      where: { parentOrgId: currentOrgId, type: "PARTNER", isActive: true },
+      select: { id: true },
+    });
+    query = { currentOrgId: { in: [currentOrgId, ...partners.map(partner => partner.id)] } };
+  }
 
   const kiosks = await prisma.kiosk.findMany({
     where: query,
@@ -232,6 +248,83 @@ export const assignKiosks = asyncHandler(async (req: Request, res: Response) => 
   });
 
   res.status(200).json(new ApiResponse(200, { kiosks: assigned, organization: target }, "Kiosks assigned successfully"));
+});
+
+/** Deactivate machines while preserving ownership, assignment history, and kiosk data. */
+export const deactivateKiosks = asyncHandler(async (req: Request, res: Response) => {
+  const { organizationId, kioskIds } = AssignKiosksSchema.parse(req.body);
+  const sourceOrgId = req.membership!.organizationId;
+  const sourceType = req.membership!.type;
+
+  if (!["COMPANY", "DISTRIBUTOR"].includes(sourceType)) {
+    throw new ApiError(403, "Only Master Admins and Distributors can deactivate kiosks");
+  }
+
+  const target = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, type: true, parentOrgId: true, isActive: true },
+  });
+  const expectedTargetType = sourceType === "COMPANY" ? "DISTRIBUTOR" : "PARTNER";
+  if (!target || !target.isActive || target.type !== expectedTargetType || target.parentOrgId !== sourceOrgId) {
+    throw new ApiError(403, "Kiosks can only be deactivated for your direct network children");
+  }
+
+  await ensureRetiredKioskStatus();
+
+  const returned = await prisma.$transaction(async (tx) => {
+    const kiosks = await tx.kiosk.findMany({
+      where: {
+        id: { in: kioskIds },
+        currentOrgId: organizationId,
+        status: { in: ["AVAILABLE", "RETURNED", "MAINTENANCE"] },
+        reservedOrderId: null,
+      },
+      select: { id: true, machineCode: true, model: true },
+    });
+    if (kiosks.length !== kioskIds.length) {
+      throw new ApiError(409, "One or more selected kiosks cannot be deactivated");
+    }
+
+    await tx.kiosk.updateMany({
+      where: { id: { in: kioskIds } },
+      data: { status: "RETIRED" },
+    });
+    return kiosks;
+  });
+
+  res.status(200).json(new ApiResponse(200, { kiosks: returned, organization: target }, "Kiosks deactivated successfully"));
+});
+
+/** Deactivate a kiosk in a Distributor/Partner inventory without deleting its history. */
+export const removeKiosk = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const organizationId = req.membership!.organizationId;
+  const organizationType = req.membership!.type;
+  if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
+  if (!["DISTRIBUTOR", "PARTNER"].includes(organizationType)) {
+    throw new ApiError(403, "Only Distributors and Partners can remove kiosks from inventory");
+  }
+
+  await ensureRetiredKioskStatus();
+
+  const kiosk = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id=${id} FOR UPDATE`;
+    const current = await tx.kiosk.findUnique({ where: { id } });
+    if (!current || current.currentOrgId !== organizationId) {
+      throw new ApiError(404, "Kiosk not found in your inventory");
+    }
+    if (current.reservedOrderId || ["RESERVED", "ASSIGNED", "RETIRED"].includes(current.status)) {
+      throw new ApiError(409, "Reserved, in-transit, and retired kiosks cannot be deactivated");
+    }
+
+    return tx.kiosk.update({
+      where: { id },
+      data: { status: "RETIRED" },
+      select: { id: true, machineCode: true, status: true, currentOrgId: true },
+    });
+  });
+
+  res.status(200).json(new ApiResponse(200, { kiosk }, "Kiosk deactivated successfully"));
 });
 
 export const updateKioskStatus = asyncHandler(

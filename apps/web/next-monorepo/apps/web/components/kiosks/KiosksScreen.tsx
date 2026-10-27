@@ -256,6 +256,7 @@ export default function KiosksScreen() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         canEdit={canTransact}
+        onRemoved={() => void refetch()}
       />
     </div>
   )

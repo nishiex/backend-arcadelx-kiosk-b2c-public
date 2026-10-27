@@ -346,7 +346,7 @@ export const getDistributors = asyncHandler(
 
     const partnersByDistributor = new Map<
       string,
-      { id: string; name: string; type: string; state: string | null; city: string | null; owner: { id: string; name: string; email: string } | null }[]
+      { id: string; name: string; type: string; state: string | null; city: string | null; owner: { id: string; name: string; email: string } | null; agreementStatus: string | null }[]
     >();
 
     if (visibleDistributorIds.length > 0) {
@@ -388,6 +388,9 @@ export const getDistributors = asyncHandler(
           select: {
             parentOrgId: true,
             childOrgId: true,
+            status: true,
+            createdAt: true,
+            id: true,
             parentOrg: { select: partnerSelect },
             childOrg: { select: partnerSelect },
           },
@@ -407,6 +410,16 @@ export const getDistributors = asyncHandler(
           },
         }),
       ]);
+
+      const agreementStatusByPartner = new Map<string, string>();
+      for (const agreement of [...agreementLinks].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id))) {
+        const distributorId = agreement.parentOrg.type === "DISTRIBUTOR" ? agreement.parentOrgId : agreement.childOrgId;
+        const partnerId = agreement.parentOrg.type === "PARTNER" ? agreement.parentOrgId : agreement.childOrgId;
+        if (visibleDistributorIds.includes(distributorId) && agreement.parentOrg.type !== agreement.childOrg.type) {
+          const key = `${distributorId}:${partnerId}`;
+          if (!agreementStatusByPartner.has(key)) agreementStatusByPartner.set(key, agreement.status);
+        }
+      }
 
       const links = [
         ...registeredPartners.map((partner) => ({
@@ -436,7 +449,9 @@ export const getDistributors = asyncHandler(
           if (anchor.type !== "DISTRIBUTOR") continue;
           if (candidate.type !== "PARTNER" || candidate.id === companyOrgId) continue;
           const list = partnersByDistributor.get(anchorId) ?? [];
-          if (!list.some((partner) => partner.id === candidate.id)) list.push(candidate);
+          if (!list.some((partner) => partner.id === candidate.id)) {
+            list.push({ ...candidate, agreementStatus: agreementStatusByPartner.get(`${anchorId}:${candidate.id}`) ?? null });
+          }
           partnersByDistributor.set(anchorId, list);
         }
       }

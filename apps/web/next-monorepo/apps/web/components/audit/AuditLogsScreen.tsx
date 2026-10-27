@@ -2,10 +2,11 @@
 
 import React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { RefreshCw, Search } from "lucide-react"
+import { Download, FileText, RefreshCw, Search } from "lucide-react"
 import { useMe } from "@/hooks/useMe"
 import { fetchAuditLogs, type OrgType } from "@/lib/backend-api"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
+import { downloadCsv, downloadPdf } from "@/lib/export-utils"
 
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
 
@@ -13,11 +14,12 @@ export default function AuditLogsScreen() {
   const { canManageMembers, isLoading } = useMe()
   const [page, setPage] = React.useState(1)
   const [actorOrgType, setActorOrgType] = React.useState<OrgType | "">("")
+  const [search, setSearch] = React.useState("")
   const [entity, setEntity] = React.useState("")
   const [action, setAction] = React.useState("")
   const logs = useQuery({
-    queryKey: ["audit-logs", page, actorOrgType, entity, action],
-    queryFn: () => fetchAuditLogs(page, 20, { actorOrgType: actorOrgType || undefined, entity: entity || undefined, action: action || undefined }),
+    queryKey: ["audit-logs", page, actorOrgType, search, entity, action],
+    queryFn: () => fetchAuditLogs(page, 20, { actorOrgType: actorOrgType || undefined, search: search || undefined, entity: entity || undefined, action: action || undefined }),
     enabled: canManageMembers,
     staleTime: 10_000,
   })
@@ -26,17 +28,23 @@ export default function AuditLogsScreen() {
   if (!canManageMembers) return <EmptyState message="Only Company Owners and Admins can view audit logs." />
   const rows = logs.data?.logs ?? []
   const meta = logs.data?.meta
+  const exportHeaders = ["Time", "Actor", "Organization", "Action", "Entity", "Reference", "Status", "Status code", "Path"]
+  const exportRows = rows.map(log => [new Date(log.createdAt).toLocaleString(), log.actorName, log.actorOrgName ?? log.actorOrgType ?? "", log.action, log.entity, log.reference ?? "", log.status, log.statusCode, `${log.method} ${log.path}`])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1><p className="mt-1 text-sm text-muted-foreground">Review write actions across the network.</p></div>
-        <button type="button" onClick={() => void logs.refetch()} disabled={logs.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><RefreshCw size={15} className={logs.isFetching ? "animate-spin" : ""} /> Refresh</button>
+        <div><h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1><p className="mt-1 text-sm text-muted-foreground">Review API activity across the network.</p></div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => downloadCsv("audit-logs.csv", exportHeaders, exportRows)} disabled={!rows.length} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><Download size={15} /> CSV</button>
+          <button type="button" onClick={() => downloadPdf("audit-logs.pdf", "Audit Logs", exportHeaders, exportRows)} disabled={!rows.length} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><FileText size={15} /> PDF</button>
+          <button type="button" onClick={() => void logs.refetch()} disabled={logs.isFetching} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><RefreshCw size={15} className={logs.isFetching ? "animate-spin" : ""} /> Refresh</button>
+        </div>
       </header>
       <section className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
-        <div className="relative min-w-48 flex-1"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input aria-label="Filter audit logs" placeholder="Entity or action…" value={entity || action} onChange={event => { setEntity(event.target.value.toUpperCase()); setAction(""); setPage(1) }} className={`${control} w-full pl-9`} /></div>
+        <div className="relative min-w-48 flex-1"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input aria-label="Filter audit logs" placeholder="Search entity, action, actor…" value={search} onChange={event => { setSearch(event.target.value); setEntity(""); setAction(""); setPage(1) }} className={`${control} w-full pl-9`} /></div>
         <select aria-label="Filter actor organization" value={actorOrgType} onChange={event => { setActorOrgType(event.target.value as OrgType | ""); setPage(1) }} className={control}><option value="">All organizations</option><option value="COMPANY">Company</option><option value="DISTRIBUTOR">Distributor</option><option value="PARTNER">Partner</option></select>
-        <select aria-label="Filter action" value={action} onChange={event => { setAction(event.target.value); setEntity(""); setPage(1) }} className={control}><option value="">All actions</option><option value="CREATE">Create</option><option value="REQUEST">Request</option><option value="APPROVE">Approve</option><option value="UPDATE">Update</option><option value="REJECT">Reject</option><option value="DELETE">Delete</option></select>
+        <select aria-label="Filter action" value={action} onChange={event => { setAction(event.target.value); setSearch(""); setEntity(""); setPage(1) }} className={control}><option value="">All actions</option><option value="READ">Read</option><option value="LOGIN">Login</option><option value="REFRESH">Refresh</option><option value="LOGOUT">Logout</option><option value="CREATE">Create</option><option value="REQUEST">Request</option><option value="APPROVE">Approve</option><option value="UPDATE">Update</option><option value="REJECT">Reject</option><option value="DELETE">Delete</option></select>
       </section>
       {logs.isLoading ? <div className="space-y-3"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div> : logs.isError ? <ErrorState message="Couldn’t load audit logs." onRetry={() => void logs.refetch()} /> : !rows.length ? <EmptyState message="No audit events match the selected filters." /> : (
         <section className="overflow-x-auto rounded-xl border border-border bg-card">

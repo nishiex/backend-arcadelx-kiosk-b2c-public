@@ -15,29 +15,35 @@ function classify(path: string, method: string) {
   const action = last === "approve" || last === "accept" ? "APPROVE"
     : last === "reject" ? "REJECT"
     : last === "initiate" ? "REQUEST"
+    : segment === "auth" && last === "login" ? "LOGIN"
+    : segment === "auth" && last === "refresh" ? "REFRESH"
+    : segment === "auth" && last === "logout" ? "LOGOUT"
     : method === "POST" ? "CREATE"
     : method === "PATCH" ? "UPDATE"
-    : method === "DELETE" ? "DELETE" : method;
+    : method === "DELETE" ? "DELETE" : method === "GET" ? "READ" : method;
   return { entity, action };
 }
 
 export async function writeAuditLog(req: Request, res: Response) {
-  if (req.method === "GET" || !req.path.startsWith("/api/") || req.path === "/api/audit-logs") return;
+  const requestPath = req.originalUrl.split("?")[0] ?? req.path;
+  // Audit-log reads are excluded to avoid recursively creating a new entry every
+  // time the audit page refreshes. Every other API request is recorded.
+  if (!requestPath.startsWith("/api/") || requestPath === "/api/audit-logs") return;
   const actor = req.user?.id ? await prisma.user.findUnique({
     where: { id: req.user.id }, select: { name: true },
   }) : null;
   const organization = req.membership?.organizationId ? await prisma.organization.findUnique({
     where: { id: req.membership.organizationId }, select: { name: true, type: true },
   }) : null;
-  const { entity, action } = classify(req.path, req.method);
-  const reference = req.path.match(UUID)?.[0] ?? null;
+  const { entity, action } = classify(requestPath, req.method);
+  const reference = requestPath.match(UUID)?.[0] ?? null;
   const bodyKeys = req.body && typeof req.body === "object" ? Object.keys(req.body).filter(key => !/password|token|secret|signature/i.test(key)) : [];
   await prisma.auditLog.create({
     data: {
       id: crypto.randomUUID(), actorUserId: req.user?.id ?? null, actorOrganizationId: req.membership?.organizationId ?? null,
       actorName: actor?.name ?? "System", actorOrgType: organization?.type ?? null, actorOrgName: organization?.name ?? null,
       action, entity, reference, detail: bodyKeys.length ? `Fields: ${bodyKeys.join(", ")}` : null,
-      method: req.method, path: req.path, statusCode: res.statusCode, status: res.statusCode < 400 ? "SUCCESS" : "FAILED",
+      method: req.method, path: requestPath, statusCode: res.statusCode, status: res.statusCode < 400 ? "SUCCESS" : "FAILED",
     },
   });
 }

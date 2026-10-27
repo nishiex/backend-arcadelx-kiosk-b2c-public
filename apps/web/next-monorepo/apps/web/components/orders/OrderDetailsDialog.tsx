@@ -3,7 +3,7 @@
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Download, Eye, X } from "lucide-react"
+import { Eye, X } from "lucide-react"
 import { toast } from "sonner"
 import { fetchOrderDetails, updateOrderPricing, type KioskOrder, type KioskOrderDetails } from "@/lib/backend-api"
 import { ErrorState, Skeleton } from "@/components/dashboard/ui"
@@ -104,7 +104,7 @@ export default function OrderDetailsDialog({
                   <div><dt className="text-muted-foreground">Payment</dt><dd className="mt-1 font-medium">{data.paymentStatus.charAt(0) + data.paymentStatus.slice(1).toLowerCase()}</dd></div>
                   <div><dt className="text-muted-foreground">Created</dt><dd className="mt-1 font-medium">{orderDate(data.createdAt)}</dd></div>
                 </dl>
-                {((canPay && data.status === "APPROVED" && data.paymentStatus === "PENDING") || data.status === "DELIVERED") && (
+                {canPay && data.status === "APPROVED" && data.paymentStatus === "PENDING" && (
                   <section aria-label="Order actions" className="rounded-xl border border-border bg-muted/20 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -118,15 +118,6 @@ export default function OrderDetailsDialog({
                           ) : (
                             <CashPaymentButton order={data} disabled={actionsDisabled} onChanged={handleOrderChanged} />
                           )
-                        )}
-                        {data.status === "DELIVERED" && (
-                          <a
-                            href={`/api/orders/${encodeURIComponent(data.id)}/invoice`}
-                            download={`${data.orderNumber}-invoice.pdf`}
-                            className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring"
-                          >
-                            <Download size={15} /> Download invoice PDF
-                          </a>
                         )}
                       </div>
                     </div>

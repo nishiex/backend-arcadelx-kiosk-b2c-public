@@ -1,10 +1,11 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { Activity, AlertTriangle, Cpu, RefreshCw } from "lucide-react"
+import { Activity, AlertTriangle, Cpu, Download, FileText, RefreshCw } from "lucide-react"
 import { useMe } from "@/hooks/useMe"
 import { fetchAnalyticsSummary } from "@/lib/backend-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
+import { downloadCsv, downloadPdf } from "@/lib/export-utils"
 
 const number = new Intl.NumberFormat("en-IN")
 const dateTime = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" })
@@ -49,6 +50,7 @@ export default function AnalyticsScreen() {
   })
   const eventColumns = columnsForRows(analytics.data?.events ?? [], eventColumnOrder)
   const groupColumns = columnsForRows(analytics.data?.groups ?? [], groupColumnOrder)
+  const eventRows = (analytics.data?.events ?? []).map(event => eventColumns.map(column => formatCellValue(column, event[column])))
 
   if (isLoading) return <Skeleton className="h-64 w-full" />
   if (isError) return <ErrorState message="Unable to verify your access. Refresh the page to try again." />
@@ -62,10 +64,14 @@ export default function AnalyticsScreen() {
           <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
           <p className="mt-1 text-sm text-muted-foreground">{isDistributor ? "Live activity for machines currently under your control." : "Live event and device activity from Mothership."}</p>
         </div>
-        <button className={buttonClass} disabled={analytics.isFetching} onClick={() => void analytics.refetch()}>
-          <RefreshCw size={16} className={analytics.isFetching ? "animate-spin" : ""} />
-          {analytics.isFetching ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className={buttonClass} disabled={!eventRows.length} onClick={() => downloadCsv("analytics-events.csv", eventColumns.map(columnLabel), eventRows)}><Download size={16} /> CSV</button>
+          <button className={buttonClass} disabled={!eventRows.length} onClick={() => downloadPdf("analytics-events.pdf", "Analytics Events", eventColumns.map(columnLabel), eventRows)}><FileText size={16} /> PDF</button>
+          <button className={buttonClass} disabled={analytics.isFetching} onClick={() => void analytics.refetch()}>
+            <RefreshCw size={16} className={analytics.isFetching ? "animate-spin" : ""} />
+            {analytics.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </header>
       {analytics.isPending ? (
         <div className="grid gap-4 sm:grid-cols-3"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div>

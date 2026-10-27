@@ -21,7 +21,6 @@ import {
   type EodPriceUpdate,
 } from "@/lib/devices-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
-import MothershipPairingPanel from "./MothershipPairingPanel"
 
 const buttonClass =
   "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
@@ -159,8 +158,6 @@ export default function DevicesScreen() {
           </button>
         ))}
       </div>
-
-      {isMasterAdmin && <MothershipPairingPanel onPaired={() => devices.refetch()} />}
 
       {devices.isError ? (
         <ErrorState message="Couldn't load the device fleet." onRetry={() => devices.refetch()} />
@@ -427,10 +424,11 @@ function PricingTab({
         <GamePriceTable
           deviceId={selectedDevice}
           games={prices.data.games}
+          isRetired={prices.data.kioskStatus === "RETIRED"}
           eod={prices.data.eod}
           eodMeta={prices.data.eodMeta}
-          canWrite={canWrite}
-          canRequest={canRequest}
+          canWrite={canWrite && prices.data.kioskStatus !== "RETIRED"}
+          canRequest={canRequest && prices.data.kioskStatus !== "RETIRED"}
           onSaved={onSaved}
         />
       )}
@@ -441,6 +439,7 @@ function PricingTab({
 function GamePriceTable({
   deviceId,
   games,
+  isRetired,
   eod,
   eodMeta,
   canWrite,
@@ -449,6 +448,7 @@ function GamePriceTable({
 }: {
   deviceId: string
   games: GamePriceView[]
+  isRetired: boolean
   eod: Record<string, EodPriceUpdate | null>
   eodMeta: { timezone: string; nextExecutionAt: string }
   canWrite: boolean
@@ -488,6 +488,7 @@ function GamePriceTable({
 
   return (
     <div className="space-y-4">
+      {isRetired && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">This kiosk is retired. Game prices cannot be changed or requested.</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p role="status" className="text-sm text-muted-foreground">
           {games.length} game{games.length === 1 ? "" : "s"} on{" "}

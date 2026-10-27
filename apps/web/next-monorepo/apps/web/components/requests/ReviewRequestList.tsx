@@ -69,7 +69,7 @@ export default function ReviewRequestList({
   /** When set, only rows involving this organization are listed. */
   counterpartyId?: string
 }) {
-  const { me, role, canReviewRequests } = useMe()
+  const { me, role, orgType, canReviewRequests } = useMe()
   const organizationId = me?.membership?.organizationId
   const isMasterAdmin = me?.membership?.status === "ACTIVE" &&
     me.membership.organization.type === "COMPANY" && me.membership.role === "OWNER"
@@ -100,7 +100,12 @@ export default function ReviewRequestList({
 
   return (
     <>
-      {kind === "agreements" && role !== "OWNER" && (
+      {kind === "agreements" && orgType === "PARTNER" && (
+        <p className="text-sm text-muted-foreground">
+          Agreement terms are view-only for Partners. Discuss any changes with the Company or Distributor directly.
+        </p>
+      )}
+      {kind === "agreements" && orgType !== "PARTNER" && role !== "OWNER" && (
         <p className="text-sm text-muted-foreground">
           Only your organization&apos;s Owner can approve financial agreements.
         </p>
@@ -124,7 +129,7 @@ export default function ReviewRequestList({
             {rows.map(request => {
               const incoming = request.to.id === organizationId
               const pending = request.status === "PENDING" || request.status === "PENDING_APPROVAL"
-              const canDecide = incoming && pending && (kind === "network" || role === "OWNER")
+              const canDecide = orgType !== "PARTNER" && incoming && pending && (kind === "network" || role === "OWNER")
               const subject = `${kind === "network" ? "Connection" : "Agreement"} from ${request.from.name}`
               const counterparty = request.from.id === organizationId ? request.to : request.from
               return (

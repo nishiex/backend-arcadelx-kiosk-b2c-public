@@ -2,11 +2,12 @@
 
 import React from "react"
 import * as RadixDialog from "@radix-ui/react-dialog"
+import { useMutation } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { X } from "lucide-react"
-import type { Kiosk } from "@/lib/backend-api"
+import { removeKiosk, type Kiosk } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { StatusBadge } from "@/components/dashboard/ui"
-import MothershipPairingPanel from "@/components/devices/MothershipPairingPanel"
 
 /**
  * Read-only machine details.
@@ -29,13 +30,26 @@ export default function KioskDetailDialog({
   kiosk,
   open,
   onOpenChange,
+  onRemoved,
 }: {
   kiosk: Kiosk | null
   open: boolean
   onOpenChange: (v: boolean) => void
+  onRemoved?: () => void
   canEdit?: boolean
 }) {
-  const { isMasterAdmin } = useMe()
+  const { orgType, role } = useMe()
+  const removeMutation = useMutation({
+    mutationFn: () => removeKiosk(kiosk!.id),
+    onSuccess: () => {
+      toast.success("Kiosk removed from inventory")
+      onOpenChange(false)
+      onRemoved?.()
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Couldn't remove kiosk"),
+  })
+  const canDeactivate = (orgType === "DISTRIBUTOR" || orgType === "PARTNER") && (role === "OWNER" || role === "ADMIN")
+  const canDeactivateStatus = kiosk ? !["RESERVED", "ASSIGNED", "RETIRED"].includes(kiosk.status) : false
 
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -82,9 +96,19 @@ export default function KioskDetailDialog({
                 delivered. It cannot be edited here.
               </p>
 
-              {isMasterAdmin && (
-                <div className="mt-5">
-                  <MothershipPairingPanel />
+              {canDeactivate && (
+                <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-xs text-muted-foreground">Deactivate this kiosk while preserving its ownership and assignment history.</p>
+                  <button
+                    type="button"
+                    disabled={!canDeactivateStatus || removeMutation.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Deactivate ${kiosk.machineCode}? Its ownership and history will be preserved.`)) removeMutation.mutate()
+                    }}
+                    className="shrink-0 rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {removeMutation.isPending ? "Deactivating…" : "Deactivate kiosk"}
+                  </button>
                 </div>
               )}
             </>

@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import {
   createAgreement,
   fetchAgreementsForChild,
+  terminateAgreement,
   updateAgreement,
   type Agreement,
 } from "@/lib/backend-api"
@@ -26,7 +27,9 @@ type PartnerAgreementTarget = {
 }
 
 export default function PartnerAgreementDialog({ partner, organizationId }: { partner: PartnerAgreementTarget; organizationId: string }) {
-  const { isCompany } = useMe()
+  const { isCompany, role } = useMe()
+  const canEditAgreement = role === "OWNER"
+  const canUpdateAgreement = canEditAgreement && isCompany
   const [open, setOpen] = React.useState(false)
   const [parentShare, setParentShare] = React.useState("60")
   const [childShare, setChildShare] = React.useState("40")
@@ -61,7 +64,7 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
       return createAgreement({ childOrgId: partner.id, ...terms })
     },
     onSuccess: async agreement => {
-      toast.success(agreement.status === "ACTIVE" ? "Partner agreement saved and activated" : "Partner agreement sent for approval")
+      toast.success(agreement.status === "ACTIVE" ? "Partner agreement saved and activated" : "Partner agreement saved")
       await refresh()
     },
     onError: (error: Error) => toast.error(error.message),
@@ -80,7 +83,16 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
     },
     onError: (error: Error) => toast.error(error.message),
   })
-  const busy = draft.isPending || update.isPending
+  const terminate = useMutation({
+    mutationFn: () => terminateAgreement(current!.id),
+    onSuccess: async () => {
+      toast.success("Partner agreement terminated")
+      setEditing(false)
+      await refresh()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  const busy = draft.isPending || update.isPending || terminate.isPending
 
   React.useEffect(() => {
     if (!open || !current) return
@@ -116,7 +128,7 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-xl sm:p-6">
           <Dialog.Title className="pr-10 text-xl font-semibold">Partner agreement · {partner.name}</Dialog.Title>
           <Dialog.Description className="mt-2 text-sm text-muted-foreground">
-            {isCompany ? "Define the Company-to-Partner terms and send them to the Partner Owner for approval." : "Define your Distributor-to-Partner terms. The agreement becomes active immediately."}
+            {isCompany ? "Define the Company-to-Partner terms and save the agreement." : "Define your Distributor-to-Partner terms and save the agreement."}
           </Dialog.Description>
           <Dialog.Close disabled={busy} aria-label="Close agreement" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted disabled:opacity-50">
             <X size={18} />
@@ -131,10 +143,18 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
             ) : current?.status === "ACTIVE" ? (
               <div className="space-y-3">
                 <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">This Partner agreement is active.</p>
-                {!isCompany && !editing && (
-                  <button type="button" disabled={busy} onClick={() => setEditing(true)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-                    Update agreement terms
-                  </button>
+                {canEditAgreement && !editing && (
+                  <div className="flex flex-wrap gap-2">
+                    {canUpdateAgreement && <button type="button" disabled={busy} onClick={() => setEditing(true)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                      Update agreement terms
+                    </button>}
+                    <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Terminate the agreement with ${partner.name}?`)) terminate.mutate() }} className="rounded-lg border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50">
+                      {terminate.isPending ? "Terminating…" : "Terminate agreement"}
+                    </button>
+                  </div>
+                )}
+                {!isCompany && canEditAgreement && !editing && (
+                  <p className="text-sm text-muted-foreground">Terminate the current agreement before saving new Distributor-to-Partner terms.</p>
                 )}
               </div>
             ) : (
@@ -148,15 +168,15 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
                 </div>
                 <button type="button" disabled={busy} onClick={() => draft.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
                   {draft.isPending && <Loader2 size={16} className="animate-spin" />}
-                  {draft.isPending ? (isCompany ? "Sending…" : "Saving…") : (isCompany ? "Send for approval" : "Save agreement")}
+                  {draft.isPending ? "Saving…" : "Save agreement"}
                 </button>
               </div>
             )}
-            {editing && current?.status === "ACTIVE" && !isCompany && (
+            {editing && current?.status === "ACTIVE" && canUpdateAgreement && (
               <div className="space-y-3 border-t border-border pt-4">
                 <p className="text-sm text-muted-foreground">Updated terms take effect immediately for future Partner orders.</p>
                 <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
-                  <label className="text-xs font-medium">Distributor share (%)<input type="number" min="0" max="100" step="0.01" value={parentShare} onChange={event => setParentShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
+                  <label className="text-xs font-medium">{isCompany ? "Company" : "Distributor"} share (%)<input type="number" min="0" max="100" step="0.01" value={parentShare} onChange={event => setParentShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Partner share (%)<input type="number" min="0" max="100" step="0.01" value={childShare} onChange={event => setChildShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Collection per kiosk (INR)<input type="number" min="0" step="1" value={deposit} onChange={event => setDeposit(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Non-refundable fee (INR)<input type="number" min="0" step="1" value={nonRefundable} onChange={event => setNonRefundable(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>

@@ -3,7 +3,6 @@ import { prisma } from "../../utils/db";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { renderInvoicePDF } from "../../services/pdf/invoice.pdf";
 import {
   queueInvoice,
   attemptDelivery,
@@ -296,8 +295,8 @@ export const createOrder = asyncHandler(async (req, res) => {
   const currentOrgId = req.membership!.organizationId;
   const currentOrgType = req.membership!.type;
 
-  if (currentOrgType === 'PARTNER' && parsed.type !== 'REQUEST') {
-    throw new ApiError(403, 'Partners can request kiosks but cannot allocate them');
+  if (currentOrgType === 'PARTNER') {
+    throw new ApiError(403, 'Partners are not allowed to request kiosks');
   }
   if (currentOrgType === 'COMPANY' && parsed.type === 'REQUEST') {
     throw new ApiError(403, 'Company cannot request kiosks; use ALLOCATION to push kiosks to distributors or partners');
@@ -654,52 +653,6 @@ export const deliverOrder = asyncHandler(async (req, res) => {
         "Order delivered and kiosk ownership transferred",
       ),
     );
-});
-
-export const getOrderInvoice = asyncHandler(async (req, res) => {
-  const id = req.params.orderId;
-  if (typeof id !== "string") throw new ApiError(400, "Invalid order ID");
-  const order = await prisma.order.findUnique({
-    where: { id },
-    select: {
-      parentOrgId: true, childOrgId: true,
-      orderNumber: true, createdAt: true, quantity: true,
-      depositPerMachine: true, nonRefundablePerMachine: true,
-      totalDeposit: true, totalNonRefundable: true, taxAmount: true, grandTotal: true,
-      parentOrg: { select: { name: true } },
-      childOrg: { select: { name: true } },
-      dispatchedKiosks: {
-        select: {
-          kiosk: { select: { machineCode: true, model: true } },
-        },
-        orderBy: { kioskId: "asc" },
-      },
-    },
-  });
-  if (!order) throw new ApiError(404, "Order not found");
-  if (
-    ![order.parentOrgId, order.childOrgId].includes(
-      req.membership!.organizationId,
-    )
-  )
-    throw new ApiError(403, "Unauthorized to access this invoice");
-  // Render from the immutable order snapshot on every request. This keeps downloads
-  // available on Vercel, where /tmp is ephemeral and generated invoice files do not
-  // survive across invocations or instances.
-  const pdf = await renderInvoicePDF({
-    ...order,
-    parentOrgName: order.parentOrg.name,
-    childOrgName: order.childOrg.name,
-    date: order.createdAt,
-    kiosks: order.dispatchedKiosks.map(({ kiosk }) => kiosk),
-  });
-  res.setHeader("Cache-Control", "private, no-store");
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${order.orderNumber}.pdf"`,
-  );
-  res.send(pdf);
 });
 
 export const getOrderRequests = asyncHandler(async (req, res) => {

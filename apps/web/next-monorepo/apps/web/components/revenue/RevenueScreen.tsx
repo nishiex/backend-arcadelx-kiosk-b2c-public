@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowDownWideNarrow, ArrowUpWideNarrow, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, Download, FileText, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from "@/components/dashboard/ui"
 import RevenueTrendChart from "@/components/dashboard/RevenueTrendChart"
+import { downloadCsv, downloadPdf } from "@/lib/export-utils"
 
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -261,6 +262,8 @@ export default function RevenueScreen() {
   const resetPaymentFilters = () => { setPaymentSearch(""); setPaymentStatus(""); setPaymentDevice(""); setPaymentGame(""); setPaymentProvider(""); setPaymentFrom(""); setPaymentTo(""); setPaymentsPage(1) }
   const refreshing =
     revenue.isFetching || rates.isFetching || payments.isFetching || syncPaymentsPending
+  const revenueExportHeaders = ["Machine", "Location", "Distributor", "Partner", "Today", "This month", "All time"]
+  const revenueExportRows = filtered.map(row => [row.machineCode, row.location, row.distributor, row.partner, row.today, row.thisMonth, row.totalRevenue])
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -270,6 +273,8 @@ export default function RevenueScreen() {
           <p className="mt-1 text-sm text-muted-foreground">Fleet performance and payment activity · Figures use India Standard Time (IST)</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className={buttonClass} disabled={!filtered.length} onClick={() => downloadCsv("revenue.csv", revenueExportHeaders, revenueExportRows)}><span className="flex items-center gap-2"><Download size={16} /> CSV</span></button>
+          <button className={buttonClass} disabled={!filtered.length} onClick={() => downloadPdf("revenue.pdf", "Machine Revenue", revenueExportHeaders, revenueExportRows)}><span className="flex items-center gap-2"><FileText size={16} /> PDF</span></button>
           <button
             className={buttonClass}
             disabled={refreshing || editing}

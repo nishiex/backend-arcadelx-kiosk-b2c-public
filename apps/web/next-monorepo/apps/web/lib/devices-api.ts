@@ -114,11 +114,11 @@ export async function fetchDevices(): Promise<{
 
 export async function fetchDevicePrices(
   deviceId: string
-): Promise<{ deviceId: string; games: GamePriceView[]; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }> {
+): Promise<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }> {
   const res = await apiFetch(`/api/devices/${encodeURIComponent(deviceId)}/prices`, {
     cache: "no-store",
   })
-  return handleRes<{ deviceId: string; games: GamePriceView[]; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }>(res)
+  return handleRes<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }>(res)
 }
 
 export type EodPriceUpdate = { id: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }

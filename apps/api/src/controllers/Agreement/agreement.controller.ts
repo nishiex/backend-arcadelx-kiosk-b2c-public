@@ -112,9 +112,7 @@ export const createAgreement = asyncHandler(async (req, res) => {
       depositAmountPerMachine = input.depositAmountPerMachine;
       nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine;
     }
-    const activatesImmediately =
-      parent.type === "DISTRIBUTOR" ||
-      (parent.type === "COMPANY" && childIsDirectCompanyPartner);
+    const activatesImmediately = parent.type === "COMPANY" && childIsDirectCompanyPartner;
     return tx.agreement.create({
       data: {
         networkConnectionId,
@@ -124,8 +122,8 @@ export const createAgreement = asyncHandler(async (req, res) => {
         childSharePct,
         depositAmountPerMachine,
         nonRefundableAmountPerMachine,
-        // Distributor-to-Partner terms and direct Company-created Partner terms
-        // are controlled by the creating master organization and activate immediately.
+        // Direct Company-created Partner terms activate immediately. Distributor-to-Partner
+        // terms require the Partner Owner's approval before becoming active.
         status: activatesImmediately ? "ACTIVE" : "PENDING_APPROVAL",
         effectiveFrom: new Date(),
       },
@@ -237,6 +235,9 @@ export const updateAgreement = asyncHandler(async (req, res) => {
     });
     if (!current || current.parentOrgId !== parentOrgId || current.status !== "ACTIVE") {
       throw new ApiError(404, "Active agreement not found or unauthorized");
+    }
+    if (current.parentOrg.type === "DISTRIBUTOR") {
+      throw new ApiError(409, "Terminate the current Distributor agreement before creating new terms");
     }
 
     await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${current.childOrgId} FOR UPDATE`;

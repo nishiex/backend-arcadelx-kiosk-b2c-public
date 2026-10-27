@@ -95,7 +95,7 @@ export default function CreateOrderDialog({ organizationId, orgType, disabled, o
             {disabled && <p role="status" className="text-sm text-muted-foreground">Kiosk requests are temporarily unavailable. Please try again later.</p>}
             
             <label className="block space-y-2 text-sm font-medium">Number of containers
-              <input aria-label="Number of containers" aria-invalid={!validQuantity} aria-describedby="request-quantity-hint" type="number" min={1} max={50} step={1} required value={quantity} disabled={mutation.isPending || disabled} onChange={event => setQuantity(event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5" />
+              <input aria-label="Number of containers" aria-invalid={!validQuantity} aria-describedby="request-quantity-hint" type="number" min={1} max={50} step={1} required value={quantity} disabled={mutation.isPending} onChange={event => setQuantity(event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5" />
             </label>
             <p id="request-quantity-hint" className={`text-sm ${validQuantity ? "text-muted-foreground" : "text-destructive"}`}>Request between 1 and 50 containers.</p>
             <label className="block space-y-2 text-sm font-medium">Kiosk model

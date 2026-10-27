@@ -58,9 +58,13 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   await assertDeviceVisible(req, parsed.data.deviceId);
   const games = await getDevicePrices(parsed.data.deviceId);
   const eod = await Promise.all(games.map(async game => ({ gameId: game.gameId, update: await pricingStatus(parsed.data.deviceId, game.gameId) })));
+  const kiosk = await prisma.kiosk.findFirst({
+    where: { OR: [{ externalDeviceId: parsed.data.deviceId }, { machineCode: parsed.data.deviceId }] },
+    select: { status: true },
+  });
   res
     .status(200)
-    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
 });
 
 export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {

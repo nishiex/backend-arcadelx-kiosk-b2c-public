@@ -2,8 +2,9 @@
 
 import React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Search, Bell, Users, Share2, ClipboardList, ScrollText } from "lucide-react"
+import { Search, Bell, Users, Share2, ClipboardList, ScrollText, LayoutDashboard, Monitor, UsersRound, Building2, Settings, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 import Avatar from "@/components/ui/avatar"
 import ThemeToggle from "@/components/dashboard/ThemeToggle"
@@ -14,6 +15,7 @@ import {
   fetchReviewRequests,
   fetchWorkflowReadiness,
 } from "@/lib/backend-api"
+import { fetchDevicePriceRequests } from "@/lib/devices-api"
 import { gsap, prefersReducedMotion } from "@/lib/gsap"
 
 type Notice = {
@@ -32,7 +34,10 @@ type Notice = {
  */
 export default function Header() {
   const { me, role, canManageMembers, isCompany, isLoading: loadingMe } = useMe()
+  const router = useRouter()
   const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [searchOpen, setSearchOpen] = React.useState(false)
   const bellRef = React.useRef<HTMLButtonElement>(null)
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
   const canReview = me?.membership?.status === "ACTIVE" && isOwnerOrAdmin
@@ -79,6 +84,12 @@ export default function Header() {
     queryKey: ["orders", "UNDER_REVIEW", "header"],
     queryFn: () => fetchOrders("UNDER_REVIEW"),
     enabled: canReview && readiness.data?.orderDecisions === true,
+    refetchInterval: 10_000,
+  })
+  const priceRequests = useQuery({
+    queryKey: ["device-price-requests", "header"],
+    queryFn: fetchDevicePriceRequests,
+    enabled: canReview && isCompany,
     refetchInterval: 10_000,
   })
 
@@ -134,6 +145,18 @@ export default function Header() {
       icon: <ClipboardList size={15} />,
     })
   }
+  const pendingPriceRequests = (priceRequests.data?.requests ?? []).filter(
+    request => request.status === "PENDING",
+  ).length
+  if (canReview && isCompany && pendingPriceRequests > 0) {
+    notices.push({
+      key: "device-price-requests",
+      label: "Game price requests",
+      href: "/devices",
+      count: pendingPriceRequests,
+      icon: <Bell size={15} />,
+    })
+  }
 
   const total = notices.reduce((sum, notice) => sum + notice.count, 0)
   // "All caught up" may only appear once every queue we asked about has answered;
@@ -143,7 +166,7 @@ export default function Header() {
     loadingMe ||
     (canManageMembers && members.isLoading) ||
     (canReview &&
-      (incomingConnections.isLoading || pendingAgreements.isLoading || readiness.isLoading || orders.isLoading))
+      (incomingConnections.isLoading || pendingAgreements.isLoading || readiness.isLoading || orders.isLoading || priceRequests.isLoading))
 
   // Surface every pending notification as a popup when it first arrives or grows.
   // Keep the bell/dropdown as the persistent detail view, but do not make users open it
@@ -175,6 +198,24 @@ export default function Header() {
 
   // The bell is shown to anyone who can manage one of these queues.
   const showBell = canManageMembers || canReview
+  const searchItems = [
+    { label: "Dashboard", keywords: "home overview", href: "/", icon: <LayoutDashboard size={15} /> },
+    { label: "Orders", keywords: "orders delivery", href: "/orders", icon: <ClipboardList size={15} /> },
+    { label: "Devices", keywords: "devices kiosks machines", href: "/devices", icon: <Monitor size={15} /> },
+    { label: "Partners", keywords: "partners businesses", href: "/partners", icon: <UsersRound size={15} /> },
+    { label: "Distributors", keywords: "distributors network", href: "/distributors", icon: <Building2 size={15} /> },
+    { label: "Agreements", keywords: "agreements contracts", href: "/agreements", icon: <ScrollText size={15} /> },
+    { label: "Audit Logs", keywords: "audit logs history", href: "/audit-logs", icon: <ScrollText size={15} /> },
+    { label: "Settings", keywords: "settings profile", href: "/settings", icon: <Settings size={15} /> },
+  ]
+  const searchResults = search.trim()
+    ? searchItems.filter(item => `${item.label} ${item.keywords}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 6)
+    : []
+  const goToSearchResult = (href: string) => {
+    setSearch("")
+    setSearchOpen(false)
+    router.push(href)
+  }
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-4 py-4 backdrop-blur sm:px-6">
@@ -184,8 +225,27 @@ export default function Header() {
           <input
             aria-label="Search"
             className="w-56 rounded-lg border border-input bg-card py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
-            placeholder="Search…"
+            placeholder="Search pages…"
+            value={search}
+            onFocus={() => setSearchOpen(true)}
+            onChange={event => { setSearch(event.target.value); setSearchOpen(true) }}
+            onKeyDown={event => {
+              if (event.key === "Enter" && searchResults[0]) goToSearchResult(searchResults[0].href)
+              if (event.key === "Escape") setSearchOpen(false)
+            }}
           />
+          {searchOpen && (
+            <div className="animate-in fade-in slide-in-from-top-2 absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-xl duration-150">
+              <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{search ? "Results" : "Quick navigation"}</p>
+              {(search ? searchResults : searchItems.slice(0, 5)).length ? (search ? searchResults : searchItems.slice(0, 5)).map(item => (
+                <button key={item.href} type="button" onMouseDown={event => event.preventDefault()} onClick={() => goToSearchResult(item.href)} className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground transition-colors group-hover:text-foreground">{item.icon}</span>
+                  <span className="flex-1">{item.label}</span>
+                  <ArrowRight size={14} className="text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                </button>
+              )) : <p className="px-2.5 py-2 text-sm text-muted-foreground">No dashboard pages found.</p>}
+            </div>
+          )}
         </div>
       </div>
 

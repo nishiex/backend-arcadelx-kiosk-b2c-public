@@ -4,6 +4,8 @@ import {
   getKiosks,
   getKioskById,
   assignKiosks,
+  deactivateKiosks,
+  removeKiosk,
   updateKioskStatus,
   getInventorySummary,
 } from "../../controllers/Kiosk/kiosk.controller";
@@ -33,6 +35,18 @@ router.post(
   requireOrgType("COMPANY", "DISTRIBUTOR"),
   requireRole("OWNER", "ADMIN"),
   assignKiosks,
+);
+router.post(
+  "/deactivate",
+  requireOrgType("COMPANY", "DISTRIBUTOR"),
+  requireRole("OWNER", "ADMIN"),
+  deactivateKiosks,
+);
+router.delete(
+  "/:id",
+  requireOrgType("DISTRIBUTOR", "PARTNER"),
+  requireRole("OWNER", "ADMIN"),
+  removeKiosk,
 );
 router.get("/:id", getKioskById);
 router.patch(

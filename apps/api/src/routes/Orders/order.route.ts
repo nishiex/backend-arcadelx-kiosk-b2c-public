@@ -10,14 +10,13 @@ import {
   createOrder,
   approveOrder,
   rejectOrder,
-  getOrderInvoice,
+  retryOrderInvoice,
   getOrderRequests,
   getOrderDetails,
   markOrderAsPaid,
   requestCashPayment,
   dispatchOrder,
   deliverOrder,
-  retryOrderInvoice,
   getRequestModelAvailability,
   updateOrderPricing,
 } from "../../controllers/Orders/orders.controller";
@@ -92,8 +91,6 @@ router.patch(
   deliverOrder,
 );
 
-//pdf route for the frontend
-router.get("/:orderId/invoice", getOrderInvoice);
 router.post(
   "/:orderId/invoice/retry",
   requireOrgType("COMPANY", "DISTRIBUTOR"),
