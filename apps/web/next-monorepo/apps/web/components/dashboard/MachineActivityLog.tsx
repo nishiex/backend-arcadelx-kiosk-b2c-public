@@ -8,12 +8,15 @@ import { orderDate } from "@/components/orders/order-display"
 import { EmptyState, ErrorState, Panel, Skeleton, StatusBadge } from "./ui"
 
 export default function MachineActivityLog() {
+  const [page, setPage] = React.useState(1)
   const query = useQuery({
-    queryKey: ["machine-activity"],
-    queryFn: fetchMachineActivity,
+    queryKey: ["machine-activity", page],
+    queryFn: () => fetchMachineActivity(page, 10),
     refetchInterval: 10_000,
   })
   const activity = query.data?.activity ?? []
+  const meta = query.data?.meta
+  const totalPages = Math.max(meta?.totalPages ?? 1, 1)
 
   return (
     <Panel
@@ -29,7 +32,8 @@ export default function MachineActivityLog() {
       ) : !activity.length ? (
         <EmptyState message="No machine activity has been recorded yet." icon={<Activity size={28} />} />
       ) : (
-        <ul aria-label="Machine activity log" className="divide-y divide-border">
+        <>
+          <ul aria-label="Machine activity log" className="divide-y divide-border">
           {activity.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div className="flex min-w-0 items-center gap-3">
@@ -50,7 +54,15 @@ export default function MachineActivityLog() {
               <StatusBadge status={item.status} />
             </li>
           ))}
-        </ul>
+          </ul>
+          {meta && <footer className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+          <span>{meta.total} event{meta.total === 1 ? "" : "s"} · Page {page} of {totalPages}{query.isFetching && " · Updating…"}</span>
+          <span className="flex gap-2">
+            <button type="button" disabled={page <= 1 || query.isFetching} onClick={() => setPage(value => value - 1)} className="rounded-md border border-border px-3 py-2 hover:bg-muted disabled:opacity-50">Previous</button>
+            <button type="button" disabled={page >= totalPages || query.isFetching} onClick={() => setPage(value => value + 1)} className="rounded-md border border-border px-3 py-2 hover:bg-muted disabled:opacity-50">Next</button>
+          </span>
+          </footer>}
+        </>
       )}
     </Panel>
   )

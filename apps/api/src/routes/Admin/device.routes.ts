@@ -23,9 +23,9 @@ import { getUnpairedKiosks, pairKioskDevice } from '../../controllers/Internal/i
  * Reads require an authenticated member of a COMPANY, DISTRIBUTOR or PARTNER org, matching
  * the revenue endpoints: the device fleet is operational data the network already sees.
  *
- * Company OWNER/ADMIN can apply prices directly. Distributor/Partner members can submit
- * device-scoped requests for Company approval; only Company master admins can apply a
- * device price or change the game catalog for every kiosk.
+ * Company OWNER/ADMIN can apply prices directly. Distributor OWNER/ADMIN/MANAGER members
+ * can submit device-scoped requests for Company approval; only Company master admins can
+ * apply a device price or change the game catalog for every kiosk.
  *
  * Note the path prefix is `/api/devices`, not Mothership's `/api/v1/devices`: this is our
  * own surface, and keeping our versioning out of the path avoids implying we mirror
@@ -42,9 +42,9 @@ router.post('/kiosks/:machineCode/pair', requireOrgType('COMPANY'), requireRole(
 
 // Company admins review Distributor requests; Distributor admins review requests from
 // their connected Partners. Partners never receive an approval action.
-router.get('/price-requests', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
-router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
-router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
+router.get('/price-requests', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
+router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
+router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
 
 // The fleet as Mothership reports it (online state, last seen, location).
 router.get(
@@ -82,7 +82,7 @@ router.post(
 // the game's catalog price for every kiosk; a device write never falls back to it.
 router.post(
   '/:deviceId/games/:gameId/price',
-  requireOrgType('COMPANY', 'DISTRIBUTOR', 'PARTNER'),
+  requireOrgType('COMPANY', 'DISTRIBUTOR'),
   requireRole('OWNER', 'ADMIN', 'MANAGER'),
   updateDeviceGamePrice,
 );

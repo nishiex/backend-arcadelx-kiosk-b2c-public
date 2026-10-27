@@ -672,6 +672,24 @@ export async function assignKiosks(input: { organizationId: string; kioskIds: st
   return handleRes<{ kiosks: Kiosk[] }>(res);
 }
 
+export async function deactivateKiosks(input: { organizationId: string; kioskIds: string[] }) {
+  const res = await apiFetch('/api/kiosks/deactivate', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleRes<{ kiosks: Kiosk[] }>(res);
+}
+
+export async function removeKiosk(id: string) {
+  const res = await apiFetch(`/api/kiosks/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  return handleRes<{ kiosk: Pick<Kiosk, 'id' | 'machineCode' | 'status' | 'currentOrgId'> }>(res);
+}
+
 export type MachineActivity = {
   id: string;
   action: 'MACHINE_ADDED' | 'MACHINE_ASSIGNED';
@@ -685,9 +703,9 @@ export type MachineActivity = {
   orderNumber: string | null;
 };
 
-export async function fetchMachineActivity(): Promise<{ activity: MachineActivity[] }> {
-  const res = await apiFetch('/api/reports/machine-activity', { credentials: 'include', cache: 'no-store' });
-  return handleRes<{ activity: MachineActivity[] }>(res);
+export async function fetchMachineActivity(page = 1, limit = 10): Promise<{ activity: MachineActivity[]; meta: PaginationMeta }> {
+  const res = await apiFetch(`/api/reports/machine-activity?page=${page}&limit=${limit}`, { credentials: 'include', cache: 'no-store' });
+  return handleRes<{ activity: MachineActivity[]; meta: PaginationMeta }>(res);
 }
 
 export async function createKioskBatch(input: { count: number; model: string }) {

@@ -103,26 +103,22 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   if (!body.success) throw new ApiError(400, 'Invalid price payload', body.error.issues);
 
   await assertDeviceVisible(req, params.data.deviceId);
-  if (req.membership!.type !== 'COMPANY') {
-    if (body.data.scope === 'GAME_CATALOG') {
-      throw new ApiError(403, 'Only Company master admins can apply catalog-wide prices');
+
+  const games = await getDevicePrices(params.data.deviceId);
+  const game = games.find((item) => item.gameId === params.data.gameId);
+  if (!game) throw new ApiError(404, 'Game was not found on the selected device');
+  if (req.membership?.type === 'DISTRIBUTOR') {
+    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(req.membership.role)) {
+      throw new ApiError(403, 'Only Distributor owners, admins, or managers can request game price changes');
     }
-    if (req.membership!.type === 'PARTNER') {
-      const distributorAgreement = await prisma.agreement.findFirst({
-        where: {
-          childOrgId: req.membership!.organizationId,
-          parentOrg: { type: 'DISTRIBUTOR' },
-          status: 'ACTIVE',
-        },
-        select: { id: true },
-      });
-      if (!distributorAgreement) {
-        throw new ApiError(403, 'An active Distributor agreement is required to request a price change');
-      }
+    if (body.data.scope !== 'DEVICE') {
+      throw new ApiError(403, 'Distributors can request device prices only');
     }
-    const games = await getDevicePrices(params.data.deviceId);
-    const game = games.find((item) => item.gameId === params.data.gameId);
-    if (!game) throw new ApiError(404, 'Game was not found on the selected device');
+    const existing = await prisma.devicePriceRequest.findFirst({
+      where: { deviceId: params.data.deviceId, gameId: game.gameId, requesterOrgId: req.membership.organizationId, status: { in: ['PENDING', 'PROCESSING'] } },
+      select: { id: true },
+    });
+    if (existing) throw new ApiError(409, 'A pending price request already exists for this game and device');
     const request = await prisma.devicePriceRequest.create({
       data: {
         deviceId: params.data.deviceId,
@@ -130,19 +126,13 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
         displayName: game.displayName,
         price: body.data.price,
         replayPrice: body.data.replay_price ?? game.effectiveReplayPrice,
-        requesterOrgId: req.membership!.organizationId,
+        requesterOrgId: req.membership.organizationId,
         requestedById: req.user!.id,
       },
     });
-    return res.status(202).json(new ApiResponse(202, {
-      request: serializePriceRequest(request),
-    }, 'Price change request sent to the Company master admin'));
+    return res.status(201).json(new ApiResponse(201, { request }, 'Device game price request submitted'));
   }
   assertCompanyAdmin(req);
-
-  const games = await getDevicePrices(params.data.deviceId);
-  const game = games.find((item) => item.gameId === params.data.gameId);
-  if (!game) throw new ApiError(404, 'Game was not found on the selected device');
   if (body.data.scope === 'DEVICE') {
     const update = await scheduleEodDevicePrice({
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,

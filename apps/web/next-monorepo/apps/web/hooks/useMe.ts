@@ -122,9 +122,11 @@ export function useMe(): Permissions {
     canManageDevicePrices:
       !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canReviewDevicePriceRequests:
-      !isError && me?.membership?.status === "ACTIVE" && (isCompany || isDistributor) && isOwnerOrAdmin,
+      !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canRequestDevicePrices:
-      !isError && me?.membership?.status === "ACTIVE" && !isCompany &&
+      !isError &&
+      me?.membership?.status === "ACTIVE" &&
+      isDistributor &&
       (isOwnerOrAdmin || role === "MANAGER"),
     permissions,
     can,
