@@ -27,6 +27,7 @@ const kioskDisplaySelect = {
   id: true,
   machineCode: true,
   model: true,
+  externalDeviceId: true,
   status: true,
   location: true,
   currentOrgId: true,
@@ -206,14 +207,6 @@ export const assignKiosks = asyncHandler(async (req: Request, res: Response) => 
     throw new ApiError(403, "Kiosks can only be assigned to your direct network children");
   }
 
-  const activeAgreement = await prisma.agreement.findFirst({
-    where: { parentOrgId: sourceOrgId, childOrgId: organizationId, status: "ACTIVE" },
-    select: { id: true },
-  });
-  if (!activeAgreement) {
-    throw new ApiError(409, "An active agreement is required before kiosks can be assigned");
-  }
-
   const assigned = await prisma.$transaction(async (tx) => {
     const kiosks = await tx.kiosk.findMany({
       where: {
@@ -301,8 +294,8 @@ export const removeKiosk = asyncHandler(async (req: Request, res: Response) => {
   const organizationId = req.membership!.organizationId;
   const organizationType = req.membership!.type;
   if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
-  if (!["DISTRIBUTOR", "PARTNER"].includes(organizationType)) {
-    throw new ApiError(403, "Only Distributors and Partners can remove kiosks from inventory");
+  if (!["COMPANY", "DISTRIBUTOR", "PARTNER"].includes(organizationType)) {
+    throw new ApiError(403, "Only organization admins can remove kiosks from inventory");
   }
 
   await ensureRetiredKioskStatus();
@@ -325,6 +318,112 @@ export const removeKiosk = asyncHandler(async (req: Request, res: Response) => {
   });
 
   res.status(200).json(new ApiResponse(200, { kiosk }, "Kiosk deactivated successfully"));
+});
+
+const returnableKioskStatuses = ["AVAILABLE", "RETURNED", "MAINTENANCE"] as const;
+
+/** Request that a kiosk be returned to its direct supplier organization. */
+export const requestKioskReturn = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const organizationId = req.membership!.organizationId;
+  const organizationType = req.membership!.type;
+  if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
+  if (!["DISTRIBUTOR", "PARTNER"].includes(organizationType)) {
+    throw new ApiError(403, "Only Distributors and Partners can request kiosk removal");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id=${id} FOR UPDATE`;
+    const kiosk = await tx.kiosk.findUnique({ where: { id } });
+    if (!kiosk || kiosk.currentOrgId !== organizationId) {
+      throw new ApiError(404, "Kiosk not found in your inventory");
+    }
+    if (kiosk.reservedOrderId || !returnableKioskStatuses.includes(kiosk.status as typeof returnableKioskStatuses[number])) {
+      throw new ApiError(409, "This kiosk cannot be requested for removal in its current state");
+    }
+    const existing = await tx.kioskReturnRequest.findFirst({
+      where: { kioskId: id, status: "PENDING" },
+      select: { id: true },
+    });
+    if (existing) throw new ApiError(409, "A removal request is already pending for this kiosk");
+
+    return tx.kioskReturnRequest.create({
+      data: { kioskId: id, organizationId, requestedById: req.user!.id },
+      select: { id: true, kioskId: true, organizationId: true, status: true, createdAt: true },
+    });
+  });
+
+  res.status(201).json(new ApiResponse(201, { request: result }, "Kiosk removal request submitted"));
+});
+
+/** List pending return requests visible to the acting organization. */
+export const getKioskReturnRequests = asyncHandler(async (req: Request, res: Response) => {
+  const organizationId = req.membership!.organizationId;
+  const organizationType = req.membership!.type;
+  const where: Prisma.KioskReturnRequestWhereInput = organizationType === "COMPANY"
+    ? { status: "PENDING", organization: { type: "DISTRIBUTOR", parentOrgId: organizationId } }
+    : organizationType === "DISTRIBUTOR"
+      ? { status: "PENDING", organization: { parentOrgId: organizationId } }
+      : { organizationId, status: "PENDING" };
+
+  const requests = await prisma.kioskReturnRequest.findMany({
+    where,
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      kioskId: true,
+      organizationId: true,
+      status: true,
+      createdAt: true,
+      kiosk: { select: { machineCode: true, model: true, status: true, currentOrgId: true } },
+      organization: { select: { id: true, name: true, type: true, parentOrgId: true } },
+      requestedBy: { select: { id: true, name: true, email: true } },
+    },
+  });
+  res.status(200).json(new ApiResponse(200, { requests }, "Kiosk removal requests fetched successfully"));
+});
+
+/** Approve a return request and transfer the kiosk back to the direct supplier. */
+export const approveKioskReturn = asyncHandler(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  if (typeof requestId !== "string") throw new ApiError(400, "Enter a valid request Id");
+  const actingOrgId = req.membership!.organizationId;
+  const actingType = req.membership!.type;
+  if (!["COMPANY", "DISTRIBUTOR"].includes(actingType)) {
+    throw new ApiError(403, "Only Company or Distributor admins can approve kiosk removal requests");
+  }
+
+  const approved = await prisma.$transaction(async (tx) => {
+    const request = await tx.kioskReturnRequest.findUnique({
+      where: { id: requestId },
+      include: { organization: { select: { id: true, type: true, parentOrgId: true } } },
+    });
+    if (!request || request.status !== "PENDING") throw new ApiError(404, "Pending kiosk removal request not found");
+    if (request.organization.parentOrgId !== actingOrgId) {
+      throw new ApiError(403, "This kiosk removal request is outside your direct network");
+    }
+    if (actingType === "COMPANY" && request.organization.type !== "DISTRIBUTOR") {
+      throw new ApiError(403, "Company admins can approve Distributor kiosk returns only");
+    }
+    if (actingType === "DISTRIBUTOR" && request.organization.type !== "PARTNER") {
+      throw new ApiError(403, "Distributor admins can approve Partner kiosk returns only");
+    }
+
+    await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id=${request.kioskId} FOR UPDATE`;
+    const kiosk = await tx.kiosk.findUnique({ where: { id: request.kioskId } });
+    if (!kiosk || kiosk.currentOrgId !== request.organizationId || kiosk.reservedOrderId) {
+      throw new ApiError(409, "The kiosk is no longer eligible for return");
+    }
+
+    const returnedToOrgId = request.organization.parentOrgId!;
+    const now = new Date();
+    await tx.kioskAssignment.updateMany({ where: { kioskId: kiosk.id, assignedTo: null }, data: { assignedTo: now } });
+    await tx.kioskAssignment.create({ data: { kioskId: kiosk.id, organizationId: returnedToOrgId, assignedById: req.user!.id } });
+    await tx.kiosk.update({ where: { id: kiosk.id }, data: { currentOrgId: returnedToOrgId, status: "RETURNED", reservedOrderId: null } });
+    return tx.kioskReturnRequest.update({ where: { id: request.id }, data: { status: "APPROVED" }, select: { id: true, kioskId: true, organizationId: true, status: true, updatedAt: true } });
+  });
+
+  res.status(200).json(new ApiResponse(200, { request: approved }, "Kiosk removal request approved"));
 });
 
 export const updateKioskStatus = asyncHandler(

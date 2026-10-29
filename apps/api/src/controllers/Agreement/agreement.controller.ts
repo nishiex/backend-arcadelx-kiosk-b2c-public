@@ -63,10 +63,6 @@ export const createAgreement = asyncHandler(async (req, res) => {
       select: { type: true, parentOrgId: true },
     });
     if (!childOrganization) throw new ApiError(404, "Organization not found");
-    const childIsDirectCompanyPartner =
-      parent.type === "COMPANY" &&
-      childOrganization.type === "PARTNER" &&
-      childOrganization.parentOrgId === parentOrgId;
     let parentSharePct: number,
       childSharePct: number,
       depositAmountPerMachine: number,
@@ -112,7 +108,11 @@ export const createAgreement = asyncHandler(async (req, res) => {
       depositAmountPerMachine = input.depositAmountPerMachine;
       nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine;
     }
-    const activatesImmediately = parent.type === "COMPANY" && childIsDirectCompanyPartner;
+    // Company master-admin agreements are authoritative for the Company's network:
+    // activate them immediately so a Distributor does not block kiosk operations
+    // waiting for a second approval. Distributor-to-Partner agreements retain the
+    // Partner approval workflow.
+    const activatesImmediately = parent.type === "COMPANY";
     return tx.agreement.create({
       data: {
         networkConnectionId,
@@ -122,8 +122,8 @@ export const createAgreement = asyncHandler(async (req, res) => {
         childSharePct,
         depositAmountPerMachine,
         nonRefundableAmountPerMachine,
-        // Direct Company-created Partner terms activate immediately. Distributor-to-Partner
-        // terms require the Partner Owner's approval before becoming active.
+        // Company-created terms activate immediately. Only Distributor-to-Partner
+        // terms require the receiving Partner Owner's approval.
         status: activatesImmediately ? "ACTIVE" : "PENDING_APPROVAL",
         effectiveFrom: new Date(),
       },

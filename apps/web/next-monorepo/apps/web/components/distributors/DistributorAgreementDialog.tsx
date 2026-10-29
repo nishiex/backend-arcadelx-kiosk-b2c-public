@@ -394,8 +394,8 @@ export default function DistributorAgreementDialog({
                     <div>
                       <h3 className="text-sm font-semibold">Draft agreement terms</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        The distributor&apos;s Owner must approve these terms before they take effect. Any partner they later
-                        works with can have its own Distributor-to-Partner terms.
+                        These Company-to-Distributor terms activate immediately. Any partner the distributor later works
+                        with can have its own Distributor-to-Partner terms.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -2,11 +2,10 @@
 
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Building2, Eye, RefreshCw, UsersRound } from "lucide-react"
-import { toast } from "sonner"
+import { useQuery } from "@tanstack/react-query"
+import { Building2, Eye, RefreshCw, Search, UsersRound } from "lucide-react"
 import { useMe } from "@/hooks/useMe"
-import { assignKiosks, fetchDistributors, fetchKiosks, fetchPartners } from "@/lib/backend-api"
+import { fetchDistributors, fetchKiosks, fetchPartners } from "@/lib/backend-api"
 import AddPartnerForm from "./AddPartnerForm"
 import PartnerAgreementDialog from "./PartnerAgreementDialog"
 import PartnerViewMoreDialog from "./PartnerViewMoreDialog"
@@ -56,95 +55,10 @@ function PartnerKiosksDialog({ partner }: { partner: { id: string; name: string 
   )
 }
 
-function SendKiosksDialog({ partner }: { partner: { id: string; name: string; agreementStatus?: string | null } }) {
-  const { me } = useMe()
-  const queryClient = useQueryClient()
-  const [open, setOpen] = React.useState(false)
-  const [selected, setSelected] = React.useState<string[]>([])
-  const organizationId = me?.membership?.organizationId
-  const kiosks = useQuery({
-    queryKey: ["partner-transfer-kiosks", organizationId],
-    queryFn: fetchKiosks,
-    enabled: open && !!organizationId,
-    staleTime: 0,
-  })
-  const transfer = useMutation({
-    mutationFn: () => assignKiosks({ organizationId: partner.id, kioskIds: selected }),
-    onSuccess: () => {
-      toast.success(`Kiosk${selected.length === 1 ? "" : "s"} sent to ${partner.name}`)
-      setSelected([])
-      setOpen(false)
-      void queryClient.invalidateQueries({ queryKey: ["partners", organizationId] })
-      void queryClient.invalidateQueries({ queryKey: ["kiosks"] })
-    },
-    onError: (error: Error) => toast.error(error.message),
-  })
-  const available = (kiosks.data ?? []).filter(kiosk =>
-    kiosk.currentOrgId === organizationId &&
-    ["AVAILABLE", "RETURNED", "MAINTENANCE"].includes(kiosk.status),
-  )
-  const canSendKiosks = partner.agreementStatus === "ACTIVE"
-
-  function change(next: boolean) {
-    if (next) {
-      setSelected([])
-      kiosks.refetch()
-    }
-    setOpen(next)
-  }
-
-  return (
-    <Dialog.Root open={open} onOpenChange={change}>
-      <Dialog.Trigger asChild>
-        <button type="button" className={buttonClass} disabled={!organizationId}>
-          Send kiosks
-        </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl sm:p-6">
-          <Dialog.Title className="text-xl font-semibold">Send kiosks to {partner.name}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-            Select available kiosks from your Distributor inventory to transfer to this Partner.
-          </Dialog.Description>
-          <div className="mt-5 space-y-3">
-            {kiosks.isLoading ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading available kiosks…</p>
-            ) : kiosks.isError ? (
-              <p role="alert" className="text-sm text-destructive">Couldn’t load your available kiosks. Close and try again.</p>
-            ) : !available.length ? (
-              <p className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">No available kiosks are currently in your inventory.</p>
-            ) : (
-              <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
-                {available.map(kiosk => {
-                  const checked = selected.includes(kiosk.id)
-                  return (
-                    <label key={kiosk.id} className={`flex cursor-pointer items-center gap-3 border-b border-border px-3 py-3 last:border-0 ${checked ? "bg-primary/5" : ""}`}>
-                      <input type="checkbox" aria-label={`Select ${kiosk.machineCode}`} checked={checked} onChange={() => setSelected(ids => checked ? ids.filter(id => id !== kiosk.id) : [...ids, kiosk.id])} />
-                      <span className="font-mono text-sm font-medium">{kiosk.machineCode}</span>
-                      <span className="text-sm text-muted-foreground">{kiosk.model ?? "Unknown model"} · {kiosk.status.replaceAll("_", " ")}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-          <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close asChild><button type="button" className={buttonClass} disabled={transfer.isPending}>Cancel</button></Dialog.Close>
-            {!canSendKiosks && <p className="mr-auto text-xs text-amber-700 dark:text-amber-300">Approve the Partner agreement before sending kiosks.</p>}
-            <button type="button" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50" disabled={!selected.length || transfer.isPending || !canSendKiosks} onClick={() => transfer.mutate()}>
-              {transfer.isPending ? "Sending…" : `Send${selected.length ? ` (${selected.length})` : ""}`}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
-}
-
 export default function PartnersScreen() {
   const { canViewPartners, canRegisterPartners, canManageDistributors, canManageAgreements, isCompany, isMasterAdmin, isLoading, me } = useMe()
   const [scope, setScope] = React.useState<"company" | "distributor">("company")
+  const [search, setSearch] = React.useState("")
   const organizationId = me?.membership?.organizationId
   const partners = useQuery({
     queryKey: ["partners", organizationId],
@@ -159,6 +73,12 @@ export default function PartnersScreen() {
     enabled: isCompany && canManageDistributors,
     staleTime: 30_000,
     retry: 1,
+  })
+  const allKiosks = useQuery({
+    queryKey: ["partner-search-kiosks", organizationId],
+    queryFn: fetchKiosks,
+    enabled: canViewPartners && !!organizationId,
+    staleTime: 10_000,
   })
 
   if (isLoading) return <p role="status" className="text-sm text-muted-foreground">Loading partners…</p>
@@ -182,7 +102,16 @@ export default function PartnersScreen() {
         ...partner,
         distributorName: null,
       }))
-  const bodyRef = useReveal<HTMLTableSectionElement>([rows.length])
+  const query = search.trim().toLowerCase()
+  const kioskMatches = new Map<string, string>()
+  for (const kiosk of allKiosks.data ?? []) {
+    const match = [kiosk.machineCode, kiosk.model ?? ""].join(" ").toLowerCase().includes(query)
+    if (match && kiosk.currentOrgId) kioskMatches.set(kiosk.currentOrgId, kiosk.machineCode)
+  }
+  const filteredRows = !query ? rows : rows.filter(partner =>
+    [partner.name, partner.owner?.email ?? "", partner.distributorName ?? ""].join(" ").toLowerCase().includes(query) || kioskMatches.has(partner.id),
+  )
+  const bodyRef = useReveal<HTMLTableSectionElement>([filteredRows.length])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -191,10 +120,12 @@ export default function PartnersScreen() {
           <h1 className="text-2xl font-semibold tracking-tight">Partners</h1>
           <p className="mt-1 text-sm text-muted-foreground">View partners registered under or connected to your distributor account.</p>
         </div>
-        <button type="button" className={`${buttonClass} inline-flex items-center gap-2`} onClick={() => void partners.refetch()} disabled={partners.isFetching}>
-          <RefreshCw size={15} className={partners.isFetching ? "animate-spin" : ""} /> Refresh
-        </button>
-        {canRegisterPartners && <AddPartnerForm modal />}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className={`${buttonClass} inline-flex items-center gap-2`} onClick={() => void partners.refetch()} disabled={partners.isFetching}>
+            <RefreshCw size={15} className={partners.isFetching ? "animate-spin" : ""} /> Refresh
+          </button>
+          {canRegisterPartners && <AddPartnerForm modal />}
+        </div>
       </div>
       {isCompany && (
         <div className="flex flex-wrap gap-2" aria-label="Partner scope">
@@ -206,6 +137,7 @@ export default function PartnersScreen() {
           </button>
         </div>
       )}
+      <label className="relative block max-w-xl"><Search size={16} className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground" /><input className="w-full rounded-lg border border-border bg-card px-3 py-2 pl-9 text-sm outline-none focus:border-primary" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search partner, machine code, or kiosk model" aria-label="Search partners, machine code, or kiosk model" /></label>
       <section aria-labelledby="partner-list-title" className="rounded-xl border border-border bg-card">
         <div className="flex items-center gap-3 border-b border-border p-4 sm:p-6">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Building2 size={19} aria-hidden="true" /></span>
@@ -224,8 +156,8 @@ export default function PartnersScreen() {
           </div>
         ) : (isCompany ? distributors.isError : partners.isError) ? (
           <ErrorState message="Couldn’t load partners." onRetry={() => void (isCompany ? distributors.refetch() : partners.refetch())} />
-        ) : !rows.length ? (
-          <EmptyState className="py-10" icon={<UsersRound size={28} />} message="No connected partners yet." />
+        ) : !filteredRows.length ? (
+          <EmptyState className="py-10" icon={<UsersRound size={28} />} message={query ? "No partners or kiosks match this search." : "No connected partners yet."} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -239,7 +171,7 @@ export default function PartnersScreen() {
                 </tr>
               </thead>
               <tbody ref={bodyRef} className="divide-y divide-border">
-                {rows.map((partner) => (
+                {filteredRows.map((partner) => (
                   <tr key={partner.id} data-reveal className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                     <th scope="row" className="px-4 py-3 text-left">
                       <div className="flex min-w-0 items-center gap-3">
@@ -253,12 +185,12 @@ export default function PartnersScreen() {
                     {isCompany && <td className="px-3 py-3 text-muted-foreground">{partner.distributorName ?? "Direct Company"}</td>}
                     <td className="px-3 py-3 text-muted-foreground">{[partner.city, partner.state].filter(Boolean).join(", ") || "—"}</td>
                     <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${partner.agreementStatus === "ACTIVE" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : partner.agreementStatus === "PENDING_APPROVAL" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-muted text-muted-foreground"}`}>{partner.agreementStatus?.replaceAll("_", " ") ?? "Not created"}</span></td>
-                    {(isMasterAdmin || !isCompany) && <td className="px-4 py-3 text-right"><div className="flex flex-wrap justify-end gap-2"><PartnerKiosksDialog partner={partner} />{canManageAgreements && organizationId && <PartnerAgreementDialog partner={partner} organizationId={organizationId} />}{!isCompany && <SendKiosksDialog partner={partner} />}</div></td>}
+                {(isMasterAdmin || !isCompany) && <td className="px-4 py-3 text-right"><div className="flex flex-wrap justify-end gap-2"><PartnerKiosksDialog partner={partner} />{canManageAgreements && organizationId && <PartnerAgreementDialog partner={partner} organizationId={organizationId} />}</div></td>}
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">{rows.length} partner{rows.length === 1 ? "" : "s"}</div>
+            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">{filteredRows.length} partner{filteredRows.length === 1 ? "" : "s"}</div>
           </div>
         )}
       </section>
