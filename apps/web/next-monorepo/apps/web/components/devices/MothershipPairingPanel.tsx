@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { fetchUnpairedKiosks, pairKioskDevice } from "@/lib/backend-api"
+import { fetchDevices } from "@/lib/devices-api"
 
 const buttonClass =
   "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
@@ -14,6 +15,7 @@ const inputClass =
 export default function MothershipPairingPanel({ onPaired }: { onPaired?: () => Promise<unknown> }) {
   const [machineCode, setMachineCode] = React.useState("")
   const [externalDeviceId, setExternalDeviceId] = React.useState("")
+  const devices = useQuery({ queryKey: ["devices", "pairing"], queryFn: fetchDevices, staleTime: 0 })
   const unpaired = useQuery({
     queryKey: ["unpaired-kiosks"],
     queryFn: fetchUnpairedKiosks,
@@ -48,7 +50,10 @@ export default function MothershipPairingPanel({ onPaired }: { onPaired?: () => 
             <option value="">Select machine code…</option>
             {(unpaired.data ?? []).map(kiosk => <option key={kiosk.id} value={kiosk.machineCode}>{kiosk.machineCode}{kiosk.model ? ` · ${kiosk.model}` : ""}</option>)}
           </select>
-          <input aria-label="Mothership external device ID" className={inputClass} value={externalDeviceId} onChange={event => setExternalDeviceId(event.target.value)} placeholder="Mothership external device ID" disabled={pair.isPending} />
+          <select aria-label="Mothership device" className={inputClass} value={externalDeviceId} onChange={event => setExternalDeviceId(event.target.value)} disabled={pair.isPending || devices.isLoading}>
+            <option value="">Select live device UUID…</option>
+            {(devices.data?.devices ?? []).map(device => <option key={device.deviceId} value={device.hardwareUuid ?? device.deviceId}>{device.deviceId}{device.hardwareUuid ? ` · ${device.hardwareUuid}` : ""}{device.isOnline ? " · Online" : " · Offline"}</option>)}
+          </select>
           <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50" disabled={!machineCode || !externalDeviceId.trim() || pair.isPending || unpaired.isLoading}>
             {pair.isPending && <Loader2 size={16} className="animate-spin" />}
             {pair.isPending ? "Pairing…" : "Pair device"}

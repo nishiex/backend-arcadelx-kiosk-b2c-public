@@ -24,6 +24,7 @@ import { machineCodeCounterFloor } from "../machine-code-sequence";
 
 const deviceSchema = z.object({
   device_id: z.string().min(1),
+  hardware_uuid: z.string().min(1).nullish(),
   location: z.string().nullish(),
   is_online: z.boolean().nullish(),
   last_seen: z.coerce.date().nullish(),
@@ -83,20 +84,21 @@ export async function syncDevices(): Promise<DeviceSyncResult> {
   const createdMachineCodes: string[] = [];
 
   for (const device of parsed) {
+    const externalDeviceId = device.hardware_uuid || device.device_id;
     const existing = await prisma.kiosk.findFirst({
-      where: { OR: [{ externalDeviceId: device.device_id }, { machineCode: device.device_id }] },
+      where: { OR: [{ externalDeviceId }, { machineCode: device.device_id }, { externalDeviceId: device.device_id }] },
       select: { id: true, externalDeviceId: true, location: true },
     });
 
     if (existing) {
       const location = normaliseLocation(device.location);
-      const needsLink = existing.externalDeviceId !== device.device_id;
+      const needsLink = existing.externalDeviceId !== externalDeviceId;
       const needsLocation = location !== null && location !== existing.location;
       if (needsLink || needsLocation) {
         await prisma.kiosk.update({
           where: { id: existing.id },
           data: {
-            ...(needsLink ? { externalDeviceId: device.device_id } : {}),
+            ...(needsLink ? { externalDeviceId } : {}),
             ...(needsLocation ? { location } : {}),
           },
         });
@@ -117,7 +119,7 @@ export async function syncDevices(): Promise<DeviceSyncResult> {
             model: DISCOVERED_MODEL,
             status: "AVAILABLE",
             currentOrgId: company.id,
-            externalDeviceId: device.device_id,
+            externalDeviceId,
             location: normaliseLocation(device.location),
           },
           select: { id: true, currentOrgId: true },
