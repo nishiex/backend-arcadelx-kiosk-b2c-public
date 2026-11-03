@@ -1,0 +1,68 @@
+# Local development stack for the API + web app.
+#
+# The database is NOT part of this stack. DATABASE_URL / DIRECT_URL come from .env
+# (Supabase, or a Postgres on this machine reached as host.docker.internal:5433);
+# apply schema changes from the host:  cd apps/api && npx prisma migrate deploy
+#
+# Keep the dockerfile paths exactly as checked in (apps/api/dockerfile is lowercase).
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/dockerfile
+    env_file:
+      - .env
+    environment:
+      # Local stack only. Switching this to production also needs an https
+      # FRONTEND_LOGIN_URL, an explicit CORS_ORIGINS and
+      # LOCAL_DATABASE_WIPE_ENABLED=false (see apps/api/src/config/env.ts).
+      NODE_ENV: development
+      PORT: 4000
+      HOST: 0.0.0.0
+      REDIS_URL: redis://redis:6379
+      # Persist generated PDFs on the bind mount below instead of the image layer.
+      INVOICES_DIR: /app/apps/api/invoices
+      # Never let destructive maintenance endpoints into a container by accident.
+      LOCAL_DATABASE_WIPE_ENABLED: "false"
+      # In development the in-process EOD timer starts anyway (apps/api/src/server.ts);
+      # this flag only governs the non-development path.
+      EOD_PRICE_JOBS_ENABLED: "false"
+    extra_hosts:
+      # Makes host.docker.internal available on Linux too, for a DB on the host.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./apps/api/invoices:/app/apps/api/invoices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ./apps/web/next-monorepo
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the Next rewrites at build time; must reach the API by service name.
+        BACKEND_API_URL: http://api:4000
+    environment:
+      BACKEND_API_URL: http://api:4000
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:

@@ -60,7 +60,7 @@ const reserveKiosks = async (
   model?: string,
 ) => {
   // Batch-created kiosks start AVAILABLE and may become INSTALLED when hardware is
-  // paired. Both states represent real, unreserved supplier stock that can be
+  // paired. Only paired kiosks represent real, unreserved supplier stock that can be
   // requested; reservation moves either state to RESERVED.
   //
   // Deterministic selection: oldest first, then by machine code. Ordering by `id`
@@ -70,24 +70,25 @@ const reserveKiosks = async (
   // unique, making this a total order: the same inventory always yields the same
   // kiosks, and a batch allocation now follows the machine codes.
   //
-  // FOR UPDATE SKIP LOCKED makes the availability check atomic: two concurrent orders
-  // cannot select the same row, and the guarded updateMany below re-checks the same
-  // predicate so a row that changed between SELECT and UPDATE cannot slip through.
-  const kiosks = model
-    ? await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND "reservedOrderId" IS NULL AND model=${model}
-        ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`
-    : await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND "reservedOrderId" IS NULL
-        ORDER BY "createdAt", "machineCode", id LIMIT ${quantity} FOR UPDATE SKIP LOCKED`;
+  // The guarded updateMany below re-checks this predicate, so a row that changes
+  // between selection and update cannot be transferred accidentally.
+  const kioskWhere = {
+    currentOrgId: orgId,
+    externalDeviceId: { not: null },
+    status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
+    reservedOrderId: null,
+    ...(model ? { model } : {}),
+  } satisfies Prisma.KioskWhereInput;
+  const kiosks = await tx.kiosk.findMany({
+    where: kioskWhere,
+    select: { id: true },
+    orderBy: [{ createdAt: "asc" }, { machineCode: "asc" }, { id: "asc" }],
+    take: quantity,
+  });
   if (kiosks.length !== quantity) {
     // Distinguish missing model stock from stock that is already committed.
-    const [installedTotal] = model
-      ? await tx.$queryRaw<{ n: bigint }[]>`
-          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED') AND model=${model}`
-      : await tx.$queryRaw<{ n: bigint }[]>`
-          SELECT count(*) AS n FROM "Kiosk" WHERE "currentOrgId"=${orgId} AND status IN ('AVAILABLE', 'INSTALLED')`;
-    if (Number(installedTotal?.n ?? 0) === 0) {
+    const installedTotal = await tx.kiosk.count({ where: kioskWhere });
+    if (installedTotal === 0) {
       throw new ApiError(
         409,
         model
@@ -106,10 +107,7 @@ const reserveKiosks = async (
   const updated = await tx.kiosk.updateMany({
     where: {
       id: { in: ids },
-      currentOrgId: orgId,
-      status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
-      reservedOrderId: null,
-      ...(model ? { model } : {}),
+      ...kioskWhere,
     },
     data: { status: "RESERVED", reservedOrderId: orderId },
   });
@@ -126,12 +124,12 @@ const assertRequestModelAvailable = async (
   model: string,
   quantity: number,
 ) => {
-  // Serialize requests and approvals for one supplier so multiple requests cannot
-  // independently claim the same unreserved model inventory.
-  await tx.$queryRaw`SELECT id FROM "Organization" WHERE id=${supplierOrgId} FOR UPDATE`;
+  // The reservation transaction performs the final guarded update, so concurrent
+  // requests cannot commit the same kiosk even if this availability check races.
   const available = await tx.kiosk.count({
     where: {
       currentOrgId: supplierOrgId,
+      externalDeviceId: { not: null },
       status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
       reservedOrderId: null,
       model,
@@ -171,6 +169,7 @@ export const getRequestModelAvailability = asyncHandler(async (req, res) => {
         by: ["model"],
         where: {
           currentOrgId: agreement.parentOrgId,
+          externalDeviceId: { not: null },
           status: { in: [...REQUESTABLE_KIOSK_STATUSES] },
           reservedOrderId: null,
         },
@@ -277,6 +276,7 @@ async function lockedStock(
     kiosks.some(
       (k) =>
         k.currentOrgId !== order.parentOrgId ||
+        !k.externalDeviceId ||
         k.status !== status ||
         k.reservedOrderId !== order.id,
     )

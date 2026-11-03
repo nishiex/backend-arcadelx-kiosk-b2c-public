@@ -1,0 +1,14 @@
+# Excludes apply to every nested workspace, including apps/web/next-monorepo.
+# Docker only reads the .dockerignore at each build context root, so the web
+# build has its own file at apps/web/next-monorepo/.dockerignore.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.log
+
+.env
+.env.*
+!.env.docker.example
+
+.git

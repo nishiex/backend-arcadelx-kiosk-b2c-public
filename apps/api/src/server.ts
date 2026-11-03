@@ -27,6 +27,6 @@ if (pricingJobs && process.env.REVENUE_JOBS_ENABLED !== 'true') {
   }
 }
 
-app.listen(PORT, '127.0.0.1',()=>{
+app.listen(PORT, env.HOST,()=>{
     console.log(`Server Running on ${PORT}`);
 })

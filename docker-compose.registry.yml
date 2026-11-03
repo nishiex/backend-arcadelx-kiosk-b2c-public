@@ -1,0 +1,44 @@
+# Pull-based variant of docker-compose.mothership.yml: identical services, but the
+# images come from a registry instead of being built on the server.
+#
+#   export IMAGE_REPO=<dockerhub-user> IMAGE_TAG=<tag>
+#   docker compose -f docker-compose.registry.yml pull
+#   docker compose -f docker-compose.registry.yml up -d
+#
+# Build and push from a machine whose CPU architecture matches the server
+# (`uname -m` → x86_64 ⇒ --platform linux/amd64, aarch64 ⇒ linux/arm64).
+
+name: arcadelx
+
+services:
+  api:
+    image: ${IMAGE_REPO:-arcadelx}/arcadelx-api:${IMAGE_TAG:-latest}
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      HOST: 0.0.0.0
+      INVOICES_DIR: /app/apps/api/invoices
+      LOCAL_DATABASE_WIPE_ENABLED: "false"
+      EOD_PRICE_JOBS_ENABLED: "false"
+    volumes:
+      - ./apps/api/invoices:/app/apps/api/invoices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: ${IMAGE_REPO:-arcadelx}/arcadelx-web:${IMAGE_TAG:-latest}
+    environment:
+      # Baked into the Next rewrites at build time; kept here for clarity.
+      BACKEND_API_URL: http://api:4000
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

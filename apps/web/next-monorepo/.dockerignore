@@ -1,0 +1,10 @@
+# Build context for the web image (apps/web/next-monorepo).
+# Nested node_modules here is ~650 MB and never needed inside the image.
+**/node_modules
+**/.next
+**/.turbo
+**/*.log
+.env*
+!.env.example
+coverage
+.git

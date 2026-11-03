@@ -2,26 +2,23 @@ import type { Prisma } from "../generated/prisma/client";
 import { prisma } from "../utils/db";
 import { ApiError } from "../utils/ApiError";
 
-type Client = Pick<Prisma.TransactionClient, '$queryRaw'>;
 export type OrganizationAccess = { id: string; type: string; isActive: boolean; accessVersion: number };
 
 // JSON field extraction preserves existing logins before this additive migration
 // is deployed. Status writes are unavailable until BOTH columns exist. Never
 // cache access state: each authenticated request must see a committed deactivation.
-export async function getUserOrganizationAccess(userId: string, db: Client = prisma, lock = false) {
-  if (lock) {
-    await db.$queryRaw`SELECT o.id FROM "Organization" o
-      JOIN "Membership" m ON m."organizationId" = o.id
-      WHERE m."userId" = ${userId} FOR UPDATE OF o`;
-  }
-  const rows = await db.$queryRaw<OrganizationAccess[]>`
-    SELECT o.id, o.type,
-      COALESCE((to_jsonb(o)->>'isActive')::boolean, true) AS "isActive",
-      COALESCE((to_jsonb(o)->>'accessVersion')::integer, 0) AS "accessVersion"
-    FROM "Organization" o JOIN "Membership" m ON m."organizationId" = o.id
-    WHERE m."userId" = ${userId}
-  `;
-  return rows[0];
+export async function getUserOrganizationAccess(
+  userId: string,
+  db: typeof prisma | Prisma.TransactionClient = prisma,
+  _lock = false,
+): Promise<OrganizationAccess | undefined> {
+  // Prisma does not expose row-level FOR UPDATE locking. The caller's transaction
+  // still keeps session creation atomic, while this relation query avoids raw SQL and
+  // works against the current Organization schema.
+  return (await db.organization.findFirst({
+    where: { memberships: { some: { userId } } },
+    select: { id: true, type: true, isActive: true, accessVersion: true },
+  })) ?? undefined;
 }
 
 export function assertOrganizationActive(access: OrganizationAccess | undefined) {

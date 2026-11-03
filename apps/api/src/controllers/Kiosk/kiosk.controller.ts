@@ -212,13 +212,14 @@ export const assignKiosks = asyncHandler(async (req: Request, res: Response) => 
       where: {
         id: { in: kioskIds },
         currentOrgId: sourceOrgId,
+        externalDeviceId: { not: null },
         status: { in: ["AVAILABLE", "RETURNED", "MAINTENANCE"] },
         reservedOrderId: null,
       },
       select: { id: true, machineCode: true, model: true },
     });
     if (kiosks.length !== kioskIds.length) {
-      throw new ApiError(409, "One or more selected kiosks are no longer available");
+      throw new ApiError(409, "One or more selected kiosks are unavailable or unpaired");
     }
 
     const now = new Date();

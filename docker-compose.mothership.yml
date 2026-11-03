@@ -1,0 +1,60 @@
+# Integration overlay for a server that already runs `the-mothership` (Compose project
+# `the-mothership`, port 8080) and `headscale` (Compose project `headscale`, port 8085).
+#
+# This is a separate Compose project (`arcadelx`): it never redefines, restarts or
+# removes the existing containers, and it declares no database service and no volumes.
+#
+# No external network is required: web calls api over this project's own default
+# network. Attach `the-mothership_default` later only if the API must reach Mothership
+# by container name instead of its public URL.
+#
+#   docker compose -f docker-compose.mothership.yml up -d --build
+#
+# Only the frontend is published. The API stays internal: Next rewrites /api/* to it.
+
+name: arcadelx
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/dockerfile
+    env_file:
+      - .env
+    environment:
+      # Kept as-is during integration; see the production implications in
+      # docs/deploy-mothership.md before switching this to production.
+      NODE_ENV: development
+      PORT: 4000
+      HOST: 0.0.0.0
+      # Must match the bind mount below and the image default.
+      INVOICES_DIR: /app/apps/api/invoices
+      LOCAL_DATABASE_WIPE_ENABLED: "false"
+      EOD_PRICE_JOBS_ENABLED: "false"
+    volumes:
+      - ./apps/api/invoices:/app/apps/api/invoices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ./apps/web/next-monorepo
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the Next rewrites at build time.
+        BACKEND_API_URL: http://api:4000
+    environment:
+      BACKEND_API_URL: http://api:4000
+    ports:
+      # Loopback by default: terminate TLS in the host proxy and route the domain here.
+      # Set WEB_BIND=0.0.0.0 only if you really want the port public.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+

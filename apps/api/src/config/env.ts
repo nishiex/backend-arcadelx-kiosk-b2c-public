@@ -7,6 +7,7 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.string().regex(/^\d+$/).refine(value => Number(value) > 0 && Number(value) <= 65535, 'Invalid port').default('4000'),
+  HOST: z.string().default('localhost'),
   DATABASE_URL: z.string().url("Must be a valid Postgres URL"),
   DIRECT_URL: z.string().url("Must be a valid Postgres URL"),
   ACCESS_SECRET_TOKEN: z.string().min(64),
