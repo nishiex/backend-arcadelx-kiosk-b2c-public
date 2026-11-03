@@ -156,6 +156,7 @@ export type Kiosk = {
   id: string;
   machineCode: string;
   model: string | null;
+  externalDeviceId?: string | null;
   status: KioskStatus;
   location: string | null;
   currentOrgId: string | null;
@@ -276,9 +277,16 @@ export type KioskOrderDetails = KioskOrder & {
 };
 
 export async function fetchOrders(status?: OrderStatus, signal?: AbortSignal): Promise<KioskOrder[]> {
-  const query = status ? `?${new URLSearchParams({ status })}` : '';
-  const res = await apiFetch(`/api/orders${query}`, { signal, cache: 'no-store' });
-  return (await handleRes<{ orders: KioskOrder[] }>(res)).orders;
+  const orders: KioskOrder[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const params = new URLSearchParams({ page: String(page), limit: '100' });
+    if (status) params.set('status', status);
+    const res = await apiFetch(`/api/orders?${params}`, { signal, cache: 'no-store' });
+    const data = await handleRes<{ orders: KioskOrder[]; meta?: { totalPages?: number } }>(res);
+    orders.push(...data.orders);
+    if (!data.meta?.totalPages || page >= data.meta.totalPages) break;
+  }
+  return orders;
 }
 
 export async function fetchOrderDetails(orderId: string, signal?: AbortSignal): Promise<KioskOrderDetails> {
@@ -301,7 +309,8 @@ export async function updateOrderPricing(orderId: string, payload: {
 /**
  * Post-approval lifecycle steps. Each is supplier-side (the API requires the caller
  * to be the order's parent organization) and strictly ordered by the API:
- *   APPROVED + unpaid -> paid -> dispatch -> deliver (DELIVERED, terminal).
+ *   APPROVED + cash-requested unpaid -> cash-confirmed -> dispatch -> deliver
+ *   (DELIVERED, terminal). Online gateway confirmation is not implemented.
  * `dispatch` assigns the reserved kiosks; `deliver` transfers their ownership to the
  * child organization and clears their reservation.
  */
@@ -658,9 +667,31 @@ export async function fetchMe(): Promise<Me> {
 }
 
 export async function fetchKiosks(): Promise<Kiosk[]> {
-  const res = await apiFetch('/api/kiosks', { credentials: 'include' });
-  const json = await handleRes<{ kiosks: Kiosk[] }>(res);
-  return json.kiosks;
+  const kiosks: Kiosk[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const params = new URLSearchParams({ page: String(page), limit: '100' });
+    const res = await apiFetch(`/api/kiosks?${params}`, { credentials: 'include' });
+    const json = await handleRes<{ kiosks: Kiosk[]; meta?: { totalPages?: number } }>(res);
+    kiosks.push(...json.kiosks);
+    if (!json.meta?.totalPages || page >= json.meta.totalPages) break;
+  }
+  return kiosks;
+}
+
+export async function syncKioskDevices() {
+  const res = await apiFetch('/api/kiosks/sync-devices', {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  return handleRes<{
+    totalRecordsFetched: number;
+    newKiosksCreated: number;
+    kiosksUpdated: number;
+    devicesWithoutId: number;
+    rejectedRecords: number;
+    createdMachineCodes: string[];
+  }>(res);
 }
 
 export async function assignKiosks(input: { organizationId: string; kioskIds: string[] }) {
@@ -689,6 +720,36 @@ export async function removeKiosk(id: string) {
     credentials: 'include',
   });
   return handleRes<{ kiosk: Pick<Kiosk, 'id' | 'machineCode' | 'status' | 'currentOrgId'> }>(res);
+}
+
+export type KioskReturnRequest = {
+  id: string
+  kioskId: string
+  organizationId: string
+  status: "PENDING" | "APPROVED"
+  createdAt: string
+  kiosk: { machineCode: string; model: string | null; status: KioskStatus; currentOrgId: string | null }
+  organization: { id: string; name: string; type: OrgType; parentOrgId: string | null }
+  requestedBy: { id: string; name: string; email: string }
+}
+
+export async function requestKioskReturn(id: string) {
+  const res = await apiFetch(`/api/kiosks/${encodeURIComponent(id)}/return-request`, {
+    method: 'POST', credentials: 'include',
+  })
+  return handleRes<{ request: Pick<KioskReturnRequest, 'id' | 'kioskId' | 'organizationId' | 'status' | 'createdAt'> }>(res)
+}
+
+export async function fetchKioskReturnRequests() {
+  const res = await apiFetch('/api/kiosks/return-requests', { credentials: 'include', cache: 'no-store' })
+  return handleRes<{ requests: KioskReturnRequest[] }>(res)
+}
+
+export async function approveKioskReturn(requestId: string) {
+  const res = await apiFetch(`/api/kiosks/return-requests/${encodeURIComponent(requestId)}/approve`, {
+    method: 'POST', credentials: 'include',
+  })
+  return handleRes<{ request: Pick<KioskReturnRequest, 'id' | 'kioskId' | 'organizationId' | 'status'> }>(res)
 }
 
 export type MachineActivity = {
@@ -780,6 +841,9 @@ export type MothershipPayment = {
   qr_id: string | null;
   created_at: string;
   updated_at: string;
+  payment_date?: string;
+  distributor_name?: string | null;
+  partner_name?: string | null;
 };
 
 export type MothershipPaymentsFeed = {
@@ -800,6 +864,48 @@ export async function fetchMothershipPayments(page = 1, signal?: AbortSignal, pa
     signal,
   });
   return handleRes<MothershipPaymentsFeed>(res);
+}
+
+export async function downloadMothershipPaymentsExport(format: 'csv' | 'pdf'): Promise<void> {
+  const res = await apiFetch(`/api/revenue/payments?format=${format}`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    await handleRes(res);
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `mothership-payments.${format}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Open a blank Google Sheet and copy the current payment CSV for pasting. */
+export async function openMothershipPaymentsInGoogleSheets(): Promise<void> {
+  const sheetWindow = window.open('https://docs.google.com/spreadsheets/create', '_blank', 'noopener,noreferrer');
+  if (!sheetWindow) throw new Error('Google Sheets could not be opened. Please allow pop-ups for this site.');
+
+  try {
+    const res = await apiFetch('/api/revenue/payments?format=csv', {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      await handleRes(res);
+      return;
+    }
+    await navigator.clipboard.writeText(await res.text());
+    sheetWindow.focus();
+  } catch (error) {
+    sheetWindow.close();
+    throw error;
+  }
 }
 
 export type MothershipSyncResult = {

@@ -101,6 +101,53 @@ export type GamePriceView = {
   overrideReplayPrice: number | null
   /** Upstream rows collapsed into this one; 2 means Mothership returned a duplicate. */
   mergedRows: number
+  iconUrl: string | null
+  imageUrl: string | null
+}
+
+export type LauncherGameView = {
+  gameId: string
+  name: string
+  iconUrl: string | null
+  posterUrl: string | null
+  price: number
+  replayPrice: number
+  catalogPrice: number | null
+  needsUpdate: boolean
+  version: string | null
+  playable: boolean
+}
+
+/**
+ * Return the games and effective prices for one machine using the same dynamic
+ * device-pricing read used by the Devices screen. This keeps older distributor
+ * views compatible without maintaining a second launcher proxy route.
+ */
+export async function fetchLauncherGames(deviceId: string): Promise<{
+  deviceId: string
+  games: LauncherGameView[]
+  comingSoon: LauncherGameView[]
+  needsUpdate: number
+}> {
+  const result = await fetchDevicePrices(deviceId)
+  const games = result.games.map((game) => ({
+    gameId: game.gameId,
+    name: game.displayName,
+    iconUrl: game.iconUrl,
+    posterUrl: game.imageUrl,
+    price: game.effectivePrice,
+    replayPrice: game.effectiveReplayPrice,
+    catalogPrice: game.basePrice,
+    needsUpdate: game.hasOverride,
+    version: null,
+    playable: true,
+  }))
+  return {
+    deviceId,
+    games,
+    comingSoon: [],
+    needsUpdate: games.filter((game) => game.needsUpdate).length,
+  }
 }
 
 export async function fetchDevices(): Promise<{
@@ -114,14 +161,19 @@ export async function fetchDevices(): Promise<{
 
 export async function fetchDevicePrices(
   deviceId: string
-): Promise<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }> {
+): Promise<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; runTime: string; nextExecutionAt: string } }> {
   const res = await apiFetch(`/api/devices/${encodeURIComponent(deviceId)}/prices`, {
     cache: "no-store",
   })
-  return handleRes<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; nextExecutionAt: string } }>(res)
+  return handleRes<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; runTime: string; nextExecutionAt: string } }>(res)
 }
 
-export type EodPriceUpdate = { id: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
+export async function setEodPricingRunTime(time: string): Promise<{ runTime: string; timezone: string; nextExecutionAt: string }> {
+  const res = await apiFetch('/api/devices/eod-time', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time }) })
+  return handleRes<{ runTime: string; timezone: string; nextExecutionAt: string }>(res)
+}
+
+export type EodPriceUpdate = { id: string; businessDate: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
 
 export type ResetDevicePricesResult = {
   deviceId: string
@@ -145,6 +197,9 @@ export type SetDeviceGamePriceResult = {
   status?: "PENDING"
   scheduledFor?: string
   timezone?: string
+  appliedNow?: boolean
+  supersededSchedules?: number
+  scheduledDate?: string
   updateId?: string
 }
 
@@ -213,7 +268,7 @@ export async function rejectDevicePriceRequest(requestId: string, reason: string
 export async function setDeviceGamePrice(
   deviceId: string,
   gameId: string,
-  input: { price: number; replay_price: number; scope?: "DEVICE" | "GAME_CATALOG" }
+  input: { price: number; replay_price: number; scheduled_date?: string; scope?: "DEVICE" | "GAME_CATALOG"; apply_now?: boolean }
 ): Promise<SetDeviceGamePriceResult> {
   const res = await apiFetch(
     `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
