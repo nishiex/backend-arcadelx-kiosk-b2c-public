@@ -28,6 +28,12 @@ pipeline {
 
         stage('Deploy') {
             steps {
+                sh '''
+                    old_api="$(docker ps -aq --filter label=com.docker.compose.project=arcadelx --filter label=com.docker.compose.service=api)"
+                    old_web="$(docker ps -aq --filter label=com.docker.compose.project=arcadelx --filter label=com.docker.compose.service=web)"
+                    if [ -n "$old_api" ]; then docker rm -f $old_api; fi
+                    if [ -n "$old_web" ]; then docker rm -f $old_web; fi
+                '''
                 sh 'docker compose up -d --remove-orphans api web redis'
             }
         }
