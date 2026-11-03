@@ -28,6 +28,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
+                sh 'docker compose down --remove-orphans'
                 sh '''
                     old_api="$(docker ps -aq --filter label=com.docker.compose.project=arcadelx --filter label=com.docker.compose.service=api)"
                     old_web="$(docker ps -aq --filter label=com.docker.compose.project=arcadelx --filter label=com.docker.compose.service=web)"
