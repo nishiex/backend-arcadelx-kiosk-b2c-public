@@ -59,7 +59,13 @@ const RegisterOrgFields = z.object({
   city: citySchema,
   pincode: pincodeSchema,
   address: addressSchema,
-  gstNumber: z.string().trim().min(1).max(30).optional(),
+  // The field is a plain 12-digit number, not a GSTIN: the registry values already in use
+  // (10 digits) are numeric, and the business rule is exactly twelve digits.
+  gstNumber: z
+    .string()
+    .trim()
+    .regex(/^\d{12}$/, "GST number must be 12 digits")
+    .optional(),
   phone: z.string().trim().min(1).max(32).optional(),
   country: z.string().trim().min(1).max(100).optional(),
 });

@@ -89,7 +89,7 @@ try {
     assert.equal(posts().length, 0, 'Owner contact must contain exactly ten digits')
   }
   await setValue('ownerContact', '0123456789')
-  await setValue('gstNumber', 'TEST-PARTNER-GST')
+  await setValue('gstNumber', '123456789012')
   fail = true; await submit()
   await until(() => !!document.querySelector('[role="alert"]'))
   assert.ok(document.querySelector('form'))
@@ -105,7 +105,7 @@ try {
   await React.act(async () => release!())
   await until(() => !!button('Retry credentials email'))
   assert.equal(document.querySelector('form'), null)
-  assert.deepEqual(posts().at(-1)!.body, { orgName: 'Test Partner', ownerName: 'Partner Owner', ownerEmail: 'partner@example.invalid', ownerContact: '0123456789', gstNumber: 'TEST-PARTNER-GST', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: 400001, orgType: 'PARTNER' })
+  assert.deepEqual(posts().at(-1)!.body, { orgName: 'Test Partner', ownerName: 'Partner Owner', ownerEmail: 'partner@example.invalid', ownerContact: '0123456789', gstNumber: '123456789012', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: 400001, orgType: 'PARTNER' })
   assert.equal(posts().at(-1)!.credentials, 'include')
   assert.ok(document.body.textContent?.includes('have not been emailed'))
   await React.act(async () => button('Retry credentials email')!.click())

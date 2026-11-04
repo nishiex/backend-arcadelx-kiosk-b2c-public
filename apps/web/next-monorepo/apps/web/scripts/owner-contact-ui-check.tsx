@@ -58,7 +58,7 @@ try {
   qc.setQueryData(['me'], me)
   await React.act(async () => root.render(<QueryClientProvider client={qc}><AppRouterContext.Provider value={router}><PathnameContext.Provider value="/distributors/new"><AddDistributorForm /></PathnameContext.Provider></AppRouterContext.Provider></QueryClientProvider>))
   await flush()
-  for (const [name, value] of Object.entries({ orgName: 'Contact Distributor', ownerName: 'Owner Person', ownerEmail: 'owner@example.invalid', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: '400001', phone: '9999999999', gstNumber: 'TEST-GST' })) await fill(name, value)
+  for (const [name, value] of Object.entries({ orgName: 'Contact Distributor', ownerName: 'Owner Person', ownerEmail: 'owner@example.invalid', address: 'Test street address', state: 'Maharashtra', city: 'Mumbai', pincode: '400001', phone: '9999999999', gstNumber: '123456789012' })) await fill(name, value)
   for (const value of ['', '12345', 'abcdefghij', '12345678901']) {
     await fill('ownerContact', value); await submit()
     assert.equal(calls.length, 0, 'Invalid contact makes no invite or registration calls')
@@ -72,7 +72,7 @@ try {
   assert.equal(redirects.at(-1), '/distributors')
   assert.equal(calls.at(-1)?.body.ownerContact, '0987654321')
   assert.equal(calls.at(-1)?.body.phone, '9999999999')
-  assert.equal(calls.at(-1)?.body.gstNumber, 'TEST-GST')
+  assert.equal(calls.at(-1)?.body.gstNumber, '123456789012')
   assert.equal(calls.at(-1)?.body.inviteCode, 'TESTCODE12')
   assert.ok(!document.querySelector('[name="inviteCode"]'), 'Invite stays system-generated')
   console.log('PASS Distributor contact validation, separate organization phone/GST, duplicate recovery, automatic invite and successful registration redirect')

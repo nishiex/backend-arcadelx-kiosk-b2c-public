@@ -180,8 +180,16 @@ export default function AddDistributorForm() {
           <Field label="Business Name" required error={errors.orgName?.message}>
             <input className={inputCls} {...register("orgName", { required: "Business name is required" })} />
           </Field>
-          <Field label="GST Number">
-            <input className={inputCls} {...register("gstNumber")} />
+          <Field label="GST Number" error={errors.gstNumber?.message}>
+            <input
+              className={inputCls}
+              inputMode="numeric"
+              maxLength={12}
+              {...register("gstNumber", {
+                setValueAs: (value: string) => value.trim() || undefined,
+                validate: value => !value || /^\d{12}$/.test(value) || "GST number must be 12 digits",
+              })}
+            />
           </Field>
           <Field label="Contact Person" required error={errors.ownerName?.message}>
             <input className={inputCls} {...register("ownerName", { required: "Contact person is required" })} />

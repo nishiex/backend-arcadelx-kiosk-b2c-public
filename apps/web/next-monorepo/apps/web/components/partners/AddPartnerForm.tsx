@@ -131,8 +131,11 @@ function PartnerForm({ modal }: { modal: boolean }) {
             </div>
             <div>
               <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number <span className="text-xs font-normal text-muted-foreground">(optional)</span></label>
-              <input id="gstNumber" maxLength={30} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                {...register("gstNumber", { setValueAs: (value: string) => value.trim() || undefined, maxLength: { value: 30, message: "Enter at most 30 characters" } })} />
+              <input id="gstNumber" inputMode="numeric" maxLength={12} aria-invalid={!!errors.gstNumber} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                {...register("gstNumber", {
+                  setValueAs: (value: string) => value.trim() || undefined,
+                  validate: value => !value || /^\d{12}$/.test(value) || "GST number must be 12 digits",
+                })} />
               {errors.gstNumber && <p className="mt-1 text-xs text-destructive">{errors.gstNumber.message}</p>}
             </div>
           </fieldset>
