@@ -1,6 +1,6 @@
 import { ApiError } from '../../utils/ApiError';
 import {
-  DeviceListResponseSchema,
+  DevicesResponseSchema,
   DevicePricesResponseSchema,
   GameCatalogResponseSchema,
   LauncherGamesResponseSchema,
@@ -133,12 +133,12 @@ async function callMothership(
 }
 
 export async function listDevices(): Promise<{ devices: DeviceView[]; lastUpdated: string | null }> {
-  const payload = await callMothership('/api/v1/kiosks/device-ids', { method: 'GET' });
-  const parsed = DeviceListResponseSchema.safeParse(payload);
+  const payload = await callMothership('/api/v1/devices', { method: 'GET' });
+  const parsed = DevicesResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw new ApiError(502, 'Mothership device API returned an unexpected device payload');
   }
-  const devices = parsed.data.kiosks.map((device) => ({
+  const devices = parsed.data.devices.map((device) => ({
     deviceId: device.device_id,
     hardwareUuid: device.hardware_uuid ?? null,
     headscaleIp: device.headscale_ip ?? null,
@@ -148,11 +148,24 @@ export async function listDevices(): Promise<{ devices: DeviceView[]; lastUpdate
     location: device.location ?? null,
     publicIp: device.public_ip ?? null,
   }));
-  return { devices, lastUpdated: parsed.data.last_updated ?? null };
+  return { devices, lastUpdated: null };
 }
 
 /** `has_override` arrives as 0/1; normalise to a real boolean. */
 const toBool = (value: number | boolean): boolean => value === true || value === 1;
+
+type LauncherGameAsset = { gameId: string; name: string; iconUrl: string | null; posterUrl: string | null };
+let launcherAssetsCache: { expiresAt: number; games: LauncherGameAsset[] } | null = null;
+
+async function getLauncherGameAssets(): Promise<LauncherGameAsset[]> {
+  if (launcherAssetsCache && launcherAssetsCache.expiresAt > Date.now()) return launcherAssetsCache.games;
+  const payload = await callMothership('/api/v1/launcher/games', { method: 'GET' });
+  const parsed = LauncherGamesResponseSchema.safeParse(payload);
+  if (!parsed.success) throw new ApiError(502, 'Mothership launcher games API returned an unexpected payload');
+  const games = parsed.data.games.map(game => ({ gameId: game.GameId, name: game.GameName, iconUrl: game.IconUrl || null, posterUrl: game.PosterUrl || null }));
+  launcherAssetsCache = { expiresAt: Date.now() + 60_000, games };
+  return games;
+}
 
 /**
  * Merge Mothership's duplicate rows.
@@ -177,6 +190,12 @@ function mergeGamePrices(
     has_override: number | boolean;
     override_price: number | null;
     override_replay_price: number | null;
+    /** Staged change waiting for the scheduled run; absent on applied rows. */
+    pending?: {
+      op: string | null;
+      price: number | null;
+      replayPrice: number | null;
+    } | null;
   }[],
 ): GamePriceView[] {
   const byName = new Map<string, { row: (typeof rows)[number]; count: number }>();
@@ -206,29 +225,10 @@ function mergeGamePrices(
     overrideReplayPrice: row.override_replay_price,
     mergedRows: count,
     differsFromCatalog: false,
+    pending: row.pending ?? null,
     iconUrl: null,
     imageUrl: null,
   }));
-}
-
-function artworkKey(value: string): string {
-  return value.trim().toLocaleLowerCase();
-}
-
-async function getLauncherArtwork(): Promise<Map<string, { iconUrl: string | null; imageUrl: string | null }>> {
-  const payload = await callMothership('/api/v1/launcher/games', { method: 'GET' });
-  const parsed = LauncherGamesResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    throw new ApiError(502, 'Mothership launcher API returned an unexpected games payload');
-  }
-
-  const artwork = new Map<string, { iconUrl: string | null; imageUrl: string | null }>();
-  for (const game of [...parsed.data.games, ...parsed.data.coming_soon]) {
-    const media = { iconUrl: game.IconUrl || null, imageUrl: game.PosterUrl || null };
-    artwork.set(artworkKey(game.GameId), media);
-    artwork.set(artworkKey(game.GameName), media);
-  }
-  return artwork;
 }
 
 export async function getDevicePrices(
@@ -244,20 +244,12 @@ export async function getDevicePrices(
     throw new ApiError(502, 'Mothership device API returned an unexpected pricing payload');
   }
   const catalog = catalogSnapshot ?? (await getGameCatalog());
-  let artwork = new Map<string, { iconUrl: string | null; imageUrl: string | null }>();
-  try {
-    artwork = await getLauncherArtwork();
-  } catch (error) {
-    // Artwork is additive UI metadata; a launcher asset outage must not hide prices.
-    console.warn('[mothership-devices] launcher artwork unavailable', {
-      error: error instanceof Error ? error.message : 'unknown error',
-    });
-  }
+  const launcherAssets = await getLauncherGameAssets();
   return mergeGamePrices(parsed.data.pricing).map((game) => {
-    const media = artwork.get(artworkKey(game.displayName));
-    const withArtwork = media ? { ...game, ...media } : game;
     const catalogGame = findCatalogGame(catalog, game);
-    if (!catalogGame) return { ...withArtwork, differsFromCatalog: false };
+    const asset = launcherAssets.find(item => item.gameId === game.gameId || item.name === game.displayName);
+    const artwork = { iconUrl: asset?.iconUrl ?? null, imageUrl: asset?.posterUrl ?? null };
+    if (!catalogGame) return { ...game, ...artwork, differsFromCatalog: false };
 
     const differsFromCatalog =
       !samePrice(game.effectivePrice, catalogGame.price) ||
@@ -267,13 +259,14 @@ export async function getDevicePrices(
     // running an override, and a device reset cannot clear the difference. Only
     // Mothership's own override fields may set `hasOverride`.
     return {
-      ...withArtwork,
+      ...game,
       basePrice: catalogGame.price,
       baseReplayPrice: catalogGame.replay_price,
       differsFromCatalog,
       hasOverride: game.hasOverride,
       overridePrice: game.overridePrice,
       overrideReplayPrice: game.overrideReplayPrice,
+      ...artwork,
     };
   });
 }
@@ -284,10 +277,9 @@ const PRICE_EPSILON = 0.001;
 const samePrice = (a: number, b: number): boolean => Math.abs(a - b) < PRICE_EPSILON;
 
 /**
- * An override exists only when Mothership reports one. Price drift against the catalog
- * used to be counted here, which made reset verification fail on kiosks that had
- * nothing to reset: the upstream reset cannot make a device price equal the catalog
- * price, so the row stayed flagged no matter how often it was reset.
+ * An override exists only when Mothership reports one. Catalog drift used to be counted
+ * here, which made reset verification fail on kiosks with nothing to reset: an upstream
+ * device reset cannot make the device price equal the catalog price.
  */
 function hasPriceOverride(game: GamePriceView): boolean {
   return (
@@ -650,10 +642,10 @@ export async function setDeviceGamePrice(
     body.replay_price = input.replay_price;
   }
 
-  await callMothership(
+  const writeResponse = (await callMothership(
     `/api/v1/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameBefore.gameId)}/price`,
     { method: 'POST', body },
-  );
+  )) as { applies_at?: string | null; scheduled?: boolean } | null;
 
   const [devicesAfter, catalogAfter] = await Promise.all([
     listDevices(),
@@ -675,8 +667,30 @@ export async function setDeviceGamePrice(
     throw new ApiError(502, 'Could not verify selected device prices after update', { deviceId });
   }
 
-  const gameAfter = findGameOnDevice(targetAfter, gameId);
+  let gameAfter = findGameOnDevice(targetAfter, gameId);
   const replayPrice = input.replay_price ?? gameBefore.effectiveReplayPrice;
+
+  /**
+   * Mothership stages device writes: the POST answers `scheduled: true` with an
+   * `applies_at` moment, and the kiosk keeps reading its old price until the scheduler
+   * runs. The staged change is therefore the write's receipt, and comparing only live
+   * values would report every successful save as a failure.
+   */
+  const pendingMatches = (view: typeof gameAfter) =>
+    !!view?.pending &&
+    samePrice(view.pending.price ?? Number.NaN, input.price) &&
+    (view.pending.replayPrice == null || samePrice(view.pending.replayPrice, replayPrice));
+
+  // "Apply now" is our own promise, not upstream's: Mothership ignores `apply_now` and
+  // queues regardless, so honour it by flushing the queue and re-reading.
+  if (
+    input.apply_now &&
+    !samePrice(gameAfter?.effectivePrice ?? Number.NaN, input.price) &&
+    pendingMatches(gameAfter)
+  ) {
+    await callMothership('/api/v1/schedule/run-now', { method: 'POST' });
+    gameAfter = findGameOnDevice(await getDevicePrices(deviceId, catalogAfter), gameId);
+  }
   const targetValuesVerified =
     !!gameAfter &&
     samePrice(gameAfter.effectivePrice, input.price) &&
@@ -706,12 +720,31 @@ export async function setDeviceGamePrice(
     if (!unchanged) changedDevices.push(id);
   }
 
+  if (
+    !targetVerified &&
+    pendingMatches(gameAfter) &&
+    catalogUnchanged &&
+    changedDevices.length === 0 &&
+    !fleetChanged
+  ) {
+    return {
+      deviceId,
+      gameId: gameBefore.gameId,
+      displayName: gameBefore.displayName,
+      price: input.price,
+      replayPrice,
+      scope: 'DEVICE_GAME_OVERRIDE',
+      status: 'PENDING',
+      scheduledFor: writeResponse?.applies_at ?? undefined,
+    };
+  }
+
   if (!targetVerified || changedDevices.length > 0 || fleetChanged) {
     const failureMessage = !catalogUnchanged
       ? 'Mothership changed catalog prices during a device-scoped update'
       : targetVerified
         ? 'Mothership changed pricing outside the selected device, so the update was not verified as device-only'
-        : 'Mothership did not confirm the requested device prices in its readback';
+        : 'Mothership did not confirm a device price override; no price change was verified';
     throw new ApiError(
       502,
       failureMessage,
@@ -756,5 +789,6 @@ export async function setDeviceGamePrice(
     price: gameAfter.effectivePrice,
     replayPrice: gameAfter.effectiveReplayPrice,
     scope: 'DEVICE_GAME_OVERRIDE',
+    status: 'APPLIED',
   };
 }

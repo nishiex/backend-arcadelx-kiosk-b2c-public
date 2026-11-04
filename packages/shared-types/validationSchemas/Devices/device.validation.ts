@@ -53,6 +53,11 @@ export const DeviceListResponseSchema = z.object({
   total_kiosks: z.number(),
 });
 
+/** Current Mothership fleet response (`GET /api/v1/devices`). */
+export const DevicesResponseSchema = z.object({
+  devices: z.array(UpstreamDeviceSchema),
+});
+
 /** Normalize complete rows and sparse rows whose base fields carry the device prices. */
 const UpstreamPriceSchema = z.object({
   base_price: z.number(),
@@ -64,8 +69,28 @@ const UpstreamPriceSchema = z.object({
   has_override: z.union([z.number(), z.boolean()]).optional(),
   override_price: z.number().nullable().optional(),
   override_replay_price: z.number().nullable().optional(),
+  /**
+   * A change Mothership has accepted but not yet applied. Device price writes are staged
+   * and go live at the scheduler's next run (INVENTORY: `pending_price_changes`), so this
+   * is the only evidence a write succeeded when the kiosk still reports the old price.
+   */
+  pending: z
+    .object({
+      op: z.string().optional(),
+      price: z.number().nullable().optional(),
+      replay_price: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 }).transform((row) => ({
   ...row,
+  pending: row.pending
+    ? {
+        op: row.pending.op ?? null,
+        price: row.pending.price ?? null,
+        replayPrice: row.pending.replay_price ?? null,
+      }
+    : null,
   effective_price: row.effective_price ?? row.override_price ?? row.base_price,
   effective_replay_price:
     row.effective_replay_price ?? row.override_replay_price ?? row.base_replay_price,
@@ -100,12 +125,9 @@ export const SetDeviceGamePriceSchema = z.object({
     .min(0, "Replay price cannot be negative")
     .max(100000, "Replay price looks implausible")
     .optional(),
-  scope: z.enum(['DEVICE', 'GAME_CATALOG']).optional().default('DEVICE'),
-  /**
-   * Write the device price now instead of staging it for the midnight EOD run.
-   * Only meaningful for `DEVICE` scope; the catalog write is always immediate.
-   */
+  scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Scheduled date must use YYYY-MM-DD").optional(),
   apply_now: z.boolean().optional(),
+  scope: z.enum(['DEVICE', 'GAME_CATALOG']).optional().default('DEVICE'),
 });
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
@@ -137,8 +159,10 @@ export const SetDeviceGamePriceResultSchema = z.object({
   replayPrice: z.number(),
   /** What was actually written, so the caller can state the reach of the change honestly. */
   scope: z.enum(['DEVICE_GAME_OVERRIDE', 'GAME_CATALOG']),
-  /** True when the write bypassed the EOD queue because the operator chose "Apply now". */
-  appliedNow: z.boolean().optional(),
+  /** APPLIED means the kiosk already reads the new price; PENDING means it is queued. */
+  status: z.enum(['APPLIED', 'PENDING']).optional(),
+  /** Human-readable moment the queued change goes live, as Mothership phrases it. */
+  scheduledFor: z.string().optional(),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
@@ -158,6 +182,19 @@ const UpstreamCatalogGameSchema = z.object({
 
 export const GameCatalogResponseSchema = z.object({
   games: z.array(UpstreamCatalogGameSchema),
+});
+
+const LauncherGameAssetSchema = z.object({
+  GameId: z.string(),
+  GameName: z.string(),
+  IconUrl: z.string().trim().nullable().optional(),
+  PosterUrl: z.string().trim().nullable().optional(),
+  isplayable: z.boolean().optional(),
+});
+
+export const LauncherGamesResponseSchema = z.object({
+  games: z.array(LauncherGameAssetSchema),
+  coming_soon: z.array(LauncherGameAssetSchema).optional(),
 });
 
 /** One upstream catalog entry (`GET /api/v1/games`), as parsed by the schema above. */
@@ -197,31 +234,22 @@ export const GamePriceViewSchema = z.object({
   /** Number of upstream rows collapsed into this one (1 = no duplicates). */
   mergedRows: z.number(),
   /**
-   * The device charges something other than the catalog price. This is drift, not an
-   * override: a device reset cannot clear it, so it must never feed reset verification.
+   * The device charges something other than the catalog price. Drift, not an override:
+   * a device reset cannot clear it, so it must never feed reset verification.
    */
   differsFromCatalog: z.boolean(),
-  iconUrl: z.string().url().nullable(),
-  imageUrl: z.string().url().nullable(),
+  iconUrl: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  /** Staged change waiting for the scheduled run; null once applied or when none exists. */
+  pending: z
+    .object({
+      op: z.string().nullable(),
+      price: z.number().nullable(),
+      replayPrice: z.number().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type DeviceView = z.infer<typeof DeviceViewSchema>;
 export type GamePriceView = z.infer<typeof GamePriceViewSchema>;
-
-const LauncherGameSchema = z.object({
-  GameId: z.string(),
-  GameName: z.string(),
-  IconUrl: z.string(),
-  PosterUrl: z.string(),
-  isplayable: z.boolean(),
-  price: z.number(),
-  replayprice: z.number(),
-  version: z.number(),
-});
-
-export const LauncherGamesResponseSchema = z.object({
-  games: z.array(LauncherGameSchema),
-  coming_soon: z.array(LauncherGameSchema),
-});
-
-export type LauncherGame = z.infer<typeof LauncherGameSchema>;

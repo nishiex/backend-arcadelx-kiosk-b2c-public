@@ -19,7 +19,8 @@ import {
   resetAllDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
-import { assertDeviceNotRetired, BUSINESS_TIMEZONE, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
+import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, eodRunForDate, getEodPricingTime, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
+import { setRunningEodPricingTime } from '../../services/Mothership/eod-pricing.scheduler';
 
 /**
  * Device fleet and per-device game pricing.
@@ -64,7 +65,17 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   });
   res
     .status(200)
-    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+});
+
+const eodTimeBodySchema = z.object({ time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'EOD pricing time must use HH:mm, for example 00:00 or 23:30') });
+
+export const setEodPricingRunTime = asyncHandler(async (req: Request, res: Response) => {
+  assertCompanyAdmin(req);
+  const body = eodTimeBodySchema.safeParse(req.body);
+  if (!body.success) throw new ApiError(400, 'Invalid EOD pricing time', body.error.issues);
+  const runTime = setRunningEodPricingTime(body.data.time);
+  res.status(200).json(new ApiResponse(200, { runTime, timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() }, 'EOD pricing time updated'));
 });
 
 export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {
@@ -146,26 +157,31 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   }
   assertCompanyAdmin(req);
   if (body.data.scope === 'DEVICE') {
-    // `apply_now` is the operator's explicit "not the midnight queue" choice. Without
-    // it the write is staged for EOD, which is what every device write used to do -- even
-    // when the client asked for the immediate path.
     if (body.data.apply_now) {
-      const applied = SetDeviceGamePriceResultSchema.parse(
-        await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data),
-      );
-      return res
-        .status(200)
-        .json(new ApiResponse(200, { ...applied, appliedNow: true }, 'Device game price applied and verified'));
+      const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));
+      const supersededSchedules = await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice);
+      // The flush is explicit but not guaranteed: if Mothership still reports the change as
+      // pending, say so instead of claiming it went live.
+      const applied = result.status !== 'PENDING';
+      const message = applied
+        ? 'Device game price applied live and verified'
+        : `Price queued at Mothership for ${result.scheduledFor ?? 'the next scheduled run'}; the kiosk still reads its previous price`;
+      return res.status(applied ? 200 : 202).json(new ApiResponse(applied ? 200 : 202, { ...result, appliedNow: applied, supersededSchedules }, message));
+    }
+    if (body.data.scheduled_date && body.data.scheduled_date < businessDate()) {
+      throw new ApiError(400, 'Scheduled date cannot be in the past');
     }
     const update = await scheduleEodDevicePrice({
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
       price: body.data.price, replayPrice: body.data.replay_price ?? game.effectiveReplayPrice, createdById: req.user!.id,
+      ...(body.data.scheduled_date ? { scheduledDate: body.data.scheduled_date } : {}),
     });
+    const scheduledDate = update.businessDate.toISOString().slice(0, 10);
     return res.status(202).json(new ApiResponse(202, {
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
       currentPrice: game.effectivePrice, currentReplayPrice: game.effectiveReplayPrice,
       price: Number(update.price), replayPrice: Number(update.replayPrice), status: update.status,
-      scheduledFor: nextEod(), timezone: BUSINESS_TIMEZONE, updateId: update.id,
+      scheduledDate, scheduledFor: eodRunForDate(scheduledDate), timezone: BUSINESS_TIMEZONE, updateId: update.id,
     }, 'Device game price scheduled for EOD application'));
   }
   const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));
@@ -177,7 +193,9 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
         result,
         result.scope === 'GAME_CATALOG'
           ? 'Game catalog price applied to all kiosks and verified'
-          : 'Device game price updated and verified',
+          : result.status === 'PENDING'
+            ? `Device price queued at Mothership for ${result.scheduledFor ?? 'the next scheduled run'}`
+            : 'Device game price updated and verified',
       ),
     );
 });
@@ -193,8 +211,19 @@ function assertCompanyAdmin(req: Request) {
 
 async function visibleDeviceKiosks(req: Request) {
   if (req.membership!.type === 'COMPANY') return null;
+  // A Distributor's fleet covers its direct Partners' machines too, mirroring the kiosk
+  // inventory scope: without the partner rows a Distributor whose own machines are still
+  // in transit sees an empty fleet and can never request a price for a placed machine.
+  const orgIds: string[] = [req.membership!.organizationId];
+  if (req.membership!.type === 'DISTRIBUTOR') {
+    const partners = await prisma.organization.findMany({
+      where: { parentOrgId: req.membership!.organizationId, type: 'PARTNER', isActive: true },
+      select: { id: true },
+    });
+    orgIds.push(...partners.map((partner) => partner.id));
+  }
   return prisma.kiosk.findMany({
-    where: { currentOrgId: req.membership!.organizationId },
+    where: { currentOrgId: { in: orgIds } },
     select: { externalDeviceId: true, machineCode: true },
   });
 }
@@ -256,7 +285,10 @@ export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Res
   });
   const visibleRequests = [];
   for (const request of requests) {
-    if (await canReviewPriceRequest(req, request.requesterOrg.type, request.requesterOrg.id)) visibleRequests.push(request);
+    // A Distributor also sees its own submissions read-only so it can tell what is still
+    // waiting on the Company; the approve and reject routes refuse those regardless.
+    const ownSubmission = request.requesterOrgId === req.membership!.organizationId;
+    if (ownSubmission || (await canReviewPriceRequest(req, request.requesterOrg.type, request.requesterOrg.id))) visibleRequests.push(request);
   }
   res.json(new ApiResponse(200, {
     requests: visibleRequests.map((request) => ({ ...serializePriceRequest(request), requesterOrg: request.requesterOrg, requestedBy: request.requestedBy, reviewedBy: request.reviewedBy })),
@@ -275,9 +307,24 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
   });
   if (claimed.count !== 1) throw new ApiError(409, 'This price request has already been reviewed');
   try {
+    // The device must still sit inside the requester's network: the Distributor's own
+    // machines or its direct Partners'. A Distributor may request a price for a machine
+    // it placed with a Partner, so its own org id alone is too narrow here.
+    const requesterOrgIds: string[] = [request.requesterOrgId];
+    const requester = await prisma.organization.findUnique({
+      where: { id: request.requesterOrgId },
+      select: { type: true },
+    });
+    if (requester?.type === 'DISTRIBUTOR') {
+      const partnerChildren = await prisma.organization.findMany({
+        where: { parentOrgId: request.requesterOrgId, type: 'PARTNER', isActive: true },
+        select: { id: true },
+      });
+      requesterOrgIds.push(...partnerChildren.map((partner) => partner.id));
+    }
     const ownedKiosk = await prisma.kiosk.findFirst({
       where: {
-        currentOrgId: request.requesterOrgId,
+        currentOrgId: { in: requesterOrgIds },
         OR: [{ externalDeviceId: request.deviceId }, { machineCode: request.deviceId }],
       },
       select: { id: true, status: true },
