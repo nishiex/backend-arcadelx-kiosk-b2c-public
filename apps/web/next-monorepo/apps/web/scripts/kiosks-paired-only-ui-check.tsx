@@ -137,6 +137,9 @@ try {
   await React.act(async () => toggle!.click())
   await until(() => bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine to appear")
   assert.ok(bodyText().includes("ADLX-UNPAIRED-1"), "unticking the toggle reveals the unpaired machine")
+  assert.ok(bodyText().includes("Pairing"), "the table names the pairing column")
+  assert.ok(bodyText().includes("Unpaired"), "the unpaired machine is labelled Unpaired")
+  assert.ok(bodyText().includes("Paired"), "a paired machine is labelled Paired")
 
   // Mint a machine: it is unpaired by definition, so the list must widen instead of freezing.
   await React.act(async () => toggle!.click())

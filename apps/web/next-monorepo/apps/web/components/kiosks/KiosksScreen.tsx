@@ -183,6 +183,7 @@ export default function KiosksScreen() {
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Machine Code</th>
+                  <th className="px-4 py-3 font-medium">Pairing</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Assigned To</th>
                   <th className="px-4 py-3 font-medium">Location</th>
@@ -197,6 +198,19 @@ export default function KiosksScreen() {
                       <div className="text-xs text-muted-foreground">
                         {k.serialNumber ?? `SN-${k.id.slice(0, 8).toUpperCase()}`}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* Pairing is separate from lifecycle status: a kiosk can be
+                          AVAILABLE and still have no hardware attached. */}
+                      {k.externalDeviceId ? (
+                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                          Paired
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                          Unpaired
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={k.status} />
