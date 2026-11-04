@@ -189,7 +189,27 @@ export const GamePriceViewSchema = z.object({
   overrideReplayPrice: z.number().nullable(),
   /** Number of upstream rows collapsed into this one (1 = no duplicates). */
   mergedRows: z.number(),
+  iconUrl: z.string().url().nullable(),
+  imageUrl: z.string().url().nullable(),
 });
 
 export type DeviceView = z.infer<typeof DeviceViewSchema>;
 export type GamePriceView = z.infer<typeof GamePriceViewSchema>;
+
+const LauncherGameSchema = z.object({
+  GameId: z.string(),
+  GameName: z.string(),
+  IconUrl: z.string(),
+  PosterUrl: z.string(),
+  isplayable: z.boolean(),
+  price: z.number(),
+  replayprice: z.number(),
+  version: z.number(),
+});
+
+export const LauncherGamesResponseSchema = z.object({
+  games: z.array(LauncherGameSchema),
+  coming_soon: z.array(LauncherGameSchema),
+});
+
+export type LauncherGame = z.infer<typeof LauncherGameSchema>;

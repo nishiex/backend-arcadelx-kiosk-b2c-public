@@ -3,6 +3,7 @@ import {
   DeviceListResponseSchema,
   DevicePricesResponseSchema,
   GameCatalogResponseSchema,
+  LauncherGamesResponseSchema,
   type DeviceView,
   type GamePriceView,
   type ResetDevicePricesResult,
@@ -204,7 +205,29 @@ function mergeGamePrices(
     overridePrice: row.override_price,
     overrideReplayPrice: row.override_replay_price,
     mergedRows: count,
+    iconUrl: null,
+    imageUrl: null,
   }));
+}
+
+function artworkKey(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+async function getLauncherArtwork(): Promise<Map<string, { iconUrl: string | null; imageUrl: string | null }>> {
+  const payload = await callMothership('/api/v1/launcher/games', { method: 'GET' });
+  const parsed = LauncherGamesResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiError(502, 'Mothership launcher API returned an unexpected games payload');
+  }
+
+  const artwork = new Map<string, { iconUrl: string | null; imageUrl: string | null }>();
+  for (const game of [...parsed.data.games, ...parsed.data.coming_soon]) {
+    const media = { iconUrl: game.IconUrl || null, imageUrl: game.PosterUrl || null };
+    artwork.set(artworkKey(game.GameId), media);
+    artwork.set(artworkKey(game.GameName), media);
+  }
+  return artwork;
 }
 
 export async function getDevicePrices(
@@ -220,15 +243,26 @@ export async function getDevicePrices(
     throw new ApiError(502, 'Mothership device API returned an unexpected pricing payload');
   }
   const catalog = catalogSnapshot ?? (await getGameCatalog());
+  let artwork = new Map<string, { iconUrl: string | null; imageUrl: string | null }>();
+  try {
+    artwork = await getLauncherArtwork();
+  } catch (error) {
+    // Artwork is additive UI metadata; a launcher asset outage must not hide prices.
+    console.warn('[mothership-devices] launcher artwork unavailable', {
+      error: error instanceof Error ? error.message : 'unknown error',
+    });
+  }
   return mergeGamePrices(parsed.data.pricing).map((game) => {
+    const media = artwork.get(artworkKey(game.displayName));
+    const withArtwork = media ? { ...game, ...media } : game;
     const catalogGame = findCatalogGame(catalog, game);
-    if (!catalogGame) return game;
+    if (!catalogGame) return withArtwork;
 
     const differsFromCatalog =
       !samePrice(game.effectivePrice, catalogGame.price) ||
       !samePrice(game.effectiveReplayPrice, catalogGame.replay_price);
     return {
-      ...game,
+      ...withArtwork,
       basePrice: catalogGame.price,
       baseReplayPrice: catalogGame.replay_price,
       hasOverride: game.hasOverride || differsFromCatalog,

@@ -586,8 +586,29 @@ function GamePriceTable({
               <React.Fragment key={game.gameId}>
                 <tr className="hover:bg-muted/40">
                   <td className="px-4 py-3">
-                    <p className="font-medium">{game.displayName}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{game.gameId}</p>
+                    {/* Artwork comes from the launcher catalogue (`IconUrl` / `PosterUrl`),
+                        so a game added upstream shows its own art without a code change. */}
+                    <div className="flex items-center gap-3">
+                      <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-muted">
+                        {game.iconUrl ?? game.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={game.iconUrl ?? game.imageUrl ?? undefined}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full items-center justify-center text-muted-foreground">
+                            <Gamepad2 size={16} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <p className="font-medium">{game.displayName}</p>
+                        <p className="truncate font-mono text-xs text-muted-foreground">{game.gameId}</p>
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 tabular-nums">{inr.format(game.effectivePrice)}</td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">
