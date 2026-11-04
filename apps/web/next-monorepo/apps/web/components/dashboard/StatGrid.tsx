@@ -24,7 +24,7 @@ import { Skeleton, ErrorState } from "./ui"
 const nf = new Intl.NumberFormat("en-IN")
 
 export default function StatGrid() {
-  const { canManageMembers, canManageNetwork } = useMe()
+  const { canManageMembers, canManageNetwork, orgType } = useMe()
 
   const inventory = useQuery({
     queryKey: ["inventorySummary"],
@@ -59,7 +59,14 @@ export default function StatGrid() {
   }
 
   const cards: Card[] = [
-    { label: "Total Kiosks", value: total, icon: <Box size={18} />, iconClass: "bg-primary/10 text-primary", hint: "Across your inventory" },
+    {
+      label: "Total Kiosks",
+      value: total,
+      icon: <Box size={18} />,
+      iconClass: "bg-primary/10 text-primary",
+      // A Distributor's total spans its own inventory plus the machines its Partners run.
+      hint: orgType === "DISTRIBUTOR" ? "Own inventory and Partner machines" : "Across your inventory",
+    },
     { label: "Available", value: available, icon: <MapPin size={18} />, iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", accent: "bg-emerald-500", pct: share(available) },
     { label: "Installed", value: installed, icon: <CheckCircle2 size={18} />, iconClass: "bg-violet-500/10 text-violet-600 dark:text-violet-400", accent: "bg-violet-500", pct: share(installed) },
   ]

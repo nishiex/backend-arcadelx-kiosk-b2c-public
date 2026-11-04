@@ -537,10 +537,21 @@ export const getInventorySummary = asyncHandler(
     const orgType = req.membership!.type;
 
     // Company dashboards match the Kiosks page and cover the whole company fleet.
-    // Distributor/Partner dashboards remain scoped to their current inventory.
+    // A Distributor's fleet is the machines it still holds plus the ones it has placed
+    // with its Partners: counting only its own inventory hid every installed kiosk.
+    let scope: Prisma.KioskWhereInput = { currentOrgId };
+    if (orgType === "COMPANY") {
+      scope = {};
+    } else if (orgType === "DISTRIBUTOR") {
+      const partners = await prisma.organization.findMany({
+        where: { parentOrgId: currentOrgId, type: "PARTNER" },
+        select: { id: true },
+      });
+      scope = { currentOrgId: { in: [currentOrgId, ...partners.map((partner) => partner.id)] } };
+    }
     const summary = await prisma.kiosk.groupBy({
       by: ["status"],
-      where: orgType === "COMPANY" ? {} : { currentOrgId },
+      where: scope,
       _count: {
         status: true,
       },
