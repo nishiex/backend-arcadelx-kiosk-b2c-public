@@ -48,7 +48,9 @@ export default function KioskDetailDialog({
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Couldn't remove kiosk"),
   })
-  const canDeactivate = (orgType === "DISTRIBUTOR" || orgType === "PARTNER") && (role === "OWNER" || role === "ADMIN")
+  // Only a Distributor retires a machine. A Partner holds kiosks, it does not write them
+  // off; asking its supplier to take the machine back is the Partner's route.
+  const canDeactivate = orgType === "DISTRIBUTOR" && (role === "OWNER" || role === "ADMIN")
   const canDeactivateStatus = kiosk ? !["RESERVED", "ASSIGNED", "RETIRED"].includes(kiosk.status) : false
 
   return (

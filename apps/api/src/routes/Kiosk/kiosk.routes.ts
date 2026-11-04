@@ -44,7 +44,8 @@ router.post(
 );
 router.delete(
   "/:id",
-  requireOrgType("DISTRIBUTOR", "PARTNER"),
+  // Retiring a machine is the Distributor's call; Partners return kiosks instead.
+  requireOrgType("DISTRIBUTOR"),
   requireRole("OWNER", "ADMIN"),
   removeKiosk,
 );

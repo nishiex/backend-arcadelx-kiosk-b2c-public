@@ -312,8 +312,10 @@ export const removeKiosk = asyncHandler(async (req: Request, res: Response) => {
   const organizationId = req.membership!.organizationId;
   const organizationType = req.membership!.type;
   if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
-  if (!["COMPANY", "DISTRIBUTOR", "PARTNER"].includes(organizationType)) {
-    throw new ApiError(403, "Only organization admins can remove kiosks from inventory");
+  // Partners never retire a kiosk: they hold inventory placed by their supplier and
+  // return it through requestKioskReturn instead.
+  if (organizationType !== "DISTRIBUTOR") {
+    throw new ApiError(403, "Only Distributors can deactivate kiosks");
   }
 
   await ensureRetiredKioskStatus();
