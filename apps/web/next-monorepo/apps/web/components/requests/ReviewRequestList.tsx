@@ -73,8 +73,9 @@ export default function ReviewRequestList({
   const organizationId = me?.membership?.organizationId
   const isMasterAdmin = me?.membership?.status === "ACTIVE" &&
     me.membership.organization.type === "COMPANY" && me.membership.role === "OWNER"
-  const canViewNetworkInventory = isMasterAdmin ||
-    (me?.membership?.status === "ACTIVE" && me.membership.organization.type === "DISTRIBUTOR")
+  // Only the Company OWNER reviews a counterparty's kiosk inventory. Distributors and
+  // Partners decide on the request itself; the other side's fleet is not their business.
+  const canViewNetworkInventory = isMasterAdmin
   const query = useQuery({
     queryKey: ["review-requests", organizationId, kind, page],
     queryFn: () => fetchReviewRequests(kind, page),
