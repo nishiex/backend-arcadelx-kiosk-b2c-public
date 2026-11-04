@@ -82,38 +82,68 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
   }, 'Hardware device paired successfully'));
 });
 
-export const UnpairKioskDevice = asyncHandler(async(req:Request,res:Response)=>{
-  
-  const { machineCode, hardwareUUID } = req.params;
+/**
+ * Release a machine code from its hardware. The mirror of pairing: pairing installs the
+ * kiosk and opens an ownership window, so unpairing has to undo both, or the dashboard
+ * keeps counting an installed machine and revenue keeps attributing a detached device.
+ */
+export const UnpairKioskDevice = asyncHandler(async (req: Request, res: Response) => {
+  const machineCode = String(req.params.machineCode ?? "");
+  const hardwareUUID = String(req.params.hardwareUUID ?? "");
 
-  if(typeof machineCode !== "string")throw new ApiError(400,"Machine Code should be a string");
-  
-  const kiosk = await prisma.kiosk.findFirst({where:{machineCode}});
+  const kiosk = await prisma.kiosk.findUnique({ where: { machineCode } });
+  if (!kiosk) throw new ApiError(404, `No kiosk exists with machine code ${machineCode}`);
 
-  if(!kiosk)throw new ApiError(400,"Kiosk Doesnt Exist ,Please enter a Machine Code that exists");
+  // Idempotent: an already-unpaired code answers like a successful call, with the same
+  // body shape as the write below.
+  if (!kiosk.externalDeviceId) {
+    return res.status(200).json(new ApiResponse(200, { kiosk: describeKiosk(kiosk) }, 'Device already unpaired'));
+  }
+  if (hardwareUUID !== kiosk.externalDeviceId) {
+    throw new ApiError(409, `Hardware UUID does not match the device paired to ${machineCode}`);
+  }
+  if (["RESERVED", "ASSIGNED"].includes(kiosk.status)) {
+    throw new ApiError(409, `${machineCode} is ${kiosk.status.toLowerCase()} on an order; finish that order before unpairing`);
+  }
 
-  //check id already unpaired
-  if(kiosk.externalDeviceId === null) return res.status(200).json(new ApiResponse(200,"Device already Unpaired Successfully"));
-
-  //check if the hardware that we need to unpair is acctually same 
-  if(hardwareUUID != kiosk.externalDeviceId)throw new ApiError(404,`Hardware UUID doesnt match to Id presnt in Business DB for ${machineCode}`);
-
-  const updatedKiosk = await prisma.kiosk.update(
-    {
-      where:{
-        machineCode,
+  const now = new Date();
+  const updated = await prisma.$transaction(async (tx) => {
+    // Conditional on the device still being the one we read, so a pairing that lands in
+    // between cannot be undone by this call.
+    const released = await tx.kiosk.updateMany({
+      where: { machineCode, externalDeviceId: hardwareUUID },
+      data: {
+        externalDeviceId: null,
+        status: kiosk.status === "INSTALLED" ? "AVAILABLE" : kiosk.status,
       },
-      data:{
-        externalDeviceId:null
-      },
-      select:{
-        machineCode:true,
-        externalDeviceId:true,
-        model:true
-      }
+    });
+    if (released.count !== 1) {
+      throw new ApiError(409, `${machineCode} changed while it was being unpaired; retry`);
     }
-  )
-  
-  res.status(200).json(new ApiResponse(200, { kiosk: updatedKiosk }, `${machineCode} of hardware_uuid ${hardwareUUID} unpaired successfully`));
+    // Close the ownership window pairing opened: revenue attribution only counts rows
+    // whose assignedTo is still null.
+    await tx.kioskAssignment.updateMany({
+      where: { kioskId: kiosk.id, assignedTo: null },
+      data: { assignedTo: now },
+    });
+    return tx.kiosk.findUniqueOrThrow({ where: { id: kiosk.id } });
+  });
 
-})
+  res.status(200).json(new ApiResponse(200, {
+    kiosk: describeKiosk(updated),
+  }, `Hardware ${hardwareUUID} unpaired from ${machineCode}`));
+});
+
+function describeKiosk(kiosk: {
+  machineCode: string;
+  model: string | null;
+  status: string;
+  externalDeviceId: string | null;
+}) {
+  return {
+    machineCode: kiosk.machineCode,
+    model: kiosk.model,
+    status: kiosk.status,
+    externalDeviceId: kiosk.externalDeviceId,
+  };
+}
