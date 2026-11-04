@@ -359,7 +359,6 @@ function FleetTab({
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="px-4 py-3 font-medium">Device</th>
               <th className="px-4 py-3 font-medium">State</th>
-              <th className="px-4 py-3 font-medium">No of kiosks</th>
               <th className="px-4 py-3 font-medium">Location</th>
               <th className="px-4 py-3 font-medium">Last seen</th>
               <th className="px-4 py-3 font-medium">Hardware UUID</th>
@@ -373,7 +372,6 @@ function FleetTab({
                 <td className="px-4 py-3">
                   <OnlineDot online={device.isOnline} />
                 </td>
-                <td className="px-4 py-3 tabular-nums">{device.kioskNumber ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{device.location ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                   {when(device.lastSeen)}
