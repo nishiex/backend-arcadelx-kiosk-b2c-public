@@ -651,8 +651,9 @@ Agreement creation/approval locks the child organization and network, checks
 exact ACTIVE initiator/receiver endpoints and hierarchy, and rechecks pending or
 active conflicts. SQL additionally enforces one pending/active agreement per
 parent/child pair. Application checks serialize competing Distributor suppliers
-for the same Partner. Creation starts PENDING_APPROVAL, child approval activates,
-parent termination retains the row and sets `effectiveTo`.
+for the same Partner. New agreements activate immediately; the approval endpoint
+remains available only for legacy pending agreements. Parent termination retains
+the row and sets `effectiveTo`.
 
 Company agreements require explicit shares totaling 100 and explicit amounts.
 Distributor → Partner shares stay 60/40 and inherit amounts from the active

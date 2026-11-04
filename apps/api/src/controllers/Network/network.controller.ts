@@ -500,7 +500,7 @@ export const getPartners = asyncHandler(async (req: Request, res: Response) => {
     createdAt: true,
     owner: { select: { id: true, name: true, email: true } },
   } as const;
-  const [connections, registeredPartners] = await Promise.all([
+  const [connections, registeredPartners, activeRegisteredPartnerAgreements] = await Promise.all([
     prisma.networkConnection.findMany({
       where: {
         initiatorOrgId: organizationId,
@@ -522,7 +522,21 @@ export const getPartners = asyncHandler(async (req: Request, res: Response) => {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       select: partnerSelect,
     }),
+    // A Partner created directly by a Distributor does not necessarily have a
+    // NetworkConnection row in older data. Its allocation eligibility is still
+    // determined by the same active parent/child agreement as createOrder.
+    prisma.agreement.findMany({
+      where: {
+        parentOrgId: organizationId,
+        status: "ACTIVE",
+        childOrg: { is: { type: "PARTNER" } },
+      },
+      select: { childOrgId: true },
+    }),
   ]);
+  const activeRegisteredPartnerIds = new Set(
+    activeRegisteredPartnerAgreements.map((agreement) => agreement.childOrgId),
+  );
 
   const partners = new Map<string, {
     id: string;
@@ -552,7 +566,7 @@ export const getPartners = asyncHandler(async (req: Request, res: Response) => {
         ...partner,
         connectionId: null,
         connectedAt: null,
-        agreementStatus: null,
+        agreementStatus: activeRegisteredPartnerIds.has(partner.id) ? "ACTIVE" : null,
       });
     }
   }

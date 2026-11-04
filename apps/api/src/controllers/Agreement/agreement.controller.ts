@@ -108,11 +108,9 @@ export const createAgreement = asyncHandler(async (req, res) => {
       depositAmountPerMachine = input.depositAmountPerMachine;
       nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine;
     }
-    // Company master-admin agreements are authoritative for the Company's network:
-    // activate them immediately so a Distributor does not block kiosk operations
-    // waiting for a second approval. Distributor-to-Partner agreements retain the
-    // Partner approval workflow.
-    const activatesImmediately = parent.type === "COMPANY";
+    // Terms are approved by the supplying organization at creation time. Activating
+    // immediately keeps the relationship ready for allocations without requiring a
+    // second Owner action from the receiving organization.
     return tx.agreement.create({
       data: {
         networkConnectionId,
@@ -122,9 +120,7 @@ export const createAgreement = asyncHandler(async (req, res) => {
         childSharePct,
         depositAmountPerMachine,
         nonRefundableAmountPerMachine,
-        // Company-created terms activate immediately. Only Distributor-to-Partner
-        // terms require the receiving Partner Owner's approval.
-        status: activatesImmediately ? "ACTIVE" : "PENDING_APPROVAL",
+        status: "ACTIVE",
         effectiveFrom: new Date(),
       },
     });
@@ -135,7 +131,7 @@ export const createAgreement = asyncHandler(async (req, res) => {
       new ApiResponse(
         201,
         { agreement },
-        agreement.status === "ACTIVE" ? "Agreement created and activated" : "Agreement drafted and sent for approval",
+        "Agreement created and activated",
       ),
     );
 });

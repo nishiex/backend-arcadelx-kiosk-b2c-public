@@ -122,7 +122,7 @@ export default function DistributorAgreementDialog({
   const draft = useMutation({
     mutationFn: (terms: Parameters<typeof createAgreement>[0]) => createAgreement(terms),
     onSuccess: async () => {
-      toast.success("Agreement saved")
+      toast.success("Agreement saved and activated")
       await refresh()
       setDepositAmount("")
       setNonRefundableAmount("")
@@ -468,7 +468,7 @@ export default function DistributorAgreementDialog({
 
                 {draft.isSuccess && (
                   <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                    Agreement saved for {distributor.name}. Approval can be handled separately.
+                    Agreement saved and activated for {distributor.name}.
                   </p>
                 )}
               </>
