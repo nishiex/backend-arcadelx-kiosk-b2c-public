@@ -27,20 +27,18 @@ const inputCls =
  */
 export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }) {
   const [open, setOpen] = React.useState(false)
-  const [model, setModel] = React.useState<string>(KIOSK_MODELS[0])
   const [count, setCount] = React.useState(1)
   const queryClient = useQueryClient()
 
   // Reset the form each time the dialog opens.
   React.useEffect(() => {
     if (open) {
-      setModel(KIOSK_MODELS[0])
       setCount(1)
     }
   }, [open])
 
   const mutation = useMutation({
-    mutationFn: () => createKioskBatch({ count, model }),
+    mutationFn: () => createKioskBatch({ count, model: KIOSK_MODELS[0] }),
     onSuccess: (data) => {
       toast.success(
         data.count > 1
@@ -55,7 +53,7 @@ export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to mint machines"),
   })
 
-  const valid = model.trim().length > 0 && count >= 1 && count <= 100
+  const valid = count >= 1 && count <= 100
 
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
@@ -76,19 +74,12 @@ export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }
 
           <div className="mb-4 rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-xs text-muted-foreground">
-              Machine codes are generated server-side and guaranteed unique. Pick a model and how
-              many units to mint into your inventory.
+              Machine codes are generated server-side and guaranteed unique. Choose how many
+              units to mint into your inventory.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Machine Model">
-              <select className={inputCls} value={model} onChange={(e) => setModel(e.target.value)}>
-                {KIOSK_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </Field>
             <Field label="Quantity (1–100)">
               <input
                 type="number"

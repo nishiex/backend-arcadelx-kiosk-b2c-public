@@ -53,7 +53,6 @@ export default function KiosksScreen() {
   const { data, isLoading, isFetching, isError, refetch } = useOwnedKiosks()
 
   const [q, setQ] = React.useState("")
-  const [modelFilter, setModelFilter] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
   // Machines only start charging once a kiosk is paired to hardware, so the default
@@ -64,14 +63,10 @@ export default function KiosksScreen() {
 
   const kiosks = data ?? []
   const pairedKiosks = kiosks.filter((k) => !!k.externalDeviceId)
-  const models = Array.from(new Set(kiosks.map((k) => k.model).filter((model): model is string => !!model)))
-    .sort((a, b) => a.localeCompare(b))
   const filtered = kiosks.filter((k) => {
-    const matchesSearch = !q || k.machineCode.toLowerCase().includes(q.toLowerCase()) || (k.model ?? "").toLowerCase().includes(q.toLowerCase())
+    const matchesSearch = !q || k.machineCode.toLowerCase().includes(q.toLowerCase())
     return (
-      matchesSearch &&
-      (!modelFilter || k.model === modelFilter) &&
-      (!pairedOnly || !!k.externalDeviceId)
+      matchesSearch && (!pairedOnly || !!k.externalDeviceId)
     )
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -119,26 +114,10 @@ export default function KiosksScreen() {
                 setPage(1)
               }}
               aria-label="Search machines"
-              placeholder="Search by code or model…"
+              placeholder="Search by machine code…"
               className="w-full rounded-lg border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
             />
           </div>
-          <label className="flex w-full min-w-0 items-center gap-2 text-xs text-muted-foreground sm:w-auto">
-            Model
-            <select
-              aria-label="Model"
-              value={modelFilter}
-              disabled={isLoading || isError}
-              onChange={(e) => {
-                setModelFilter(e.target.value)
-                setPage(1)
-              }}
-              className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-50 sm:max-w-[220px] sm:flex-none"
-            >
-              <option value="">All models</option>
-              {models.map((model) => <option key={model} value={model}>{model}</option>)}
-            </select>
-          </label>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <input
               type="checkbox"
@@ -207,7 +186,6 @@ export default function KiosksScreen() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Assigned To</th>
                   <th className="px-4 py-3 font-medium">Location</th>
-                  <th className="px-4 py-3 font-medium">Model</th>
                   <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
@@ -225,7 +203,6 @@ export default function KiosksScreen() {
                     </td>
                     <td className="px-4 py-3"><AssignedCell k={k} /></td>
                     <td className="px-4 py-3">{typeof k.location === "string" ? k.location : <span className="text-muted-foreground">—</span>}</td>
-                    <td className="px-4 py-3">{k.model ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openDetail(k)}
@@ -246,7 +223,7 @@ export default function KiosksScreen() {
             <div className="space-y-1 text-xs text-muted-foreground" role="status">
               <p>
                 Showing {filtered.length ? start + 1 : 0}–{start + visibleKiosks.length} of {filtered.length} machines
-                {(q || modelFilter || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
+                {(q || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
                   ` (filtered from ${kiosks.length})`}
               </p>
               <p>Page {currentPage} of {totalPages}{isFetching && " · Updating..."}</p>
