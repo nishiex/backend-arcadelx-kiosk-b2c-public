@@ -56,15 +56,23 @@ export default function KiosksScreen() {
   const [modelFilter, setModelFilter] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
+  // Machines only start charging once a kiosk is paired to hardware, so the default
+  // view is the fleet that is actually live. Unpaired rows stay one click away.
+  const [pairedOnly, setPairedOnly] = React.useState(true)
   const [selected, setSelected] = React.useState<Kiosk | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
 
   const kiosks = data ?? []
+  const pairedKiosks = kiosks.filter((k) => !!k.externalDeviceId)
   const models = Array.from(new Set(kiosks.map((k) => k.model).filter((model): model is string => !!model)))
     .sort((a, b) => a.localeCompare(b))
   const filtered = kiosks.filter((k) => {
     const matchesSearch = !q || k.machineCode.toLowerCase().includes(q.toLowerCase()) || (k.model ?? "").toLowerCase().includes(q.toLowerCase())
-    return matchesSearch && (!modelFilter || k.model === modelFilter)
+    return (
+      matchesSearch &&
+      (!modelFilter || k.model === modelFilter) &&
+      (!pairedOnly || !!k.externalDeviceId)
+    )
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   // A refetch can reduce the inventory while a later page is selected.
@@ -123,6 +131,20 @@ export default function KiosksScreen() {
             </select>
           </label>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={pairedOnly}
+              disabled={isLoading || isError}
+              onChange={(e) => {
+                setPairedOnly(e.target.checked)
+                setPage(1)
+              }}
+              className="h-4 w-4 rounded border-input accent-foreground"
+            />
+            Paired only
+            <span className="tabular-nums">({pairedKiosks.length}/{kiosks.length})</span>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Rows per page
             <select
               value={pageSize}
@@ -158,7 +180,15 @@ export default function KiosksScreen() {
             icon={<MonitorSmartphone size={30} />}
           />
         ) : !filtered.length ? (
-          <EmptyState className="py-12" message="No machines match your filters." icon={<Search size={28} />} />
+          <EmptyState
+            className="py-12"
+            message={
+              pairedOnly && kiosks.length > 0
+                ? 'No paired machines match your filters. Untick "Paired only" to see every machine.'
+                : "No machines match your filters."
+            }
+            icon={<Search size={28} />}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -207,7 +237,8 @@ export default function KiosksScreen() {
             <div className="space-y-1 text-xs text-muted-foreground" role="status">
               <p>
                 Showing {filtered.length ? start + 1 : 0}–{start + visibleKiosks.length} of {filtered.length} machines
-                {(q || modelFilter) && ` (filtered from ${kiosks.length})`}
+                {(q || modelFilter || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
+                  ` (filtered from ${kiosks.length})`}
               </p>
               <p>Page {currentPage} of {totalPages}{isFetching && " · Updating..."}</p>
             </div>
