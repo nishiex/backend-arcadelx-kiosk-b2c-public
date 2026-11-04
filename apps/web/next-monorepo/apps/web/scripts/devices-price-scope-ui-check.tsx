@@ -73,7 +73,7 @@ const game = {
   differsFromCatalog: false,
 }
 
-type PostRecord = { path: string; price?: number; replay_price?: number; scope?: string }
+type PostRecord = { path: string; price?: number; replay_price?: number; scope?: string; apply_now?: boolean }
 const posts: PostRecord[] = []
 
 globalThis.fetch = async (input, init) => {
@@ -104,7 +104,19 @@ globalThis.fetch = async (input, init) => {
     })
   }
   if (url.pathname === `/api/devices/${DEVICE_ID}/prices` && method === "GET") {
-    return Response.json({ data: { deviceId: DEVICE_ID, games: [game] } })
+    return Response.json({
+      data: {
+        deviceId: DEVICE_ID,
+        games: [game],
+        kioskStatus: null,
+        eod: {},
+        eodMeta: {
+          timezone: "Asia/Kolkata",
+          runTime: "23:59",
+          nextExecutionAt: "2026-11-05T00:00:00.000Z",
+        },
+      },
+    })
   }
   if (
     url.pathname === `/api/devices/${DEVICE_ID}/games/${encodeURIComponent(GAME_ID)}/price` &&
@@ -212,8 +224,9 @@ try {
 
   // Default action: a device-scoped write. The mocked upstream does not confirm it, so the
   // clear "not confirmed" report must surface and point at the explicit fleet-wide action.
-  const saveButton = button("Save device price")
-  assert.ok(saveButton, "the default device save action must be offered")
+  // The editor's immediate device action ("Scheduled" queues an EOD write instead).
+  const saveButton = button("Apply now")
+  assert.ok(saveButton, "the immediate device action must be offered")
   await React.act(async () => saveButton.click())
   await until(() => !!document.querySelector('[role="alert"]'))
   const alertText = document.querySelector('[role="alert"]')!.textContent ?? ""
@@ -225,6 +238,7 @@ try {
     price: 150,
     replay_price: 60,
     scope: "DEVICE",
+    apply_now: true,
   })
   assert.equal(posts.filter((post) => post.scope === "GAME_CATALOG").length, 0, "no automatic fallback to the catalog")
 

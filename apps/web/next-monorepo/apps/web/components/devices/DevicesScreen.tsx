@@ -16,11 +16,14 @@ import {
   resetAllDevicePrices,
   resetDevicePrices,
   setDeviceGamePrice,
+  setEodPricingRunTime,
   type DeviceView,
   type GamePriceView,
   type EodPriceUpdate,
 } from "@/lib/devices-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
+import { ReuiTimePicker } from "@/components/ui/reui-time-picker-13"
+import { localDateKey } from "@/lib/local-date"
 
 const buttonClass =
   "rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
@@ -33,6 +36,12 @@ const inr = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   maximumFractionDigits: 2,
 })
+
+function defaultScheduledDate() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  return localDateKey(date)
+}
 
 /** Only an explicit upstream override is resetable; catalog drift is not. */
 function gameHasOverride(game: GamePriceView): boolean {
@@ -81,7 +90,7 @@ type TabId = (typeof TABS)[number]["id"]
  * OWNER/ADMIN, matching the API route.
  */
 export default function DevicesScreen() {
-  const { me, isLoading, isMasterAdmin, canViewDevices, canManageDevicePrices, canRequestDevicePrices, canReviewDevicePriceRequests } = useMe()
+  const { me, isLoading, isMasterAdmin, canViewDevices, canManageDevicePrices, canRequestDevicePrices, canViewDevicePriceRequests, canReviewDevicePriceRequests } = useMe()
   const qc = useQueryClient()
   const [tab, setTab] = useState<TabId>("fleet")
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
@@ -104,7 +113,7 @@ export default function DevicesScreen() {
   const requests = useQuery({
     queryKey: ["device-price-requests", ...scope],
     queryFn: fetchDevicePriceRequests,
-    enabled: canReviewDevicePriceRequests,
+    enabled: canViewDevicePriceRequests,
     staleTime: 15_000,
   })
 
@@ -141,11 +150,12 @@ export default function DevicesScreen() {
         </button>
       </header>
 
-      {canReviewDevicePriceRequests && (
+      {canViewDevicePriceRequests && (
         <PriceRequestQueue
           requests={requests.data?.requests ?? []}
           loading={requests.isLoading}
           onChanged={() => requests.refetch()}
+          canReview={canReviewDevicePriceRequests}
         />
       )}
 
@@ -207,10 +217,13 @@ function PriceRequestQueue({
   requests,
   loading,
   onChanged,
+  canReview,
 }: {
   requests: DevicePriceRequest[]
   loading: boolean
   onChanged: () => Promise<unknown>
+  /** Company reviewers act on requests; a Distributor's view of the queue is read-only. */
+  canReview: boolean
 }) {
   const approve = useMutation({
     mutationFn: approveDevicePriceRequest,
@@ -228,24 +241,38 @@ function PriceRequestQueue({
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't reject request"),
   })
-  const pending = requests.filter(request => request.status === "PENDING")
-  if (loading || !pending.length) return null
+  // Company reviewers work the pending queue; a Distributor sees every request in its
+  // network (its own submissions and its Partners'), all read-only — the approve and
+  // reject routes stay Company-only.
+  const rows = canReview ? requests.filter(request => request.status === "PENDING") : requests
+  if (loading || !rows.length) return null
   return (
     <Panel>
       <div className="space-y-3">
         <div>
-          <h2 className="font-semibold">Pending price requests</h2>
-          <p className="text-sm text-muted-foreground">Review incoming price requests before they reach a kiosk.</p>
+          <h2 className="font-semibold">{canReview ? "Pending price requests" : "Price requests"}</h2>
+          <p className="text-sm text-muted-foreground">
+            {canReview
+              ? "Review incoming price requests before they reach a kiosk."
+              : "Your submissions and your Partners' requests. Only the Company can approve or reject them."}
+          </p>
         </div>
         <div className="divide-y divide-border">
-          {pending.map(request => (
+          {rows.map(request => (
             <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="text-sm">
                 <p className="font-medium">{request.displayName} · {request.deviceId}</p>
                 <p className="text-muted-foreground">
                   {request.requesterOrg?.name ?? "Organization"}: {inr.format(request.price)} / replay {inr.format(request.replayPrice)}
                 </p>
+                {!canReview && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {request.status.replaceAll("_", " ").toLowerCase()}
+                    {request.reviewNote ? ` · ${request.reviewNote}` : ""}
+                  </p>
+                )}
               </div>
+              {canReview && (
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -263,6 +290,7 @@ function PriceRequestQueue({
                   }}
                 >Reject</button>
               </div>
+              )}
             </div>
           ))}
         </div>
@@ -331,6 +359,7 @@ function FleetTab({
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="px-4 py-3 font-medium">Device</th>
               <th className="px-4 py-3 font-medium">State</th>
+              <th className="px-4 py-3 font-medium">No of kiosks</th>
               <th className="px-4 py-3 font-medium">Location</th>
               <th className="px-4 py-3 font-medium">Last seen</th>
               <th className="px-4 py-3 font-medium">Hardware UUID</th>
@@ -344,6 +373,7 @@ function FleetTab({
                 <td className="px-4 py-3">
                   <OnlineDot online={device.isOnline} />
                 </td>
+                <td className="px-4 py-3 tabular-nums">{device.kioskNumber ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{device.location ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                   {when(device.lastSeen)}
@@ -456,7 +486,7 @@ function GamePriceTable({
   games: GamePriceView[]
   isRetired: boolean
   eod: Record<string, EodPriceUpdate | null>
-  eodMeta: { timezone: string; nextExecutionAt: string }
+  eodMeta: { timezone: string; runTime: string; nextExecutionAt: string }
   canWrite: boolean
   canRequest: boolean
   onSaved: () => Promise<void>
@@ -645,28 +675,16 @@ function GamePriceTable({
               <React.Fragment key={game.gameId}>
                 <tr className="hover:bg-muted/40">
                   <td className="px-4 py-3">
-                    {/* Artwork comes from the launcher catalogue (`IconUrl` / `PosterUrl`),
-                        so a game added upstream shows its own art without a code change. */}
                     <div className="flex items-center gap-3">
-                      <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-muted">
-                        {game.iconUrl ?? game.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={game.iconUrl ?? game.imageUrl ?? undefined}
-                            alt=""
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-full items-center justify-center text-muted-foreground">
-                            <Gamepad2 size={16} />
-                          </span>
-                        )}
-                      </span>
-                      <span className="min-w-0">
+                      {game.iconUrl || game.imageUrl ? (
+                        <img src={game.iconUrl || game.imageUrl || undefined} alt="" className="h-9 w-9 rounded-lg object-cover" loading="lazy" />
+                      ) : (
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true"><Gamepad2 size={17} /></span>
+                      )}
+                      <div>
                         <p className="font-medium">{game.displayName}</p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">{game.gameId}</p>
-                      </span>
+                        <p className="font-mono text-xs text-muted-foreground">{game.gameId}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 tabular-nums">{inr.format(game.effectivePrice)}</td>
@@ -680,7 +698,7 @@ function GamePriceTable({
                       </span>
                     ) : gameDiffersFromCatalog(game) ? (
                       <span
-                        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} — this kiosk has not picked it up`}
+                        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} - this kiosk has not picked it up`}
                         className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
                       >
                         Catalog differs
@@ -743,13 +761,15 @@ function DeviceGamePriceEditor({
   deviceId: string
   game: GamePriceView
   scheduledUpdate: EodPriceUpdate | null
-  eodMeta: { timezone: string; nextExecutionAt: string }
+  eodMeta: { timezone: string; runTime: string; nextExecutionAt: string }
   requestOnly: boolean
   onCancel: () => void
   onSaved: () => Promise<void>
 }) {
   const [price, setPrice] = React.useState(String(scheduledUpdate?.price ?? game.effectivePrice))
   const [replayPrice, setReplayPrice] = React.useState(String(scheduledUpdate?.replayPrice ?? game.effectiveReplayPrice))
+  const [scheduledDate, setScheduledDate] = React.useState(scheduledUpdate?.businessDate ?? defaultScheduledDate())
+  const [scheduledTime, setScheduledTime] = React.useState(eodMeta.runTime)
   const [confirmingCatalog, setConfirmingCatalog] = React.useState(false)
   const requestMutation = useMutation({
     mutationFn: () => requestDeviceGamePrice(deviceId, game.gameId, {
@@ -777,16 +797,19 @@ function DeviceGamePriceEditor({
   // catalog and every other device. The catalog scope is a separate action, sent only when
   // the operator confirms it; the form never switches between the two on its own.
   const deviceMutation = useMutation({
-    mutationFn: () =>
-      setDeviceGamePrice(deviceId, game.gameId, {
+    mutationFn: async () => {
+      await setEodPricingRunTime(scheduledTime)
+      return setDeviceGamePrice(deviceId, game.gameId, {
         price: Number(price),
         replay_price: Number(replayPrice),
+        scheduled_date: scheduledDate,
         scope: "DEVICE",
-      }),
+      })
+    },
     onSuccess: async result => {
       toast.success(
         result.status === "PENDING"
-          ? `${result.displayName} scheduled for midnight on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+          ? `${result.displayName} scheduled for ${result.scheduledDate ?? scheduledDate} at ${scheduledTime} on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
           : `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
       )
       await onSaved()
@@ -811,8 +834,19 @@ function DeviceGamePriceEditor({
       toast.error(error instanceof Error ? error.message : "Couldn't update the catalog price"),
   })
 
-  const pending = requestMutation.isPending || deviceMutation.isPending || catalogMutation.isPending
-  const activeError = requestMutation.error ?? catalogMutation.error ?? deviceMutation.error
+  const applyNowMutation = useMutation({
+    mutationFn: () => setDeviceGamePrice(deviceId, game.gameId, {
+      price: Number(price), replay_price: Number(replayPrice), scope: "DEVICE", apply_now: true,
+    }),
+    onSuccess: async result => {
+      toast.success(`${result.displayName} applied live on ${deviceId}: ${inr.format(result.price)} / replay ${inr.format(result.replayPrice)} (verified)`)
+      await onSaved()
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't apply the device price"),
+  })
+
+  const pending = requestMutation.isPending || deviceMutation.isPending || catalogMutation.isPending || applyNowMutation.isPending
+  const activeError = requestMutation.error ?? catalogMutation.error ?? deviceMutation.error ?? applyNowMutation.error
 
   return (
     <div
@@ -828,7 +862,7 @@ function DeviceGamePriceEditor({
             ? "Your request will be sent to the Company master admin for approval."
             : <>Current live price: <span className="font-medium text-foreground">{inr.format(game.effectivePrice)}</span> / replay {inr.format(game.effectiveReplayPrice)}. The price below is the scheduled EOD price; it will apply to only <span className="font-mono text-xs">{deviceId}</span> at midnight ({eodMeta.timezone}).</>}
         </p>
-        {!requestOnly && <p role="note" className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">Until then, the current live price remains active. After the upstream device update is verified, this row will show <strong>Applied</strong>. Failed updates remain visible for retry.</p>}
+        {!requestOnly && <p role="note" className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"><strong>Apply now</strong> changes this device immediately. <strong>Scheduled</strong> applies it on the selected calendar date and time ({eodMeta.timezone}).</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">
@@ -858,7 +892,20 @@ function DeviceGamePriceEditor({
           />
         </label>
       </div>
-      {(requestMutation.isError || catalogMutation.isError || deviceMutation.isError) && (
+      {!requestOnly && (
+        <div className="mt-4 overflow-x-auto">
+          <ReuiTimePicker
+            date={new Date(`${scheduledDate}T12:00:00`)}
+            time={scheduledTime}
+            minuteStep={1}
+            onDateChange={date => setScheduledDate(localDateKey(date))}
+            onTimeChange={setScheduledTime}
+            title="Schedule this price update"
+            description="Choose the calendar date and time for this device game price."
+          />
+        </div>
+      )}
+      {(requestMutation.isError || catalogMutation.isError || deviceMutation.isError || applyNowMutation.isError) && (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {activeError instanceof Error
             ? activeError.message
@@ -934,13 +981,11 @@ function DeviceGamePriceEditor({
           >
             Apply to all kiosks
           </button>
-          <button
-            type="button"
-            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            onClick={() => deviceMutation.mutate()}
-            disabled={pending || !priceValid}
-          >
-            {deviceMutation.isPending ? "Verifying…" : "Save device price"}
+          <button type="button" className={buttonClass} onClick={() => deviceMutation.mutate()} disabled={pending || !priceValid}>
+            {deviceMutation.isPending ? "Scheduling…" : "Scheduled"}
+          </button>
+          <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" onClick={() => applyNowMutation.mutate()} disabled={pending || !priceValid}>
+            {applyNowMutation.isPending ? "Applying…" : "Apply now"}
           </button>
         </div>
       )}

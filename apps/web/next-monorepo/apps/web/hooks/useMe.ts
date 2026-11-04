@@ -45,6 +45,8 @@ export type Permissions = {
   canViewDevices: boolean
   /** Company master admins may apply prices; other orgs may submit requests. */
   canManageDevicePrices: boolean
+  /** Reads the price-request queue: Company reviewers, and Distributor admins (read-only). */
+  canViewDevicePriceRequests: boolean
   canReviewDevicePriceRequests: boolean
   canRequestDevicePrices: boolean
   /** Effective permission keys ("MODULE:ACTION"). */
@@ -121,6 +123,11 @@ export function useMe(): Permissions {
      */
     canManageDevicePrices:
       !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
+    canViewDevicePriceRequests:
+      !isError &&
+      me?.membership?.status === "ACTIVE" &&
+      isOwnerOrAdmin &&
+      (isCompany || isDistributor),
     canReviewDevicePriceRequests:
       !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canRequestDevicePrices:
