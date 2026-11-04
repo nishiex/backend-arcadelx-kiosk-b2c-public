@@ -21,7 +21,11 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
 const inputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
-export default function AddMachineDialog() {
+/**
+ * Minting always creates unpaired machines, so the inventory has to widen its filter
+ * afterwards or the operator closes the dialog to an unchanged list.
+ */
+export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }) {
   const [open, setOpen] = React.useState(false)
   const [model, setModel] = React.useState<string>(KIOSK_MODELS[0])
   const [count, setCount] = React.useState(1)
@@ -45,6 +49,7 @@ export default function AddMachineDialog() {
       )
       queryClient.invalidateQueries({ queryKey: ["kiosks"] })
       queryClient.invalidateQueries({ queryKey: ["inventorySummary"] })
+      onMinted?.()
       setOpen(false)
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to mint machines"),

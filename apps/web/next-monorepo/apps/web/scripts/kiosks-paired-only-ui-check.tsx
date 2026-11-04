@@ -1,4 +1,4 @@
-// /kiosks default view: only paired machines, with the unpaired rows one click away.
+// /kiosks: paired machines by default, and minting a machine must not look like a no-op.
 // Mocked HTTP only, no live reads or writes.
 // Run from the repo root with:
 //   npx tsx --tsconfig apps/web/next-monorepo/apps/web/tsconfig.json apps/web/next-monorepo/apps/web/scripts/kiosks-paired-only-ui-check.tsx
@@ -36,6 +36,11 @@ w.matchMedia = (query: string) => ({
 globalThis.requestAnimationFrame = w.requestAnimationFrame.bind(w)
 globalThis.cancelAnimationFrame = w.cancelAnimationFrame.bind(w)
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+;(globalThis as Record<string, unknown>).ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
 
 const React = await import("react")
 const { createRoot } = await import("react-dom/client")
@@ -65,10 +70,12 @@ const base = {
   assignedOrg: null,
 }
 
-const kiosks = [
+let minted = false
+const kiosks = () => [
   { ...base, id: "k1", machineCode: "ADLX-PAIRED-1", externalDeviceId: "dev-1" },
   { ...base, id: "k2", machineCode: "ADLX-PAIRED-2", externalDeviceId: "dev-2" },
   { ...base, id: "k3", machineCode: "ADLX-UNPAIRED-1", externalDeviceId: null },
+  ...(minted ? [{ ...base, id: "k4", machineCode: "ADLX-MINTED-1", externalDeviceId: null }] : []),
 ]
 
 globalThis.fetch = async (input, init) => {
@@ -76,7 +83,13 @@ globalThis.fetch = async (input, init) => {
   const method = init?.method ?? "GET"
   if (url.pathname === "/api/auth/me") return Response.json({ data: { user: me } })
   if (url.pathname === "/api/kiosks" && method === "GET") {
-    return Response.json({ data: { kiosks, meta: { totalPages: 1 } } })
+    return Response.json({ data: { kiosks: kiosks(), meta: { totalPages: 1 } } })
+  }
+  if (url.pathname === "/api/kiosks/batch" && method === "POST") {
+    minted = true
+    return Response.json({
+      data: { count: 1, startCode: "ADLX-MINTED-1", endCode: "ADLX-MINTED-1" },
+    })
   }
   throw new Error(`Unexpected request: ${method} ${url.pathname}`)
 }
@@ -92,16 +105,18 @@ const render = async () => React.act(async () => {
     </QueryClientProvider>,
   )
 })
-const until = async (predicate: () => boolean) => {
-  for (let i = 0; i < 200; i += 1) {
+const until = async (predicate: () => boolean, why = "the UI") => {
+  for (let i = 0; i < 400; i += 1) {
     if (predicate()) return
     await React.act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
     })
   }
-  throw new Error("timed out waiting for the UI")
+  throw new Error(`timed out waiting for ${why}`)
 }
 const bodyText = () => document.body.textContent ?? ""
+const allButtons = () => [...document.querySelectorAll("button")]
+const button = (label: string) => allButtons().find((item) => item.textContent?.trim() === label)
 const pairedToggle = () =>
   [...document.querySelectorAll("input[type=checkbox]")].find((el) =>
     el.closest("label")?.textContent?.includes("Paired only"),
@@ -119,10 +134,25 @@ try {
   assert.ok(bodyText().includes("(2/3)"), "the toggle states how many machines are paired")
 
   await React.act(async () => toggle!.click())
-  await until(() => bodyText().includes("ADLX-UNPAIRED-1"))
+  await until(() => bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine to appear")
   assert.ok(bodyText().includes("ADLX-UNPAIRED-1"), "unticking the toggle reveals the unpaired machine")
 
-  console.log("PASS kiosks UI: paired machines by default, unpaired one click away")
+  // Mint a machine: it is unpaired by definition, so the list must widen instead of freezing.
+  await React.act(async () => toggle!.click())
+  await until(() => !bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine to hide again")
+
+  const addButton = button("Add Machine")
+  assert.ok(addButton, "the mint action is offered")
+  await React.act(async () => addButton!.click())
+  await until(() => !!button("Mint Machine"), "the mint dialog")
+
+  await React.act(async () => button("Mint Machine")!.click())
+  await until(() => bodyText().includes("ADLX-MINTED-1"), "the minted machine to appear")
+
+  assert.ok(bodyText().includes("ADLX-MINTED-1"), "a freshly minted machine is shown without extra clicks")
+  assert.equal(pairedToggle()!.checked, false, "minting widens the filter so the new machine is visible")
+
+  console.log("PASS kiosks UI: paired by default, unpaired one click away, minting reveals the new machine")
 } finally {
   await React.act(async () => root.unmount())
   queryClient.clear()

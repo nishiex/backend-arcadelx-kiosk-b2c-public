@@ -95,7 +95,16 @@ export default function KiosksScreen() {
             Manage and monitor every kiosk in the {orgType === "COMPANY" ? "company's" : "your"} fleet.
           </p>
         </div>
-        {isCompany && <AddMachineDialog />}
+        {isCompany && (
+          <AddMachineDialog
+            onMinted={() => {
+              // Freshly minted machines have no hardware yet, so reveal the unpaired ones
+              // the operator just created instead of leaving the list looking unchanged.
+              setPairedOnly(false)
+              setPage(1)
+            }}
+          />
+        )}
       </div>
 
       {/* Toolbar + table */}
