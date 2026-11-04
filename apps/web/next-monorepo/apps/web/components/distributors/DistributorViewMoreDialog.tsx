@@ -4,7 +4,7 @@ import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useQuery } from "@tanstack/react-query"
 import { Building2, CalendarDays, Cpu, Gamepad2, Mail, MapPin, Phone, Search, Undo2, X } from "lucide-react"
-import { deactivateKiosks, fetchKiosks, type Distributor } from "@/lib/backend-api"
+import { deactivateKiosks, fetchAgreementsForChild, fetchKiosks, type Distributor } from "@/lib/backend-api"
 import { fetchLauncherGames } from "@/lib/devices-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState } from "@/components/dashboard/ui"
@@ -74,12 +74,50 @@ function PartnerAgreementAndMachines({
 }) {
   const [agreementPage, setAgreementPage] = React.useState(1)
   const assigned = (kiosks ?? []).filter((kiosk) => kiosk.currentOrgId === partner.id)
+  // The request list only carries approvals in flight. An agreement that is already
+  // active has no request row, so the terms have to come from the agreements endpoint or
+  // the panel reads "No requests" while the Partner is plainly operating.
+  const agreements = useQuery({
+    queryKey: ["partner-agreements", partner.id],
+    queryFn: () => fetchAgreementsForChild(partner.id),
+  })
+  const rows = agreements.data ?? []
+  const current = rows.find((row) => row.status === "ACTIVE") ?? rows[0]
 
   return (
     <div className="mt-4 grid gap-4 border-t border-border pt-4 lg:grid-cols-2">
       <section>
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agreement</h4>
-        <ReviewRequestList kind="agreements" page={agreementPage} onPageChange={setAgreementPage} counterpartyId={partner.id} />
+        {agreements.isLoading ? (
+          <p role="status" className="text-xs text-muted-foreground">Loading agreement…</p>
+        ) : agreements.isError ? (
+          <p role="alert" className="text-xs text-destructive">Couldn&apos;t load this Partner&apos;s agreement.</p>
+        ) : current ? (
+          <dl className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-3 text-xs">
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Status</dt>
+              <dd className="font-medium">{current.status.replaceAll("_", " ").toLowerCase()}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Share</dt>
+              <dd className="tabular-nums">{current.parentSharePct}% / {current.childSharePct}%</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Deposit per kiosk</dt>
+              <dd className="tabular-nums">₹{Number(current.depositAmountPerMachine).toLocaleString("en-IN")}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Non-refundable</dt>
+              <dd className="tabular-nums">₹{Number(current.nonRefundableAmountPerMachine).toLocaleString("en-IN")}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Effective from</dt>
+              <dd>{new Date(current.effectiveFrom).toLocaleDateString("en-IN")}</dd>
+            </div>
+          </dl>
+        ) : (
+          <ReviewRequestList kind="agreements" page={agreementPage} onPageChange={setAgreementPage} counterpartyId={partner.id} />
+        )}
       </section>
       <section className="rounded-lg border border-border bg-muted/20 p-3">
         <div className="mb-2 flex items-center justify-between gap-3">
