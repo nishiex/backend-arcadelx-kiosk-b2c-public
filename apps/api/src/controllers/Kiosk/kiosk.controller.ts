@@ -219,6 +219,23 @@ export const assignKiosks = asyncHandler(async (req: Request, res: Response) => 
       select: { id: true, machineCode: true, model: true },
     });
     if (kiosks.length !== kioskIds.length) {
+      // Name the unpaired machines explicitly: "unavailable or unpaired" left operators
+      // guessing whether the machine is in the wrong state or simply has no hardware yet.
+      const eligible = new Set(kiosks.map((kiosk) => kiosk.id));
+      const unpaired = await tx.kiosk.findMany({
+        where: {
+          id: { in: kioskIds.filter((id) => !eligible.has(id)) },
+          currentOrgId: sourceOrgId,
+          externalDeviceId: null,
+        },
+        select: { machineCode: true },
+      });
+      if (unpaired.length > 0) {
+        throw new ApiError(
+          409,
+          `Pair the machine to hardware before assigning it: ${unpaired.map((kiosk) => kiosk.machineCode).join(", ")}`,
+        );
+      }
       throw new ApiError(409, "One or more selected kiosks are unavailable or unpaired");
     }
 
