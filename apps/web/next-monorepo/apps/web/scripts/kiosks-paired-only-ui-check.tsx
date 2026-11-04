@@ -127,6 +127,7 @@ try {
   await until(() => bodyText().includes("ADLX-PAIRED-1"))
 
   assert.ok(!bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine is hidden by default")
+  assert.ok(!bodyText().includes("Model"), "the machines table no longer shows a model column")
   assert.ok(bodyText().includes("ADLX-PAIRED-2"), "every paired machine is listed")
   const toggle = pairedToggle()
   assert.ok(toggle, "the paired-only toggle is offered")

@@ -65,8 +65,8 @@ export default function KioskDetailDialog({
                   <RadixDialog.Title className="font-mono text-lg font-semibold">
                     {kiosk.machineCode}
                   </RadixDialog.Title>
-                  <RadixDialog.Description className="mt-1 text-sm text-muted-foreground">
-                    {kiosk.model ?? "Unknown model"}
+                  <RadixDialog.Description className="sr-only">
+                    Machine details
                   </RadixDialog.Description>
                 </div>
                 <RadixDialog.Close
