@@ -205,6 +205,7 @@ function mergeGamePrices(
     overridePrice: row.override_price,
     overrideReplayPrice: row.override_replay_price,
     mergedRows: count,
+    differsFromCatalog: false,
     iconUrl: null,
     imageUrl: null,
   }));
@@ -256,20 +257,23 @@ export async function getDevicePrices(
     const media = artwork.get(artworkKey(game.displayName));
     const withArtwork = media ? { ...game, ...media } : game;
     const catalogGame = findCatalogGame(catalog, game);
-    if (!catalogGame) return withArtwork;
+    if (!catalogGame) return { ...withArtwork, differsFromCatalog: false };
 
     const differsFromCatalog =
       !samePrice(game.effectivePrice, catalogGame.price) ||
       !samePrice(game.effectiveReplayPrice, catalogGame.replay_price);
+    // Keep the two signals apart. A device whose price merely differs from the catalog
+    // (a catalog change it has not picked up, or an unpriced upstream row) is not
+    // running an override, and a device reset cannot clear the difference. Only
+    // Mothership's own override fields may set `hasOverride`.
     return {
       ...withArtwork,
       basePrice: catalogGame.price,
       baseReplayPrice: catalogGame.replay_price,
-      hasOverride: game.hasOverride || differsFromCatalog,
-      overridePrice: game.overridePrice ?? (differsFromCatalog ? game.effectivePrice : null),
-      overrideReplayPrice:
-        game.overrideReplayPrice ??
-        (differsFromCatalog ? game.effectiveReplayPrice : null),
+      differsFromCatalog,
+      hasOverride: game.hasOverride,
+      overridePrice: game.overridePrice,
+      overrideReplayPrice: game.overrideReplayPrice,
     };
   });
 }
@@ -279,13 +283,17 @@ const PRICE_EPSILON = 0.001;
 
 const samePrice = (a: number, b: number): boolean => Math.abs(a - b) < PRICE_EPSILON;
 
+/**
+ * An override exists only when Mothership reports one. Price drift against the catalog
+ * used to be counted here, which made reset verification fail on kiosks that had
+ * nothing to reset: the upstream reset cannot make a device price equal the catalog
+ * price, so the row stayed flagged no matter how often it was reset.
+ */
 function hasPriceOverride(game: GamePriceView): boolean {
   return (
     game.hasOverride ||
     game.overridePrice !== null ||
-    game.overrideReplayPrice !== null ||
-    !samePrice(game.effectivePrice, game.basePrice) ||
-    !samePrice(game.effectiveReplayPrice, game.baseReplayPrice)
+    game.overrideReplayPrice !== null
   );
 }
 

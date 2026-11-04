@@ -34,11 +34,19 @@ const inr = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 })
 
+/** Only an explicit upstream override is resetable; catalog drift is not. */
 function gameHasOverride(game: GamePriceView): boolean {
   return (
     game.hasOverride ||
     game.overridePrice !== null ||
-    game.overrideReplayPrice !== null ||
+    game.overrideReplayPrice !== null
+  )
+}
+
+/** A device that has not caught up with the catalog still deserves a review badge. */
+function gameDiffersFromCatalog(game: GamePriceView): boolean {
+  return (
+    game.differsFromCatalog ||
     Math.abs(game.effectivePrice - game.basePrice) >= 0.001 ||
     Math.abs(game.effectiveReplayPrice - game.baseReplayPrice) >= 0.001
   )
@@ -455,6 +463,7 @@ function GamePriceTable({
 }) {
   const overrides = games.filter(gameHasOverride).length
   const [confirmingReset, setConfirmingReset] = React.useState(false)
+  const [confirmingFleetReset, setConfirmingFleetReset] = React.useState(false)
   const [editingGame, setEditingGame] = React.useState<GamePriceView | null>(null)
   const resetMutation = useMutation({
     mutationFn: () => resetDevicePrices(deviceId),
@@ -478,6 +487,7 @@ function GamePriceTable({
           ? `Reset ${result.gamesReset} overrides across ${result.devicesReset} kiosks`
           : "No device price overrides to reset",
       )
+      setConfirmingFleetReset(false)
       await onSaved()
     },
     onError: (error: unknown) =>
@@ -494,28 +504,29 @@ function GamePriceTable({
           {overrides > 0 && ` · ${overrides} with a price override`}
         </p>
         {canWrite && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setConfirmingReset(true)}
               disabled={resetMutation.isPending || resetAllMutation.isPending || overrides === 0}
-              title={overrides === 0 ? "This device has no price overrides" : undefined}
+              aria-describedby={overrides === 0 ? `${deviceId}-no-overrides` : undefined}
               className={buttonClass}
             >
               Reset device overrides
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm("Reset device overrides across all kiosks? Catalog prices will not change.")) {
-                  resetAllMutation.mutate()
-                }
-              }}
+              onClick={() => setConfirmingFleetReset(true)}
               disabled={resetMutation.isPending || resetAllMutation.isPending}
               className={buttonClass}
             >
               {resetAllMutation.isPending ? "Resetting all…" : "Reset all kiosk overrides"}
             </button>
+            {overrides === 0 && (
+              <span id={`${deviceId}-no-overrides`} className="text-xs text-muted-foreground">
+                This device has no price overrides to reset.
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -569,6 +580,54 @@ function GamePriceTable({
           </div>
         </div>
       )}
+      {confirmingFleetReset && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Reset price overrides on every kiosk"
+          className="rounded-xl border border-destructive/40 bg-destructive/10 p-4"
+        >
+          <p className="text-sm">
+            Reset every game price override on <span className="font-medium">all kiosks</span> to its
+            catalog price? Catalog prices themselves do not change. This touches the whole fleet
+            and cannot be undone from here.
+          </p>
+          {resetAllMutation.isError && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {resetAllMutation.error instanceof Error
+                ? resetAllMutation.error.message
+                : "Couldn't reset fleet device prices"}
+            </p>
+          )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingFleetReset(false)
+                resetAllMutation.reset()
+              }}
+              disabled={resetAllMutation.isPending}
+              className={buttonClass}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => resetAllMutation.mutate()}
+              disabled={resetAllMutation.isPending}
+              className="rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50"
+            >
+              {resetAllMutation.isPending ? "Resetting all…" : "Confirm fleet reset"}
+            </button>
+          </div>
+        </div>
+      )}
+      {resetAllMutation.isPending && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Resetting overrides across the fleet. Every kiosk is snapshotted before and after the
+          write, so this can take a minute on a large fleet.
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -618,6 +677,13 @@ function GamePriceTable({
                     {gameHasOverride(game) ? (
                       <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                         Override
+                      </span>
+                    ) : gameDiffersFromCatalog(game) ? (
+                      <span
+                        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} — this kiosk has not picked it up`}
+                        className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                      >
+                        Catalog differs
                       </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">Default</span>

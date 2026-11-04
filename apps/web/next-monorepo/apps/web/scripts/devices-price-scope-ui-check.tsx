@@ -70,6 +70,7 @@ const game = {
   overridePrice: null,
   overrideReplayPrice: null,
   mergedRows: 1,
+  differsFromCatalog: false,
 }
 
 type PostRecord = { path: string; price?: number; replay_price?: number; scope?: string }

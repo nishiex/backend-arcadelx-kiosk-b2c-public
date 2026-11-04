@@ -189,6 +189,11 @@ export const GamePriceViewSchema = z.object({
   overrideReplayPrice: z.number().nullable(),
   /** Number of upstream rows collapsed into this one (1 = no duplicates). */
   mergedRows: z.number(),
+  /**
+   * The device charges something other than the catalog price. This is drift, not an
+   * override: a device reset cannot clear it, so it must never feed reset verification.
+   */
+  differsFromCatalog: z.boolean(),
   iconUrl: z.string().url().nullable(),
   imageUrl: z.string().url().nullable(),
 });

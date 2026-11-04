@@ -101,6 +101,8 @@ export type GamePriceView = {
   overrideReplayPrice: number | null
   /** Upstream rows collapsed into this one; 2 means Mothership returned a duplicate. */
   mergedRows: number
+  /** Device price differs from the catalog price. Drift, not an override. */
+  differsFromCatalog: boolean
   iconUrl: string | null
   imageUrl: string | null
 }
@@ -138,7 +140,9 @@ export async function fetchLauncherGames(deviceId: string): Promise<{
     price: game.effectivePrice,
     replayPrice: game.effectiveReplayPrice,
     catalogPrice: game.basePrice,
-    needsUpdate: game.hasOverride,
+    // A kiosk that has not picked the catalog price up still needs review even though
+    // there is no override the operator could reset.
+    needsUpdate: game.hasOverride || game.differsFromCatalog,
     version: null,
     playable: true,
   }))
