@@ -81,3 +81,39 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
     kiosk: { machineCode: updatedKiosk.machineCode, externalDeviceId: updatedKiosk.externalDeviceId, model: updatedKiosk.model },
   }, 'Hardware device paired successfully'));
 });
+
+export const UnpairKioskDevice = asyncHandler(async(req:Request,res:Response)=>{
+  
+  const { machineCode, hardwareUUID } = req.params;
+
+  if(typeof machineCode !== "string")throw new ApiError(400,"Machine Code should be a string");
+  
+  const kiosk = await prisma.kiosk.findFirst({where:{machineCode}});
+
+  if(!kiosk)throw new ApiError(400,"Kiosk Doesnt Exist ,Please enter a Machine Code that exists");
+
+  //check id already unpaired
+  if(kiosk.externalDeviceId === null) return res.status(200).json(new ApiResponse(200,"Device already Unpaired Successfully"));
+
+  //check if the hardware that we need to unpair is acctually same 
+  if(hardwareUUID != kiosk.externalDeviceId)throw new ApiError(404,`Hardware UUID doesnt match to Id presnt in Business DB for ${machineCode}`);
+
+  const updatedKiosk = await prisma.kiosk.update(
+    {
+      where:{
+        machineCode,
+      },
+      data:{
+        externalDeviceId:null
+      },
+      select:{
+        machineCode:true,
+        externalDeviceId:true,
+        model:true
+      }
+    }
+  )
+  
+  res.status(200).json(new ApiResponse(200, { kiosk: updatedKiosk }, `${machineCode} of hardware_uuid ${hardwareUUID} unpaired successfully`));
+
+})

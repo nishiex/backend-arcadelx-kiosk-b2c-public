@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUnpairedKiosks, pairKioskDevice } from '../../controllers/Internal/internal.controller';
+import { getUnpairedKiosks, pairKioskDevice,UnpairKioskDevice } from '../../controllers/Internal/internal.controller';
 import { requireInternalAuth } from '../../middlewares/internal.auth';
 
 const router = Router();
@@ -8,5 +8,6 @@ const router = Router();
 // Pairing remains server-to-server protected because it changes hardware ownership.
 router.get('/kiosks/unpaired', getUnpairedKiosks);
 router.post('/kiosks/:machineCode/pair', requireInternalAuth, pairKioskDevice);
+router.post('/kiosks/:machineCode/:hardwareUUID/unpair',UnpairKioskDevice)
 
 export default router;
