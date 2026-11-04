@@ -20,7 +20,6 @@ import {
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
 import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, eodRunForDate, getEodPricingTime, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
-import { setRunningEodPricingTime } from '../../services/Mothership/eod-pricing.scheduler';
 
 /**
  * Device fleet and per-device game pricing.
@@ -66,16 +65,6 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   res
     .status(200)
     .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
-});
-
-const eodTimeBodySchema = z.object({ time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'EOD pricing time must use HH:mm, for example 00:00 or 23:30') });
-
-export const setEodPricingRunTime = asyncHandler(async (req: Request, res: Response) => {
-  assertCompanyAdmin(req);
-  const body = eodTimeBodySchema.safeParse(req.body);
-  if (!body.success) throw new ApiError(400, 'Invalid EOD pricing time', body.error.issues);
-  const runTime = setRunningEodPricingTime(body.data.time);
-  res.status(200).json(new ApiResponse(200, { runTime, timezone: BUSINESS_TIMEZONE, nextExecutionAt: nextEod() }, 'EOD pricing time updated'));
 });
 
 export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {

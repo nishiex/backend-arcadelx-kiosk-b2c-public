@@ -82,8 +82,6 @@ export const RegisterOrgSchema = z.discriminatedUnion("orgType", [
   RegisterOrgFields.extend({ orgType: z.literal("PARTNER") }),
 ]);
 
-export type RegisterOrgInput = z.infer<typeof RegisterOrgSchema>;
-
 /**
  * Login
  */

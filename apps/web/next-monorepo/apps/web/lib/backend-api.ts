@@ -192,17 +192,6 @@ export async function pairKioskDevice(machineCode: string, externalDeviceId: str
   return handleRes<{ kiosk: { machineCode: string; externalDeviceId: string; model: string | null } }>(res);
 }
 
-export type RegisterKioskInput = {
-  model: string;
-  serialNumber?: string;
-  hardwareFingerprint?: string;
-  firmwareVersion?: string;
-  manufactureDate?: string;
-  warrantyExpiry?: string;
-  location?: string;
-  status?: KioskStatus;
-};
-
 const handleRes = async <T,>(res: Response): Promise<T> => {
   const text = await res.text();
   let json: ApiResponse<T> | { message?: string } | null = null;
@@ -326,17 +315,6 @@ export async function requestCashPayment(orderId: string): Promise<KioskOrder> {
 
 export async function dispatchOrder(orderId: string): Promise<KioskOrder> {
   const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/dispatch`, { method: 'PATCH' });
-  return (await handleRes<{ order: KioskOrder }>(res)).order;
-}
-
-export async function deliverOrder(orderId: string): Promise<KioskOrder> {
-  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/deliver`, { method: 'PATCH' });
-  return (await handleRes<{ order: KioskOrder }>(res)).order;
-}
-
-/** Rejects a request under review (supplier-side, like the approve step). */
-export async function rejectOrder(orderId: string): Promise<KioskOrder> {
-  const res = await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/reject`, { method: 'PATCH' });
   return (await handleRes<{ order: KioskOrder }>(res)).order;
 }
 
@@ -595,71 +573,6 @@ export async function changePassword(input: {
   await handleRes<unknown>(res);
 }
 
-// ---- Support ----
-export const SUPPORT_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const;
-export type SupportStatus = (typeof SUPPORT_STATUSES)[number];
-export const SUPPORT_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
-export type SupportPriority = (typeof SUPPORT_PRIORITIES)[number];
-
-export type SupportTicket = {
-  id: string;
-  subject: string;
-  description: string;
-  category: string | null;
-  status: SupportStatus;
-  priority: SupportPriority;
-  createdAt: string;
-  updatedAt: string;
-  organization: { id: string; name: string; type: OrgType };
-  createdBy: { id: string; name: string; email: string };
-};
-
-export type CreateSupportTicketInput = {
-  subject: string;
-  description: string;
-  category?: string;
-  priority?: SupportPriority;
-};
-
-export async function fetchSupportTickets(): Promise<SupportTicket[]> {
-  const res = await apiFetch('/api/support', { credentials: 'include' });
-  const json = await handleRes<{ tickets: SupportTicket[] }>(res);
-  return json.tickets;
-}
-
-export async function createSupportTicket(input: CreateSupportTicketInput) {
-  const body = Object.fromEntries(
-    Object.entries(input).filter(([, v]) => v !== undefined && v !== '')
-  );
-  const res = await apiFetch('/api/support', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-  return handleRes<{ ticket: SupportTicket }>(res);
-}
-
-export async function updateSupportTicketStatus(id: string, status: SupportStatus) {
-  const res = await apiFetch(`/api/support/${id}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ status }),
-  });
-  return handleRes<{ ticket: SupportTicket }>(res);
-}
-
-export async function updateSupportTicketPriority(id: string, priority: SupportPriority) {
-  const res = await apiFetch(`/api/support/${id}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ priority }),
-  });
-  return handleRes<{ ticket: SupportTicket }>(res);
-}
-
 export async function fetchMe(): Promise<Me> {
   const res = await apiFetch('/api/auth/me', { credentials: 'include' });
   const json = await handleRes<{ user: Me }>(res);
@@ -678,32 +591,6 @@ export async function fetchKiosks(): Promise<Kiosk[]> {
   return kiosks;
 }
 
-export async function syncKioskDevices() {
-  const res = await apiFetch('/api/kiosks/sync-devices', {
-    method: 'POST',
-    credentials: 'include',
-    cache: 'no-store',
-  });
-  return handleRes<{
-    totalRecordsFetched: number;
-    newKiosksCreated: number;
-    kiosksUpdated: number;
-    devicesWithoutId: number;
-    rejectedRecords: number;
-    createdMachineCodes: string[];
-  }>(res);
-}
-
-export async function assignKiosks(input: { organizationId: string; kioskIds: string[] }) {
-  const res = await apiFetch('/api/kiosks/assign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(input),
-  });
-  return handleRes<{ kiosks: Kiosk[] }>(res);
-}
-
 export async function deactivateKiosks(input: { organizationId: string; kioskIds: string[] }) {
   const res = await apiFetch('/api/kiosks/deactivate', {
     method: 'POST',
@@ -720,36 +607,6 @@ export async function removeKiosk(id: string) {
     credentials: 'include',
   });
   return handleRes<{ kiosk: Pick<Kiosk, 'id' | 'machineCode' | 'status' | 'currentOrgId'> }>(res);
-}
-
-export type KioskReturnRequest = {
-  id: string
-  kioskId: string
-  organizationId: string
-  status: "PENDING" | "APPROVED"
-  createdAt: string
-  kiosk: { machineCode: string; model: string | null; status: KioskStatus; currentOrgId: string | null }
-  organization: { id: string; name: string; type: OrgType; parentOrgId: string | null }
-  requestedBy: { id: string; name: string; email: string }
-}
-
-export async function requestKioskReturn(id: string) {
-  const res = await apiFetch(`/api/kiosks/${encodeURIComponent(id)}/return-request`, {
-    method: 'POST', credentials: 'include',
-  })
-  return handleRes<{ request: Pick<KioskReturnRequest, 'id' | 'kioskId' | 'organizationId' | 'status' | 'createdAt'> }>(res)
-}
-
-export async function fetchKioskReturnRequests() {
-  const res = await apiFetch('/api/kiosks/return-requests', { credentials: 'include', cache: 'no-store' })
-  return handleRes<{ requests: KioskReturnRequest[] }>(res)
-}
-
-export async function approveKioskReturn(requestId: string) {
-  const res = await apiFetch(`/api/kiosks/return-requests/${encodeURIComponent(requestId)}/approve`, {
-    method: 'POST', credentials: 'include',
-  })
-  return handleRes<{ request: Pick<KioskReturnRequest, 'id' | 'kioskId' | 'organizationId' | 'status'> }>(res)
 }
 
 export type MachineActivity = {
@@ -778,33 +635,6 @@ export async function createKioskBatch(input: { count: number; model: string }) 
     body: JSON.stringify(input),
   });
   return handleRes<{ count: number; startCode: string; endCode: string }>(res);
-}
-
-export async function registerKiosk(input: RegisterKioskInput) {
-  // Drop empty-string optionals so the backend treats them as absent.
-  const body = Object.fromEntries(
-    Object.entries(input).filter(([, v]) => v !== undefined && v !== '')
-  );
-  const res = await apiFetch('/api/kiosks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-  return handleRes<{ kiosk: Kiosk }>(res);
-}
-
-export async function updateKioskStatus(
-  id: string,
-  input: { status: KioskStatus; location?: string }
-) {
-  const res = await apiFetch(`/api/kiosks/${id}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(input),
-  });
-  return handleRes<{ kiosk: Kiosk }>(res);
 }
 
 // ---- Reports / revenue ----
@@ -864,48 +694,6 @@ export async function fetchMothershipPayments(page = 1, signal?: AbortSignal, pa
     signal,
   });
   return handleRes<MothershipPaymentsFeed>(res);
-}
-
-export async function downloadMothershipPaymentsExport(format: 'csv' | 'pdf'): Promise<void> {
-  const res = await apiFetch(`/api/revenue/payments?format=${format}`, {
-    credentials: 'include',
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    await handleRes(res);
-    return;
-  }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `mothership-payments.${format}`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-/** Open a blank Google Sheet and copy the current payment CSV for pasting. */
-export async function openMothershipPaymentsInGoogleSheets(): Promise<void> {
-  const sheetWindow = window.open('https://docs.google.com/spreadsheets/create', '_blank', 'noopener,noreferrer');
-  if (!sheetWindow) throw new Error('Google Sheets could not be opened. Please allow pop-ups for this site.');
-
-  try {
-    const res = await apiFetch('/api/revenue/payments?format=csv', {
-      credentials: 'include',
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      await handleRes(res);
-      return;
-    }
-    await navigator.clipboard.writeText(await res.text());
-    sheetWindow.focus();
-  } catch (error) {
-    sheetWindow.close();
-    throw error;
-  }
 }
 
 export type MothershipSyncResult = {
@@ -981,88 +769,6 @@ export async function updateDeductionRates(input: DeductionRates): Promise<Deduc
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   });
   return normalizeRates((await handleRes<{ settings: Record<keyof DeductionRates, number | string> }>(res)).settings);
-}
-
-export type OrgMini = { id: string; name: string };
-
-export type RevenueReportRow = {
-  kioskId: string;
-  machineCode: string;
-  model: string | null;
-  partner: OrgMini | null;
-  grossRevenue: number;
-  companyShare: number;
-  distributorShare: number;
-  companySharePct: number;
-};
-
-export type RevenueReport = {
-  year: number;
-  month: number;
-  rows: RevenueReportRow[];
-  totals: { grossRevenue: number; companyShare: number; distributorShare: number };
-};
-
-export async function fetchRevenueReport(
-  year: number,
-  month: number,
-  organizationId?: string
-): Promise<RevenueReport> {
-  const qs = new URLSearchParams({ year: String(year), month: String(month) });
-  if (organizationId) qs.set('organizationId', organizationId);
-  const res = await apiFetch(`/api/reports/revenue?${qs.toString()}`, { credentials: 'include' });
-  return handleRes<RevenueReport>(res);
-}
-
-// ---- Settlements ----
-export type SettlementStatus = 'PENDING' | 'PAID';
-export type Settlement = {
-  id: string;
-  reference: string;
-  year: number;
-  month: number;
-  grossRevenue: number;
-  companyShare: number;
-  distributorShare: number;
-  status: SettlementStatus;
-  createdAt: string;
-  organization: OrgMini;
-  paidToDate: number;
-};
-
-export async function fetchSettlements(): Promise<Settlement[]> {
-  const res = await apiFetch('/api/settlements', { credentials: 'include' });
-  const json = await handleRes<{ settlements: Settlement[] }>(res);
-  return json.settlements;
-}
-
-export async function generateSettlements(year: number, month: number, organizationId?: string) {
-  const res = await apiFetch('/api/settlements/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ year, month, ...(organizationId ? { organizationId } : {}) }),
-  });
-  return handleRes<{ count: number }>(res);
-}
-
-// ---- Payments ----
-export type PaymentRow = {
-  id: string;
-  reference: string;
-  amount: number;
-  method: string;
-  transactionRef: string | null;
-  paidAt: string;
-  organization: OrgMini;
-  settlement: { id: string; reference: string } | null;
-};
-
-export type PaymentsResponse = { payments: PaymentRow[]; totalReceived: number };
-
-export async function fetchPayments(): Promise<PaymentsResponse> {
-  const res = await apiFetch('/api/payments', { credentials: 'include' });
-  return handleRes<PaymentsResponse>(res);
 }
 
 // ---- Audit Logs (company only) ----
@@ -1249,49 +955,6 @@ export async function fetchMembers(): Promise<OrgMember[]> {
 export const MANAGEABLE_ROLES = ['ADMIN', 'MANAGER', 'STAFF'] as const;
 export type ManageableRole = (typeof MANAGEABLE_ROLES)[number];
 
-export type CreateMemberInput = {
-  name: string;
-  email: string;
-  role: ManageableRole;
-  /** Optional — blank asks the server to auto-generate and email a password. */
-  password?: string;
-  aadharNumber?: string;
-  panNumber?: string;
-  mobile?: string;
-  alternateMobile?: string;
-  dateOfBirth?: string;
-  emergencyContact?: string;
-  address?: string;
-};
-
-export type CreateMemberResult = {
-  member: OrgMember;
-  credentialsEmailSent: boolean;
-  passwordGenerated: boolean;
-};
-
-/**
- * Directly create an active member (mints the account + emails temporary
- * credentials). Company OWNER/ADMIN only; role must be below the caller's own.
- *
- * NOTE: `POST /api/members` is NOT implemented on the backend and this has no
- * caller today — it would 404. Do not wire it into UI until the create-member
- * route ships; onboarding currently happens via invite code + join request.
- */
-export async function createMember(input: CreateMemberInput): Promise<CreateMemberResult> {
-  // Drop empty-string optionals so the backend treats them as absent.
-  const body = Object.fromEntries(
-    Object.entries(input).filter(([, v]) => v !== undefined && v !== '')
-  );
-  const res = await apiFetch('/api/members', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
-  return handleRes<CreateMemberResult>(res);
-}
-
 /** Approve a pending join request (with a base role) or reject it. */
 export async function handleJoinRequest(
   membershipId: string,
@@ -1303,26 +966,6 @@ export async function handleJoinRequest(
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ action, ...(role ? { role } : {}) }),
-  });
-  await handleRes<unknown>(res);
-}
-
-/** Change an active member's base (enum) role. */
-export async function updateMemberRole(membershipId: string, role: ManageableRole): Promise<void> {
-  const res = await apiFetch(`/api/members/${membershipId}/role`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ role }),
-  });
-  await handleRes<unknown>(res);
-}
-
-/** Remove an active member from the organization. */
-export async function removeMember(membershipId: string): Promise<void> {
-  const res = await apiFetch(`/api/members/${membershipId}`, {
-    method: 'DELETE',
-    credentials: 'include',
   });
   await handleRes<unknown>(res);
 }
@@ -1415,51 +1058,4 @@ export async function updateAgreement(
 
 export async function terminateAgreement(id: string): Promise<void> {
   await handleRes(await apiFetch(`/api/agreements/${encodeURIComponent(id)}/terminate`, { method: 'DELETE' }));
-}
-
-// ---- Network connections ----
-export type NetworkConnectionStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
-
-/** A connection row as returned by `GET /api/network` (all statuses, paginated). */
-export type NetworkConnection = {
-  id: string;
-  status: NetworkConnectionStatus;
-  initiatorOrgId: string;
-  receiverOrgId: string;
-  initiator: OrgRef;
-  /** Server-side field name retained as-is to match the response body. */
-  reciever: OrgRef;
-  createdAt: string;
-};
-
-/**
- * Read every page so older relationship history cannot hide the current link,
- * matching how `fetchOrderRequestSuppliers` resolves relationships.
- */
-export async function fetchOrganizationConnections(signal?: AbortSignal): Promise<NetworkConnection[]> {
-  const rows: NetworkConnection[] = [];
-  let page = 1;
-  let totalPages = 1;
-  do {
-    const res = await apiFetch(`/api/network?page=${page}&limit=50`, { signal, cache: 'no-store' });
-    const data = await handleRes<{ requests: NetworkConnection[]; meta: PaginationMeta }>(res);
-    rows.push(...data.requests);
-    const reported = data.meta?.totalPages;
-    totalPages = Number.isFinite(reported) && reported > 0 ? reported : 1;
-    page++;
-  } while (page <= totalPages && page <= MAX_PAGES);
-  return rows;
-}
-
-/**
- * Network request from a parent to a child. Agreements can only be drafted on an
- * ACTIVE connection whose initiator is the parent, so the receiver must accept the
- * request before any terms can be submitted.
- */
-export async function initiateConnection(targetOwnerEmail: string): Promise<void> {
-  await handleRes(await apiFetch('/api/network/initiate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetOwnerEmail }),
-  }));
 }

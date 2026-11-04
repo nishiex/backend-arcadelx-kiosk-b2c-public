@@ -172,11 +172,6 @@ export async function fetchDevicePrices(
   return handleRes<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; runTime: string; nextExecutionAt: string } }>(res)
 }
 
-export async function setEodPricingRunTime(time: string): Promise<{ runTime: string; timezone: string; nextExecutionAt: string }> {
-  const res = await apiFetch('/api/devices/eod-time', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time }) })
-  return handleRes<{ runTime: string; timezone: string; nextExecutionAt: string }>(res)
-}
-
 export type EodPriceUpdate = { id: string; businessDate: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
 
 export type ResetDevicePricesResult = {

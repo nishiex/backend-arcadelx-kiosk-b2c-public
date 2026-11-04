@@ -10,10 +10,6 @@ export const UpdateKioskStatusSchema = z.object({
   location: z.string().optional()
 });
 
-export const ManualOverrideExternalIdSchema = z.object({
-  externalDeviceId: z.string().length(36).uuid().nullable()
-});
-
 export const PairDeviceSchema = z.object({
   externalDeviceId: z.string().length(36).uuid()
 });

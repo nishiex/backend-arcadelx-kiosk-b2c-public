@@ -31,10 +31,6 @@ const deviceSchema = z.object({
   kiosk_number: z.coerce.number().int().nullish(),
 });
 
-const payloadSchema = z.object({
-  devices: z.array(deviceSchema),
-});
-
 export type DeviceSyncResult = {
   totalRecordsFetched: number;
   newKiosksCreated: number;

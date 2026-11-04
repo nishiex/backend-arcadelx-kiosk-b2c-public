@@ -2,19 +2,13 @@ import { prisma } from '../../utils/db';
 import { setDeviceGamePrice } from './devices.service';
 
 export const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
-let eodPricingTime = process.env.EOD_PRICE_RUN_TIME || '00:00';
+const eodPricingTime = process.env.EOD_PRICE_RUN_TIME || '00:00';
 
 function validatePricingTime(time: string): string {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
     throw new Error('EOD pricing time must use HH:mm format, for example 00:00 or 23:30');
   }
   return time;
-}
-
-/** Change the daily EOD pricing time for the running API process. */
-export function setEodPricingTime(time: string): string {
-  eodPricingTime = validatePricingTime(time);
-  return eodPricingTime;
 }
 
 export function getEodPricingTime(): string {

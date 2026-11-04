@@ -9,13 +9,11 @@ import {
   createOrder,
   fetchRequestModelAvailability,
   type CreatedOrder,
-  type OrgType,
 } from "@/lib/backend-api"
 import { KIOSK_MODELS } from "@/lib/kiosk-models"
 
-export default function CreateOrderDialog({ organizationId, orgType, disabled, onCreated }: {
+export default function CreateOrderDialog({ organizationId, disabled, onCreated }: {
   organizationId: string
-  orgType: OrgType
   disabled: boolean
   onCreated: (order: CreatedOrder) => void
 }) {

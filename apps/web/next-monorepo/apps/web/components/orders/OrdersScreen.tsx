@@ -83,7 +83,7 @@ export default function OrdersScreen() {
         <div><h1 className="text-2xl font-semibold tracking-tight">Orders &amp; Requests</h1><p className="mt-1 text-sm text-muted-foreground">Track incoming requests and outgoing machine allocations, including completed deliveries.</p></div>
         <div className="flex flex-wrap gap-2">
           {orgType === "DISTRIBUTOR" && organizationId && <CreatePartnerAllocationDialog organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => { setSearch(""); setStatus(""); setDirection(""); setCreatedMessage(`Allocation order ${order.orderNumber} created for a Partner.`) }} />}
-          {canRequest && organizationId && orgType && <CreateOrderDialog key={organizationId} organizationId={organizationId} orgType={orgType} disabled={orderActionsDisabled} onCreated={order => {
+          {canRequest && organizationId && orgType && <CreateOrderDialog key={organizationId} organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => {
             setSearch(""); setStatus(""); setDirection("")
             setCreatedMessage(`Request ${order.orderNumber} for ${order.quantity} ${order.requestedModel ?? "kiosk"} kiosk(s) submitted for supplier approval.`)
           }} />}

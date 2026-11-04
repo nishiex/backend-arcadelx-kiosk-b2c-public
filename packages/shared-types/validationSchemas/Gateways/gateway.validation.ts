@@ -68,8 +68,6 @@ export const ReorderGatewaysSchema = z
       ),
   })
   .strict();
-
-export type ReorderGatewayItem = z.infer<typeof ReorderGatewayItemSchema>;
 export type ReorderGatewaysInput = z.infer<typeof ReorderGatewaysSchema>;
 
 /** `POST /gateways/toggle` — enable or disable one provider. */

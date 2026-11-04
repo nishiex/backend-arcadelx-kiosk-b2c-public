@@ -8,7 +8,6 @@ import {
   UpdateAgreementSchema,
 } from "@shared-types/validationSchemas/agreement.validation";
 import { PaginationQuerySchema } from "@shared-types/validationSchemas/member.validation";
-import { requireWorkflow } from '../../services/workflow-readiness';
 import {
   lockAgreementParties,
   requireAgreementSlot,

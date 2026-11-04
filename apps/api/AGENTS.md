@@ -140,14 +140,9 @@ differs. The 10 kiosks already reserved by ORD-2026-00004 were deliberately left
 alone: that order is APPROVED with an issued invoice and a sent invoice email, so
 re-picking its stock would desync the invoice.
 
-**Separate pre-existing defect:** in `createOrder`, the `currentOrgType ===
-'COMPANY'` guard throws unconditionally, so it also rejects `ALLOCATION` and the
-`else` branch below it is unreachable -- while the message says "use ALLOCATION to
-push kiosks". Consequences: a COMPANY cannot create an allocation at all, no
-allocation can ever link `OrderKiosk`/invoice rows, and the only reachable
-reservation path is a Distributor `REQUEST` being approved (which is how
-ORD-2026-00004 reserved its kiosks). That is a product decision I did not change;
-fixing it means moving the ALLOCATION branch above the guard.
+**Fixed since this note:** the `createOrder` COMPANY guard is now scoped to
+`parsed.type === 'REQUEST'`, so `ALLOCATION` is reachable and the earlier report of an
+unreachable `else` branch no longer applies.
 
 ## Live payment feed (2026-10-07)
 
@@ -390,11 +385,9 @@ its role. Join selects only Organization ID/type/invite expiry for compatibility
 with absent optional profile columns. Member pagination uses an ID tie-breaker
 and a repeatable-read count/list snapshot.
 
-Network rejection: recipient OWNER/ADMIN, PENDING -> REJECTED, POST
-`/api/network/:connectionId/reject`. Agreement rejection: recipient OWNER,
-PENDING_APPROVAL -> REJECTED, PATCH `/api/agreements/:agreementId/reject`, sharing
-approval's child-organization lock. Rejected history is retained; rejected network
-rows cannot be deleted/reopened. A new agreement proposal can follow rejection.
+Network and agreement rejection was removed in `c254603`: only
+`POST /api/network/:connectionId/accept` and `PATCH /api/agreements/:agreementId/approve`
+are exposed, and the web UI offers no Reject action.
 GET `/api/network` and `/api/agreements` return paginated, party-scoped history to
 active OWNER/ADMIN members, with safe organization projections.
 

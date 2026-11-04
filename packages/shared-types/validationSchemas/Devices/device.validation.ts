@@ -46,13 +46,6 @@ const UpstreamDeviceSchema = z.object({
   public_ip: z.string().nullable().optional(),
 });
 
-export const DeviceListResponseSchema = z.object({
-  device_ids: z.array(z.string()),
-  kiosks: z.array(UpstreamDeviceSchema),
-  last_updated: z.string().nullable().optional(),
-  total_kiosks: z.number(),
-});
-
 /** Current Mothership fleet response (`GET /api/v1/devices`). */
 export const DevicesResponseSchema = z.object({
   devices: z.array(UpstreamDeviceSchema),
@@ -131,7 +124,6 @@ export const SetDeviceGamePriceSchema = z.object({
 });
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
-export type PriceWriteScope = SetDeviceGamePriceInput['scope'];
 
 /** Result returned after Mothership confirms a device-scoped override reset. */
 export const ResetDevicePricesResultSchema = z.object({

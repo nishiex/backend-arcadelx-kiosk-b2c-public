@@ -74,8 +74,6 @@ let available = false
 let readinessError = false
 let relationshipError = false
 let rejectCreate = false
-let releaseCreate: (() => void) | undefined
-let holdCreate = false
 const calls: {
   path: string
   method: string
@@ -158,10 +156,6 @@ globalThis.fetch = async (input, init) => {
       ],
     })
   if (url.pathname === "/api/orders/create") {
-    if (holdCreate)
-      await new Promise<void>((resolve) => {
-        releaseCreate = resolve
-      })
     if (rejectCreate)
       return response(null, 503, "Order requests are temporarily unavailable.")
     const order = {
@@ -234,11 +228,6 @@ async function identity() {
   await React.act(async () => {
     qc.setQueryData(["me"], me())
     await new Promise((resolve) => setTimeout(resolve, 20))
-  })
-}
-async function refreshCompanies() {
-  await React.act(async () => {
-    await qc.invalidateQueries({ queryKey: ["order-request-companies"] })
   })
 }
 async function setValue(selector: string, value: string) {

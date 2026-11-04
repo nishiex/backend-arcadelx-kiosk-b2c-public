@@ -51,8 +51,3 @@ export function assetFile(name: string): string {
   }
   return found;
 }
-
-/** Directory holding the assets, used where pdfkit needs a path root. */
-export function assetDir(): string {
-  return path.dirname(assetFile('arcadelx-logo.png'));
-}

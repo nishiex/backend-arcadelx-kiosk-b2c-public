@@ -16,8 +16,8 @@ surfaces changed, both in the web app only:
 - the **Overview stat card** (`components/dashboard/StatGrid.tsx`) no longer renders, and its
   now-unused `Wrench` import and `summary["MAINTENANCE"]` lookup were removed; the loading
   skeleton drops from 6 placeholders to 5 so the grid stays consistent.
-- the **kiosk status picker** (`components/kiosks/KioskDetailDialog.tsx`) no longer offers
-  `MAINTENANCE`, so the status cannot be set from the UI.
+- the **kiosk status picker** (`components/kiosks/KioskDetailDialog.tsx`) was removed
+  entirely; status is read-only in the detail dialog, so no status can be set from the UI.
 
 Deliberately kept, so nothing breaks:
 
@@ -28,12 +28,12 @@ Deliberately kept, so nothing breaks:
   filters out statuses with a zero count, so the Fleet composition donut needs no change and a
   kiosk in Maintenance would still appear there.
 - The API, the enum and existing rows are untouched: this is a presentation change only, so
-  restoring it is removing the hidden card line and the commented-out `<option>`.
+  restoring manual status control means re-adding the picker and its options.
 
 Verified in the running app: the Overview row shows exactly Total Kiosks, Available,
 Installed, Pending Members and Network Requests with no Maintenance card and nothing
-misaligned; the Fleet composition donut still renders; and the status picker offers
-AVAILABLE, RESERVED (disabled), ASSIGNED (disabled), INSTALLED, RETURNED, RETIRED only.
+misaligned; the Fleet composition donut still renders; and the detail dialog shows the
+current status without a picker.
 Evidence: `audits/health/overview-no-maintenance.png`.
 
 ## Network data-path fixes (2026-10-07)
@@ -178,7 +178,9 @@ The API already implemented the whole post-approval lifecycle, but the orders ta
 rendered only an **Approve** button, so an approved order could never move again:
 there was no UI and no `lib/backend-api.ts` helper for payment, dispatch or delivery.
 `OrderStatusDialog` now renders the single next valid step for each supplier-side row
-and `markOrderAsPaid` / `dispatchOrder` / `deliverOrder` call the existing endpoints.
+and `markOrderAsPaid` / `dispatchOrder` / `deliverOrderWithLocation` (from
+`lib/order-delivery.ts`, because delivery now requires a location) call the existing
+endpoints.
 
 The chain and its gates (the API re-checks all of them, so a stale row cannot fire an
 out-of-order transition):

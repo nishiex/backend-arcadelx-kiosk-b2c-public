@@ -17,8 +17,6 @@ export const sendPasswordResetOtpEmail = async ({
   name,
   otp,
 }: PasswordResetEmailParams) => {
-  const loginUrl = process.env.FRONTEND_LOGIN_URL ?? "";
-
   await sendEmail({
     to: email,
     toName: name,

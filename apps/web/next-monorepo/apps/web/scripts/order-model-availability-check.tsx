@@ -93,7 +93,6 @@ const render = async (organizationId: string) => React.act(async () => {
     <QueryClientProvider client={queryClient}>
       <CreateOrderDialog
         organizationId={organizationId}
-        orgType={organizationId === "partner-id" ? "PARTNER" : "DISTRIBUTOR"}
         disabled={false}
         onCreated={() => {}}
       />

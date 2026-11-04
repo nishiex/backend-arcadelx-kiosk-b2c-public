@@ -42,16 +42,6 @@ export const emailSubtitle = (text: string) =>
 export const emailParagraph = (text: string) =>
   `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:${EMAIL_COLORS.foreground};">${text}</p>`;
 
-export const emailStrong = (text: string) =>
-  `<strong style="font-weight:600;color:${EMAIL_COLORS.foreground};">${text}</strong>`;
-
-export const emailDivider = () =>
-  `<div style="height:1px;background:${EMAIL_COLORS.border};margin:20px 0;"></div>`;
-
-/** Recessed panel, like the dashboard's `bg-muted/30` blocks. */
-export const emailPanel = (content: string) =>
-  `<div style="background:${EMAIL_COLORS.muted};border:1px solid ${EMAIL_COLORS.border};border-radius:${RADIUS};padding:16px;margin:0 0 14px;">${content}</div>`;
-
 /**
  * Label/value rows for structured data. Values default to mono, matching how the dashboard
  * shows machine codes, order numbers and quantities.
@@ -154,23 +144,3 @@ export const emailShell = ({
   </div>
 </body>
 </html>`;
-
-/** The mandatory confidentiality notice, restyled to the same tokens. */
-export const emailDisclaimer = () =>
-  `<div style="margin:20px 0 0;padding-top:16px;border-top:1px solid ${EMAIL_COLORS.border};">
-    <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${EMAIL_COLORS.foreground};">
-      Confidential &ndash; for authorised recipient only
-    </p>
-    <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:${EMAIL_COLORS.mutedForeground};">
-      This email and the information contained herein are confidential and intended solely for the authorized recipient. Please do not share, forward, publish, or disclose your login credentials, temporary password, account information, or any other confidential information with any third party.
-    </p>
-    <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:${EMAIL_COLORS.mutedForeground};">
-      All content, materials, information, designs, software, trademarks, branding, concepts, documents, and intellectual property related to ARCADELX are the exclusive property of <strong style="color:${EMAIL_COLORS.foreground};">Nilee Games and Future Technologies Pvt. Ltd.</strong> and/or its respective licensors. All rights are reserved.
-    </p>
-    <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:${EMAIL_COLORS.mutedForeground};">
-      Any unauthorized copying, reproduction, distribution, modification, disclosure, commercial use, or dissemination of ARCADELX materials or intellectual property is strictly prohibited and may result in legal action under applicable laws.
-    </p>
-    <p style="margin:0;font-size:11px;line-height:1.5;color:${EMAIL_COLORS.mutedForeground};">
-      If you have received this email in error, please delete it immediately and notify the ARCADELX team.
-    </p>
-  </div>`;
