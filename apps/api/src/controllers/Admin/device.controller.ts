@@ -146,6 +146,17 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   }
   assertCompanyAdmin(req);
   if (body.data.scope === 'DEVICE') {
+    // `apply_now` is the operator's explicit "not the midnight queue" choice. Without
+    // it the write is staged for EOD, which is what every device write used to do -- even
+    // when the client asked for the immediate path.
+    if (body.data.apply_now) {
+      const applied = SetDeviceGamePriceResultSchema.parse(
+        await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data),
+      );
+      return res
+        .status(200)
+        .json(new ApiResponse(200, { ...applied, appliedNow: true }, 'Device game price applied and verified'));
+    }
     const update = await scheduleEodDevicePrice({
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
       price: body.data.price, replayPrice: body.data.replay_price ?? game.effectiveReplayPrice, createdById: req.user!.id,

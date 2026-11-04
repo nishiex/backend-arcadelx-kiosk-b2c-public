@@ -101,6 +101,11 @@ export const SetDeviceGamePriceSchema = z.object({
     .max(100000, "Replay price looks implausible")
     .optional(),
   scope: z.enum(['DEVICE', 'GAME_CATALOG']).optional().default('DEVICE'),
+  /**
+   * Write the device price now instead of staging it for the midnight EOD run.
+   * Only meaningful for `DEVICE` scope; the catalog write is always immediate.
+   */
+  apply_now: z.boolean().optional(),
 });
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
@@ -132,6 +137,8 @@ export const SetDeviceGamePriceResultSchema = z.object({
   replayPrice: z.number(),
   /** What was actually written, so the caller can state the reach of the change honestly. */
   scope: z.enum(['DEVICE_GAME_OVERRIDE', 'GAME_CATALOG']),
+  /** True when the write bypassed the EOD queue because the operator chose "Apply now". */
+  appliedNow: z.boolean().optional(),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
