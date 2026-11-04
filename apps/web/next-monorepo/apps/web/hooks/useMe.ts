@@ -75,6 +75,10 @@ export function useMe(): Permissions {
   const isDistributor = orgType === "DISTRIBUTOR"
   const canTransact = isCompany || isDistributor
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
+  // A Partner placed directly under the Company works with the Company; one under a
+  // Distributor reports to that Distributor, so it must not see the request action.
+  const isCompanyPartner =
+    orgType === "PARTNER" && me?.membership?.organization?.parentOrg?.type === "COMPANY"
   const canViewAnalytics = !isError && me?.membership?.status === "ACTIVE" && (isCompany || isDistributor) && isOwnerOrAdmin
 
   const permissions = me?.permissions ?? []
@@ -133,7 +137,7 @@ export function useMe(): Permissions {
     canRequestDevicePrices:
       !isError &&
       me?.membership?.status === "ACTIVE" &&
-      isDistributor &&
+      (isDistributor || isCompanyPartner) &&
       (isOwnerOrAdmin || role === "MANAGER"),
     permissions,
     can,

@@ -82,7 +82,9 @@ router.post(
 // the game's catalog price for every kiosk; a device write never falls back to it.
 router.post(
   '/:deviceId/games/:gameId/price',
-  requireOrgType('COMPANY', 'DISTRIBUTOR'),
+  // PARTNER is admitted here so a Partner that sits directly under the Company can
+  // submit a request; the controller rejects Partners that belong to a Distributor.
+  requireOrgType('COMPANY', 'DISTRIBUTOR', 'PARTNER'),
   requireRole('OWNER', 'ADMIN', 'MANAGER'),
   updateDeviceGamePrice,
 );

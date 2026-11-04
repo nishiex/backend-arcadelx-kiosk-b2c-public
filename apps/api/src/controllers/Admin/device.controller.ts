@@ -130,15 +130,41 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   const games = await getDevicePrices(params.data.deviceId);
   const game = games.find((item) => item.gameId === params.data.gameId);
   if (!game) throw new ApiError(404, 'Game was not found on the selected device');
-  if (req.membership?.type === 'DISTRIBUTOR') {
-    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(req.membership.role)) {
-      throw new ApiError(403, 'Only Distributor owners, admins, or managers can request game price changes');
+  // A Partner may request a price change only for machines it holds directly under the
+  // Company. Partners under a Distributor stay out of the Company queue: their price
+  // changes are the Distributor's to raise.
+  const membership = req.membership!;
+  const requesterType = membership.type;
+  const isCompanyPartner =
+    requesterType === 'PARTNER' &&
+    (await prisma.organization.findFirst({
+      where: { id: membership.organizationId, parentOrg: { type: 'COMPANY' } },
+      select: { id: true },
+    })) !== null;
+
+  if (requesterType === 'PARTNER' && !isCompanyPartner) {
+    // Explicit, because the generic company-admin error would suggest the action is
+    // missing rather than routed through someone else.
+    throw new ApiError(
+      403,
+      'Price changes for a Distributor partner go through that Distributor',
+    );
+  }
+
+  if (requesterType === 'DISTRIBUTOR' || isCompanyPartner) {
+    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(membership.role)) {
+      throw new ApiError(
+        403,
+        requesterType === 'PARTNER'
+          ? 'Only Partner owners, admins, or managers can request game price changes'
+          : 'Only Distributor owners, admins, or managers can request game price changes',
+      );
     }
     if (body.data.scope !== 'DEVICE') {
-      throw new ApiError(403, 'Distributors can request device prices only');
+      throw new ApiError(403, 'Price requests apply to one device at a time');
     }
     const existing = await prisma.devicePriceRequest.findFirst({
-      where: { deviceId: params.data.deviceId, gameId: game.gameId, requesterOrgId: req.membership.organizationId, status: { in: ['PENDING', 'PROCESSING'] } },
+      where: { deviceId: params.data.deviceId, gameId: game.gameId, requesterOrgId: membership.organizationId, status: { in: ['PENDING', 'PROCESSING'] } },
       select: { id: true },
     });
     if (existing) throw new ApiError(409, 'A pending price request already exists for this game and device');
@@ -149,7 +175,7 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
         displayName: game.displayName,
         price: body.data.price,
         replayPrice: body.data.replay_price ?? game.effectiveReplayPrice,
-        requesterOrgId: req.membership.organizationId,
+        requesterOrgId: membership.organizationId,
         requestedById: req.user!.id,
       },
     });
