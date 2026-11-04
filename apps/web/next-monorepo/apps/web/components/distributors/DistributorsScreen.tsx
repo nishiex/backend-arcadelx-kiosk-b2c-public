@@ -52,12 +52,14 @@ function AgreementPill({ status }: { status: string | null }) {
 }
 
 export default function DistributorsScreen() {
-  const { canManageDistributors, canManageAgreements, can, isCompany, me } = useMe()
+  const { canManageDistributors, canManageAgreements, can, isCompany, orgType, me } = useMe()
   const canAdd = canManageDistributors && can("DISTRIBUTORS", "CREATE")
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["distributors", me?.membership?.organizationId],
     queryFn: fetchDistributors,
-    enabled: isCompany,
+    // A Partner's own Distributor is its only counterparty, and the agreement terms sit
+    // behind this read.
+    enabled: isCompany || orgType === "PARTNER",
     refetchInterval: 30000,
   })
 

@@ -150,7 +150,8 @@ function NavNetworkSection({
 }) {
   const items = NETWORK_CHILDREN.filter((i) => (i.show ? i.show(perms) : true))
   const activeItem = items.find((i) => isActive(i, paths.pathname, paths.tab))
-  const showParentLink = perms.canManageDistributors
+  // Partners need the same entry point to read their Distributor's agreement.
+  const showParentLink = perms.canManageDistributors || perms.orgType === "PARTNER"
   const parentActive =
     showParentLink &&
     (paths.pathname === "/distributors" || paths.pathname.startsWith("/distributors/"))

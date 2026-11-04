@@ -287,8 +287,18 @@ export const getDistributors = asyncHandler(
     const availableProfileColumns = new Set(
       profileColumns.map(({ column_name }) => column_name),
     );
+    // A Partner sees the one Distributor it trades with, not the whole distributor list.
+    let distributorWhere: { type: "DISTRIBUTOR"; id?: string } = { type: "DISTRIBUTOR" };
+    if (req.membership!.type === "PARTNER") {
+      const self = await prisma.organization.findUnique({
+        where: { id: req.membership!.organizationId },
+        select: { parentOrgId: true },
+      });
+      if (!self?.parentOrgId) throw new ApiError(404, "No Distributor is linked to this Partner");
+      distributorWhere = { type: "DISTRIBUTOR", id: self.parentOrgId };
+    }
     const organizations = await prisma.organization.findMany({
-      where: { type: "DISTRIBUTOR" },
+      where: distributorWhere,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

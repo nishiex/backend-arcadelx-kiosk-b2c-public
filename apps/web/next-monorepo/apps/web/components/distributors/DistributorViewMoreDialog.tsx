@@ -326,6 +326,71 @@ function SummaryCard({
   )
 }
 
+/**
+ * The agreement between this Distributor and the viewer's side. A Company sees the terms it
+ * signed with the Distributor; a Partner sees the terms its own Distributor signed with it.
+ * The request list only holds approvals in flight, so it cannot answer this.
+ */
+function DistributorAgreementTerms({
+  distributorId,
+  fallback,
+}: {
+  distributorId: string
+  fallback?: React.ReactNode
+}) {
+  const { me, orgType } = useMe()
+  const selfId = me?.membership?.organizationId
+  const childId = orgType === "PARTNER" ? selfId : distributorId
+  const query = useQuery({
+    queryKey: ["distributor-agreement", distributorId, childId],
+    queryFn: () => fetchAgreementsForChild(childId!),
+    enabled: !!childId,
+  })
+  const related = (query.data ?? []).filter(
+    (row) => row.childOrg.id === distributorId || row.parentOrg.id === distributorId,
+  )
+  const row = related.find((item) => item.status === "ACTIVE") ?? related[0]
+
+  if (query.isLoading) {
+    return <p role="status" className="text-sm text-muted-foreground">Loading agreement…</p>
+  }
+  if (query.isError) {
+    return <p role="alert" className="text-sm text-destructive">Couldn&apos;t load the agreement.</p>
+  }
+  if (!row) return <>{fallback ?? <EmptyState message="No agreement has been drafted with this distributor yet." />}</>
+
+  const money = (value: number | string) => `₹${Number(value).toLocaleString("en-IN")}`
+
+  return (
+    <dl className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt className="text-xs text-muted-foreground">Status</dt>
+        <dd className="mt-0.5 font-medium">{row.status.replaceAll("_", " ").toLowerCase()}</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Share</dt>
+        <dd className="mt-0.5 tabular-nums">{row.parentSharePct}% / {row.childSharePct}%</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Deposit per kiosk</dt>
+        <dd className="mt-0.5 tabular-nums">{money(row.depositAmountPerMachine)}</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Non-refundable per kiosk</dt>
+        <dd className="mt-0.5 tabular-nums">{money(row.nonRefundableAmountPerMachine)}</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Effective from</dt>
+        <dd className="mt-0.5">{new Date(row.effectiveFrom).toLocaleDateString("en-IN")}</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-muted-foreground">Effective to</dt>
+        <dd className="mt-0.5">{row.effectiveTo ? new Date(row.effectiveTo).toLocaleDateString("en-IN") : "open-ended"}</dd>
+      </div>
+    </dl>
+  )
+}
+
 export default function DistributorViewMoreDialog({
   distributor,
   trigger,
@@ -661,14 +726,21 @@ export default function DistributorViewMoreDialog({
                         ))}
                       </ul>
                     )
-                  ) : !canReviewRequests ? (
-                    <EmptyState message="Only organization Owners and Admins can review requests." />
                   ) : (
-                    <ReviewRequestList
-                      kind="agreements"
-                      page={agreementPage}
-                      onPageChange={setAgreementPage}
-                      counterpartyId={distributor.id}
+                    <DistributorAgreementTerms
+                      distributorId={distributor.id}
+                      fallback={
+                        canReviewRequests ? (
+                          <ReviewRequestList
+                            kind="agreements"
+                            page={agreementPage}
+                            onPageChange={setAgreementPage}
+                            counterpartyId={distributor.id}
+                          />
+                        ) : (
+                          <EmptyState message="No agreement has been drafted with this distributor yet." />
+                        )
+                      }
                     />
                   )}
                 </div>

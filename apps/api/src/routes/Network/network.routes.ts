@@ -13,7 +13,8 @@ router.post('/initiate', requireOrgType("COMPANY","DISTRIBUTOR"),requireRole('OW
 router.get("/requests",requireRole("OWNER","ADMIN"),getPendingNetworkRequests)
 
 // Company-only listing of distributor organizations for the dashboard.
-router.get('/distributors', requireOrgType('COMPANY'), getDistributors);
+// Partners read this to see the Distributor they belong to; the controller scopes them.
+router.get('/distributors', requireOrgType('COMPANY', 'PARTNER'), getDistributors);
 router.get('/partners', requireOrgType('COMPANY', 'DISTRIBUTOR'), requireRole('OWNER', 'ADMIN', 'MANAGER'), getPartners);
 
 router.post('/:connectionId/accept', requireRole('OWNER', 'ADMIN'), acceptConnection);
