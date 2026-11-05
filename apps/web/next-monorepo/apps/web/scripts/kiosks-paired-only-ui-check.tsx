@@ -254,10 +254,111 @@ try {
   assert.ok(partnerRow.includes("Mar 2025"), "the assignment date is shown")
   assert.ok(bodyText().includes("Assigned"), "the table has an assignment column")
 
+  const assignedSelect = [...document.querySelectorAll("select")].find((el) =>
+    el.closest("label")?.textContent?.includes("Assigned to"),
+  ) as HTMLSelectElement | undefined
+  assert.ok(assignedSelect, "a distributor can filter by the org holding a machine")
+
+  // Only partner orgs belong in this dropdown; the empty state is a placeholder, not an option.
+  const optionText = [...assignedSelect!.options].map(option => option.textContent ?? "").join(" | ")
+  assert.ok(optionText.includes("No partner yet"), "the filter starts with no partner picked")
+  assert.ok(!optionText.includes("All machines"), "no generic all-machines entry in the dropdown")
+  assert.ok(!optionText.includes("Your inventory"), "own stock is not offered as a filter option")
+  assert.ok(optionText.includes("Acme Arcade Partner (1)"), "every child org gets its own option")
+
+  await React.act(async () => {
+    assignedSelect!.value = "org-partner"
+    assignedSelect!.dispatchEvent(new w.Event("change", { bubbles: true }))
+  })
+  await until(() => !bodyText().includes("ADLX-DIST-OWN-1"), "the child-org filter to narrow the list")
+  assert.ok(bodyText().includes("ADLX-DIST-PARTNER-1"), "the child org's machine stays visible")
+
+  const clearButton = () =>
+    [...document.querySelectorAll("button")].find(item => item.textContent?.trim() === "Clear")
+  assert.ok(clearButton(), "a Clear action appears once a partner is picked")
+  await React.act(async () => clearButton()!.click())
+  await until(() => bodyText().includes("ADLX-DIST-OWN-1"), "the filter to reset")
+
   console.log("PASS distributor kiosks UI: own stock and assigned machines, with holder org and date")
 
   await React.act(async () => distRoot.unmount())
   distClient.clear()
+}
+
+// ---------------------------------------------------------------------------
+// Distributor with no partner-held machines: the filter stays, showing only its placeholder.
+// ---------------------------------------------------------------------------
+{
+  const DIST = "org-dist"
+  const soloMe = {
+    id: "me-4",
+    email: "solo@example.test",
+    name: "Solo Distributor",
+    membership: {
+      organizationId: DIST,
+      status: "ACTIVE",
+      role: "OWNER",
+      organization: { id: DIST, name: "Solo Distribution", type: "DISTRIBUTOR" },
+    },
+    permissions: [] as string[],
+  }
+  const soloOrg = { id: DIST, name: "Solo Distribution", type: "DISTRIBUTOR" }
+  const soloKiosks = [
+    {
+      ...base,
+      id: "s1",
+      machineCode: "ADLX-SOLO-1",
+      externalDeviceId: "dev-7",
+      currentOrgId: DIST,
+      currentOrg: soloOrg,
+      assignedAt: "2025-05-01T09:00:00.000Z",
+    },
+  ]
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input), "http://localhost")
+    const method = init?.method ?? "GET"
+    if (url.pathname === "/api/auth/me") return Response.json({ data: { user: soloMe } })
+    if (url.pathname === "/api/kiosks" && method === "GET") {
+      return Response.json({ data: { kiosks: soloKiosks, meta: { totalPages: 1 } } })
+    }
+    throw new Error(`Unexpected request: ${method} ${url.pathname}`)
+  }
+
+  const soloClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  const host = document.createElement("div")
+  document.body.append(host)
+  const soloRoot = createRoot(host)
+  await React.act(async () => {
+    soloRoot.render(
+      <QueryClientProvider client={soloClient}>
+        <KiosksScreen />
+      </QueryClientProvider>,
+    )
+  })
+  await until(() => bodyText().includes("ADLX-SOLO-1"), "the solo distributor inventory")
+
+  const soloFilter = [...document.querySelectorAll("select")].find(el =>
+    el.closest("label")?.textContent?.includes("Assigned to"),
+  ) as HTMLSelectElement | undefined
+  assert.ok(soloFilter, "the partner filter is still offered without partners")
+  assert.equal(soloFilter!.options.length, 1, "only the placeholder is listed")
+  assert.equal(
+    soloFilter!.options[0]!.textContent?.trim(),
+    "No partner yet",
+    "the placeholder explains the empty filter",
+  )
+  assert.ok(
+    ![...document.querySelectorAll("button")].some(item => item.textContent?.trim() === "Clear"),
+    "there is nothing to clear",
+  )
+
+  console.log("PASS distributor kiosks UI: without partners the filter shows only its placeholder")
+
+  await React.act(async () => soloRoot.unmount())
+  soloClient.clear()
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +457,9 @@ try {
   assert.ok(partnerRow.includes("Acme Arcade Partner"), "a machine down at a partner names it")
   assert.ok(partnerRow.includes("Partner"), "a partner-held machine is labelled")
   assert.ok(partnerRow.includes("Apr 2025"), "a partner-held machine shows the date")
+
+  assert.ok(bodyText().includes("Northwind Distribution (1)"), "the distributor gets its own option")
+  assert.ok(bodyText().includes("Acme Arcade Partner (1)"), "the partner gets its own option")
 
   console.log("PASS master admin kiosks UI: whole chain visible, holder org and date on every row")
 

@@ -98,22 +98,30 @@ export const UnpairKioskDevice = asyncHandler(async(req:Request,res:Response)=>{
   //check if the hardware that we need to unpair is acctually same 
   if(hardwareUUID != kiosk.externalDeviceId)throw new ApiError(404,`Hardware UUID doesnt match to Id presnt in Business DB for ${machineCode}`);
 
-  const updatedKiosk = await prisma.kiosk.update(
-    {
-      where:{
-        machineCode,
-      },
-      data:{
-        externalDeviceId:null,
-        status:"AVAILABLE"  // CHANGE STATUS BACK TO AVAILABLE AS THE DEVICE IS NOT INSTALLED
-      },
-      select:{
-        machineCode:true,
-        externalDeviceId:true,
-        model:true
-      }
-    }
-  )
+  // Conditional on the hardware we just read: a pairing that lands in between cannot be undone
+  // by this call, and a mismatch leaves the row untouched instead of half-applied. Only an
+  // INSTALLED machine returns to sellable stock — a kiosk reserved on an order or in
+  // maintenance keeps the status its lifecycle set.
+  const released = await prisma.kiosk.updateMany({
+    where: { machineCode, externalDeviceId: hardwareUUID },
+    data: {
+      externalDeviceId: null,
+      ...(kiosk.status === "INSTALLED" ? { status: "AVAILABLE" as const } : {}),
+    },
+  });
+  if (released.count !== 1) {
+    throw new ApiError(409, `${machineCode} changed while it was being unpaired; retry`);
+  }
+
+  const updatedKiosk = await prisma.kiosk.findUniqueOrThrow({
+    where: { machineCode },
+    select: {
+      machineCode: true,
+      externalDeviceId: true,
+      model: true,
+      status: true,
+    },
+  });
   
   res.status(200).json(new ApiResponse(200, { kiosk: updatedKiosk }, `${machineCode} of hardware_uuid ${hardwareUUID} unpaired successfully`));
 

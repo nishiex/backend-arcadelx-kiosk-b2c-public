@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Cpu, Gamepad2, RefreshCw } from "lucide-react"
+import { Cpu, Gamepad2, RefreshCw, Search } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -88,9 +88,13 @@ type TabId = (typeof TABS)[number]["id"]
  * OWNER/ADMIN, matching the API route.
  */
 export default function DevicesScreen() {
-  const { me, isLoading, canViewDevices, canManageDevicePrices, canRequestDevicePrices, canViewDevicePriceRequests, canReviewDevicePriceRequests } = useMe()
+  const { me, isLoading, orgType, canViewDevices, canManageDevicePrices, canRequestDevicePrices, canViewDevicePriceRequests, canReviewDevicePriceRequests } = useMe()
   const qc = useQueryClient()
   const [tab, setTab] = useState<TabId>("fleet")
+  // The hardware fleet is the Company's view of Mothership. A Distributor or Partner works
+  // from prices and its own requests, so the Fleet tab is not offered to them.
+  const canViewFleet = orgType === "COMPANY"
+  const tabs = canViewFleet ? TABS : TABS.filter(item => item.id !== "fleet")
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
 
   const scope = [me?.id ?? "", me?.membership?.organizationId ?? ""]
@@ -123,6 +127,7 @@ export default function DevicesScreen() {
     )
   }
 
+  const activeTab: TabId = canViewFleet ? tab : "pricing"
   const list = devices.data?.devices ?? []
 
   return (
@@ -131,7 +136,9 @@ export default function DevicesScreen() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Devices</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hardware reported by Mothership, and the price each game charges on each machine.
+            {canViewFleet
+              ? "Hardware reported by Mothership, and the price each game charges on each machine."
+              : "The price each game charges on each machine."}
           </p>
         </div>
         <button
@@ -158,14 +165,14 @@ export default function DevicesScreen() {
       )}
 
       <div className="flex flex-wrap gap-2" aria-label="Device view">
-        {TABS.map(item => (
+        {tabs.map(item => (
           <button
             key={item.id}
             type="button"
-            aria-pressed={tab === item.id}
+            aria-pressed={activeTab === item.id}
             onClick={() => setTab(item.id)}
             className={`rounded-lg border px-4 py-2 text-sm font-medium ${
-              tab === item.id
+              activeTab === item.id
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card hover:bg-muted"
             }`}
@@ -179,7 +186,7 @@ export default function DevicesScreen() {
         <ErrorState message="Couldn't load the device fleet." onRetry={() => devices.refetch()} />
       ) : (
         <Panel>
-          {tab === "fleet" ? (
+          {activeTab === "fleet" ? (
             <FleetTab
               devices={list}
               lastUpdated={devices.data?.lastUpdated ?? null}
@@ -395,6 +402,100 @@ function FleetTab({
   )
 }
 
+/** Mothership exposes a UUID plus an optional kiosk number; lead with whatever a human can read. */
+function deviceLabel(device: DeviceView): string {
+  return device.kioskNumber != null ? `Kiosk #${device.kioskNumber}` : `Device ${device.deviceId.slice(0, 8)}`
+}
+
+/**
+ * Device picker for the pricing tab.
+ *
+ * The fleet list answers "what hardware exists"; this answers "which machine am I pricing",
+ * so each row carries the signals that decision needs (online state, location, last seen) and
+ * the list filters, because a bare <select> of UUIDs is unusable past a handful of devices.
+ */
+function DevicePicker({
+  devices,
+  selectedDevice,
+  onSelectDevice,
+}: {
+  devices: DeviceView[]
+  selectedDevice: string | null
+  onSelectDevice: (deviceId: string | null) => void
+}) {
+  const [query, setQuery] = useState("")
+  const needle = query.trim().toLowerCase()
+  const matches = needle
+    ? devices.filter(device =>
+        [
+          deviceLabel(device),
+          device.deviceId,
+          device.location ?? "",
+          device.kioskNumber != null ? String(device.kioskNumber) : "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle),
+      )
+    : devices
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-medium">Device</h3>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {matches.length} of {devices.length}
+        </span>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="search"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          aria-label="Search devices"
+          placeholder="Search kiosk number, device id or location"
+          className={`${inputClass} pl-9`}
+        />
+      </div>
+
+      <div className="max-h-64 overflow-y-auto rounded-xl border border-border">
+        {matches.length ? (
+          matches.map(device => {
+            const active = device.deviceId === selectedDevice
+            return (
+              <label
+                key={device.deviceId}
+                className={`flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/60 px-3 py-2.5 text-sm transition-colors last:border-0 ${
+                  active ? "bg-primary/5" : "hover:bg-muted/50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="pricing-device"
+                  className="h-4 w-4 accent-primary"
+                  checked={active}
+                  onChange={() => onSelectDevice(device.deviceId)}
+                />
+                <span className="font-medium">{deviceLabel(device)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{device.deviceId.slice(0, 8)}…</span>
+                <OnlineDot online={device.isOnline} />
+                <span className="text-xs text-muted-foreground">{device.location ?? "No location"}</span>
+                <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">Seen {when(device.lastSeen)}</span>
+              </label>
+            )
+          })
+        ) : (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No device matches “{query}”.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PricingTab({
   devices,
   selectedDevice,
@@ -417,25 +518,7 @@ function PricingTab({
   }
   return (
     <div className="space-y-5">
-      <div className="max-w-md">
-        <label htmlFor="pricing-device" className="mb-1.5 block text-sm font-medium">
-          Device
-        </label>
-        <select
-          id="pricing-device"
-          className={inputClass}
-          value={selectedDevice ?? ""}
-          onChange={event => onSelectDevice(event.target.value || null)}
-        >
-          <option value="">Select a device…</option>
-          {devices.map(device => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.deviceId}
-              {device.isOnline ? " (online)" : ""}
-            </option>
-          ))}
-        </select>
-      </div>
+      <DevicePicker devices={devices} selectedDevice={selectedDevice} onSelectDevice={onSelectDevice} />
 
       {!selectedDevice ? (
         <EmptyState

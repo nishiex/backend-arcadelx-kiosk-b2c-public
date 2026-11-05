@@ -22,6 +22,9 @@ export function useOwnedKiosks({
     queryKey: ["kiosks"],
     queryFn: fetchKiosks,
     enabled: !!organizationId,
+    // Pairing and unpairing are initiated by the hardware, so the list has to notice them on
+    // its own; polling only runs while the tab is visible.
+    refetchInterval: 30_000,
     // Select changes this view without replacing the shared API response cache.
     // The API already scopes a Distributor to its own stock plus the machines it placed with
     // children, so those rows have to survive here. Company and Partner keep the old cut:
