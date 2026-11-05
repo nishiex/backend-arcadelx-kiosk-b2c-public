@@ -21,9 +21,7 @@ const paymentFeedSchema = z.object({
 export type MothershipPayment = z.infer<typeof paymentFeedSchema>;
 
 async function fetchPaymentRecords(): Promise<unknown[]> {
-  const url =
-    process.env.MOTHERSHIP_TRANSACTION_API_URL ||
-    "https://main.arcadelx.games/api/v1/payments";
+  const url =process.env.MOTHERSHIP_TRANSACTION_API_URL!
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error("Transaction source returned HTTP " + response.status);
   const payload: unknown = await response.json();
