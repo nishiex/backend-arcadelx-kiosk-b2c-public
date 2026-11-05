@@ -104,7 +104,8 @@ export const UnpairKioskDevice = asyncHandler(async(req:Request,res:Response)=>{
         machineCode,
       },
       data:{
-        externalDeviceId:null
+        externalDeviceId:null,
+        status:"AVAILABLE"  // CHANGE STATUS BACK TO AVAILABLE AS THE DEVICE IS NOT INSTALLED
       },
       select:{
         machineCode:true,
