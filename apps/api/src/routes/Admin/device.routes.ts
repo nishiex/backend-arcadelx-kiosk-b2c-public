@@ -15,7 +15,6 @@ import {
   approveDevicePriceRequest,
   rejectDevicePriceRequest,
 } from '../../controllers/Admin/device.controller';
-import { getUnpairedKiosks, pairKioskDevice } from '../../controllers/Internal/internal.controller';
 
 /**
  * Device fleet and game pricing, proxied to Mothership.
@@ -34,11 +33,6 @@ import { getUnpairedKiosks, pairKioskDevice } from '../../controllers/Internal/i
 const router = Router();
 
 router.use(requireAuth, loadMembership);
-
-// Company Owners may pair a business kiosk from the dashboard without exposing
-// the server-to-server internal API secret to the browser.
-router.get('/unpaired-kiosks', requireOrgType('COMPANY'), requireRole('OWNER'), getUnpairedKiosks);
-router.post('/kiosks/:machineCode/pair', requireOrgType('COMPANY'), requireRole('OWNER'), pairKioskDevice);
 
 // Company admins review Distributor requests; Distributor admins review requests from
 // their connected Partners. Partners never receive an approval action.
