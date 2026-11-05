@@ -1,26 +1,11 @@
 import type { Request, Response } from "express";
-import { z } from "zod";
-import type { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../utils/db";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import {
-  BatchCreateKiosksSchema,
-  UpdateKioskStatusSchema,
-} from "@shared-types/validationSchemas/Kiosk/kiosk.validation";
+import { BatchCreateKiosksSchema } from "@shared-types/validationSchemas/Kiosk/kiosk.validation";
 import { recordOpeningAssignmentsByCode } from "../../services/kiosk-ownership";
-
-const AssignKiosksSchema = z.object({
-  organizationId: z.string().uuid(),
-  kioskIds: z.array(z.string().uuid()).min(1).max(200),
-});
-
-let retiredStatusReady: Promise<void> | null = null;
-function ensureRetiredKioskStatus() {
-  retiredStatusReady ??= prisma.$executeRawUnsafe(`ALTER TYPE "KioskStatus" ADD VALUE IF NOT EXISTS 'RETIRED'`).then(() => undefined);
-  return retiredStatusReady;
-}
 
 // Display-only organization references; do not expose contact or invite details.
 const kioskDisplaySelect = {
@@ -37,32 +22,10 @@ const kioskDisplaySelect = {
     orderBy: [{ assignedFrom: "desc" }, { id: "desc" }],
     take: 1,
     select: {
-      assignedFrom: true,
       organization: { select: { id: true, name: true, type: true } },
     },
   },
 } satisfies Prisma.KioskSelect;
-
-/**
- * What a Distributor may see: the machines it still holds, plus the machines it placed with a
- * direct child organization. The child half is anchored on the assignment ledger, so a machine
- * that never passed through this Distributor is not disclosed to it even if the child later
- * changed hands. Company (everything) and Partner (own stock) keep their existing scopes.
- */
-async function distributorInventoryScope(organizationId: string): Promise<Prisma.KioskWhereInput> {
-  const children = await prisma.organization.findMany({
-    where: { parentOrgId: organizationId, isActive: true },
-    select: { id: true },
-  });
-  const childIds = children.map(child => child.id);
-  if (!childIds.length) return { currentOrgId: organizationId };
-  return {
-    OR: [
-      { currentOrgId: organizationId },
-      { currentOrgId: { in: childIds }, assignments: { some: { organizationId } } },
-    ],
-  };
-}
 
 // Helper to format ADLX-2026-A001
 function formatMachineCode(sequenceNumber: number, year: number): string {
@@ -120,11 +83,7 @@ export const batchCreateKiosks = asyncHandler(
       );
     });
 
-    res
-      .status(201)
-      .json(
-        new ApiResponse(
-          201,
+    res.status(201).json(new ApiResponse(201,
           {
             count,
             startCode: kiosksToInsert[0]!.machineCode,
@@ -136,36 +95,83 @@ export const batchCreateKiosks = asyncHandler(
   },
 );
 
-export const getKiosks = asyncHandler(async (req: Request, res: Response) => {
-  const currentOrgId = req.membership!.organizationId;
-  const orgType = req.membership!.type;
 
-  // Company sees all machines. Distributors see their own inventory plus the machines they
-  // placed with a child org, so they can review what was transferred down their network.
-  let query: Prisma.KioskWhereInput = { currentOrgId };
-  if (orgType === "COMPANY") {
-    query = {};
-  } else if (orgType === "DISTRIBUTOR") {
-    query = await distributorInventoryScope(currentOrgId);
-  }
+export const getKiosks = asyncHandler(
+  async (req: Request, res: Response) => {
+    const currentOrgId = req.membership!.organizationId;
+    const orgType = req.membership!.type;
 
-  const kiosks = await prisma.kiosk.findMany({
-    where: query,
-    select: kioskDisplaySelect,
-    orderBy: { createdAt: "desc" },
-  });
-  const inventory = kiosks.map(({ assignments, ...kiosk }) => ({
-    ...kiosk,
-    assignedOrg: assignments[0]?.organization ?? null,
-    assignedAt: assignments[0]?.assignedFrom ?? null,
-  }));
+    const requestedOrgId = typeof req.query.organizationId === "string"? req.query.organizationId: currentOrgId;
 
-  res
-    .status(200)
-    .json(
-      new ApiResponse(200, { kiosks: inventory }, "Inventory fetched successfully"),
+    let allowedOrgIds: string[] = [];
+
+    if (orgType === "COMPANY") {
+      // Find direct Distributors.
+      const distributors = await prisma.organization.findMany({
+        where: {
+          parentOrgId: currentOrgId,
+          type: "DISTRIBUTOR",
+        },
+        select: { id: true },
+      });
+
+      const distributorIds = distributors.map((d) => d.id);
+
+      // Find direct Partners and Partners under Distributors.
+      const partners = await prisma.organization.findMany({
+        where: {
+          type: "PARTNER",
+          parentOrgId: {
+            in: [currentOrgId, ...distributorIds],
+          },
+        },
+        select: { id: true },
+      });
+
+      allowedOrgIds = [currentOrgId, ...distributorIds, ...partners.map((p) => p.id),];
+    } else if (orgType === "DISTRIBUTOR") {
+      // Find direct Partners.
+      const partners = await prisma.organization.findMany({
+        where: {
+          parentOrgId: currentOrgId,
+          type: "PARTNER",
+        },
+        select: { id: true },
+      });
+
+      allowedOrgIds = [ currentOrgId, ...partners.map((p) => p.id),];
+    } else if (orgType === "PARTNER") {
+      // Partners can only view their own inventory.
+      allowedOrgIds = [currentOrgId];
+    }
+
+    // Validate requested organization access.
+    if (!allowedOrgIds.includes(requestedOrgId)) throw new ApiError(403,"Unauthorized to view this organization's kiosks");
+    
+    // Fetch kiosks currently owned by the selected organization.
+    const kiosks = await prisma.kiosk.findMany({
+      where: {
+        currentOrgId: requestedOrgId,
+      },
+      select: kioskDisplaySelect,
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Format inventory response.
+    const inventory = kiosks.map(({ assignments, ...kiosk }) => ({
+      ...kiosk,
+      assignedOrg: assignments[0]?.organization ?? null,
+    }));
+
+    res.status(200).json(new ApiResponse(200,
+        { kiosks: inventory },"Inventory fetched successfully",
+      ),
     );
-});
+  },
+);
+
 
 export const getKioskById = asyncHandler(
   async (req: Request, res: Response) => {
@@ -182,29 +188,16 @@ export const getKioskById = asyncHandler(
 
     if (!kiosk) throw new ApiError(404, "Kiosk not found");
 
-    // Authorization wall: prevent Dist/Partner from viewing other orgs' machines via direct URL.
-    // A Distributor also reaches the machines it placed with a direct child, matching the list
-    // it just clicked through from.
-    if (orgType !== "COMPANY") {
-      const scope =
-        orgType === "DISTRIBUTOR"
-          ? await distributorInventoryScope(currentOrgId)
-          : { currentOrgId };
-      const visible = await prisma.kiosk.count({ where: { id, ...scope } });
-      if (!visible) throw new ApiError(403, "Unauthorized to view this machine");
+    // Authorization wall: Prevent Dist/Partner from viewing other orgs' machines via direct URL
+    if (orgType !== "COMPANY" && kiosk.currentOrgId !== currentOrgId) {
+      throw new ApiError(403, "Unauthorized to view this machine");
     }
     const { assignments, ...details } = kiosk;
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          {
+    res.status(200).json(new ApiResponse(200,{
             kiosk: {
               ...details,
               assignedOrg: assignments[0]?.organization ?? null,
-              assignedAt: assignments[0]?.assignedFrom ?? null,
             },
           },
           "Kiosk fetched successfully",
@@ -213,247 +206,127 @@ export const getKioskById = asyncHandler(
   },
 );
 
-/** Transfer available machines from the acting organization to its direct child. */
-export const assignKiosks = asyncHandler(async (req: Request, res: Response) => {
-  const { organizationId, kioskIds } = AssignKiosksSchema.parse(req.body);
-  const sourceOrgId = req.membership!.organizationId;
-  const sourceType = req.membership!.type;
-
-  if (!["COMPANY", "DISTRIBUTOR"].includes(sourceType)) {
-    throw new ApiError(403, "Only Master Admins and Distributors can assign kiosks");
-  }
-
-  const target = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { id: true, name: true, type: true, parentOrgId: true, isActive: true },
-  });
-  if (!target || !target.isActive) throw new ApiError(404, "Target organization not found");
-
-  const expectedTargetType = sourceType === "COMPANY" ? "DISTRIBUTOR" : "PARTNER";
-  if (target.type !== expectedTargetType || target.parentOrgId !== sourceOrgId) {
-    throw new ApiError(403, "Kiosks can only be assigned to your direct network children");
-  }
-
-  const assigned = await prisma.$transaction(async (tx) => {
-    const kiosks = await tx.kiosk.findMany({
-      where: {
-        id: { in: kioskIds },
-        currentOrgId: sourceOrgId,
-        externalDeviceId: { not: null },
-        status: { in: ["AVAILABLE", "RETURNED", "MAINTENANCE"] },
-        reservedOrderId: null,
-      },
-      select: { id: true, machineCode: true, model: true },
-    });
-    if (kiosks.length !== kioskIds.length) {
-      // Name the unpaired machines explicitly: "unavailable or unpaired" left operators
-      // guessing whether the machine is in the wrong state or simply has no hardware yet.
-      const eligible = new Set(kiosks.map((kiosk) => kiosk.id));
-      const unpaired = await tx.kiosk.findMany({
-        where: {
-          id: { in: kioskIds.filter((id) => !eligible.has(id)) },
-          currentOrgId: sourceOrgId,
-          externalDeviceId: null,
-        },
-        select: { machineCode: true },
-      });
-      if (unpaired.length > 0) {
-        throw new ApiError(
-          409,
-          `Pair the machine to hardware before assigning it: ${unpaired.map((kiosk) => kiosk.machineCode).join(", ")}`,
-        );
-      }
-      throw new ApiError(409, "One or more selected kiosks are unavailable or unpaired");
-    }
-
-    const now = new Date();
-    await tx.kioskAssignment.updateMany({
-      where: { kioskId: { in: kioskIds }, assignedTo: null },
-      data: { assignedTo: now },
-    });
-    await tx.kioskAssignment.createMany({
-      data: kioskIds.map(kioskId => ({
-        kioskId,
-        organizationId,
-        assignedById: req.user!.id,
-      })),
-    });
-    await tx.kiosk.updateMany({
-      where: { id: { in: kioskIds } },
-      data: { currentOrgId: organizationId, status: "AVAILABLE", reservedOrderId: null },
-    });
-    return kiosks;
-  });
-
-  res.status(200).json(new ApiResponse(200, { kiosks: assigned, organization: target }, "Kiosks assigned successfully"));
-});
 
 /** Deactivate machines while preserving ownership, assignment history, and kiosk data. */
+
 export const deactivateKiosks = asyncHandler(async (req: Request, res: Response) => {
-  const { organizationId, kioskIds } = AssignKiosksSchema.parse(req.body);
-  const sourceOrgId = req.membership!.organizationId;
-  const sourceType = req.membership!.type;
+    const { organizationId, kioskIds } = req.body;
 
-  if (!["COMPANY", "DISTRIBUTOR"].includes(sourceType)) {
-    throw new ApiError(403, "Only Master Admins and Distributors can deactivate kiosks");
-  }
+    const sourceOrgId = req.membership!.organizationId;
+    const sourceType = req.membership!.type;
 
-  const target = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { id: true, name: true, type: true, parentOrgId: true, isActive: true },
-  });
-  const expectedTargetType = sourceType === "COMPANY" ? "DISTRIBUTOR" : "PARTNER";
-  if (!target || !target.isActive || target.type !== expectedTargetType || target.parentOrgId !== sourceOrgId) {
-    throw new ApiError(403, "Kiosks can only be deactivated for your direct network children");
-  }
+    if (!["COMPANY", "DISTRIBUTOR"].includes(sourceType)) throw new ApiError(403,"Only Companies and Distributors can deactivate kiosks",);
+    
 
-  await ensureRetiredKioskStatus();
+    const result = await prisma.$transaction(async (tx) => {
+      let allowedOrganizationIds: string[] = [];
 
-  const returned = await prisma.$transaction(async (tx) => {
-    const kiosks = await tx.kiosk.findMany({
-      where: {
-        id: { in: kioskIds },
-        currentOrgId: organizationId,
-        status: { in: ["AVAILABLE", "RETURNED", "MAINTENANCE"] },
-        reservedOrderId: null,
-      },
-      select: { id: true, machineCode: true, model: true },
-    });
-    if (kiosks.length !== kioskIds.length) {
-      throw new ApiError(409, "One or more selected kiosks cannot be deactivated");
-    }
+      if (sourceType === "COMPANY") {
+        // Company has root access to its entire organization network.
+        const distributors = await tx.organization.findMany({
+          where: {
+            parentOrgId: sourceOrgId,
+            type: "DISTRIBUTOR",
+          },
+          select: { id: true },
+        });
 
-    await tx.kiosk.updateMany({
-      where: { id: { in: kioskIds } },
-      data: { status: "RETIRED" },
-    });
-    return kiosks;
-  });
+        const distributorIds = distributors.map((org) => org.id);
 
-  res.status(200).json(new ApiResponse(200, { kiosks: returned, organization: target }, "Kiosks deactivated successfully"));
-});
+        const partners = await tx.organization.findMany({
+          where: {
+            type: "PARTNER",
+            parentOrgId: {
+              in: [sourceOrgId, ...distributorIds],
+            },
+          },
+          select: { id: true },
+        });
 
-/** Deactivate a kiosk in a Distributor/Partner inventory without deleting its history. */
-export const removeKiosk = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const organizationId = req.membership!.organizationId;
-  const organizationType = req.membership!.type;
-  if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
-  // Partners never retire a kiosk: they hold inventory placed by their supplier, and
-  // the return flow is not exposed yet.
-  if (organizationType !== "DISTRIBUTOR") {
-    throw new ApiError(403, "Only Distributors can deactivate kiosks");
-  }
-
-  await ensureRetiredKioskStatus();
-
-  const kiosk = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id=${id} FOR UPDATE`;
-    const current = await tx.kiosk.findUnique({ where: { id } });
-    if (!current || current.currentOrgId !== organizationId) {
-      throw new ApiError(404, "Kiosk not found in your inventory");
-    }
-    if (current.reservedOrderId || ["RESERVED", "ASSIGNED", "RETIRED"].includes(current.status)) {
-      throw new ApiError(409, "Reserved, in-transit, and retired kiosks cannot be deactivated");
-    }
-
-    return tx.kiosk.update({
-      where: { id },
-      data: { status: "RETIRED" },
-      select: { id: true, machineCode: true, status: true, currentOrgId: true },
-    });
-  });
-
-  res.status(200).json(new ApiResponse(200, { kiosk }, "Kiosk deactivated successfully"));
-});
-
-export const updateKioskStatus = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { status, location } = UpdateKioskStatusSchema.parse(req.body);
-    const currentOrgId = req.membership!.organizationId;
-    const orgType = req.membership!.type;
-
-    if (typeof id !== "string") throw new ApiError(400, "Enter a valid Id");
-
-    const updatedKiosk = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Kiosk" WHERE id=${id} FOR UPDATE`;
-      const kiosk = await tx.kiosk.findUnique({ where: { id } });
-      if (!kiosk) throw new ApiError(404, "Kiosk not found");
-
-      if (orgType !== "COMPANY" && kiosk.currentOrgId !== currentOrgId) {
-        throw new ApiError(403, "Unauthorized to modify this machine");
+        allowedOrganizationIds = [sourceOrgId,...distributorIds,...partners.map((org) => org.id)];
+      } else {
+        // Distributor can manage only itself and its direct Partners.
+        const partners = await tx.organization.findMany({
+          where: {
+            parentOrgId: sourceOrgId,
+            type: "PARTNER",
+          },
+          select: { id: true },
+        });
+        allowedOrganizationIds = [sourceOrgId, ...partners.map((org) => org.id),];
       }
 
-      if (
-        kiosk.reservedOrderId ||
-        ["RESERVED", "ASSIGNED"].includes(kiosk.status) ||
-        ["RESERVED", "ASSIGNED"].includes(status)
-      ) {
-        throw new ApiError(
-          409,
-          "Reserved and in-transit kiosks can only change through their order",
-        );
-      }
-      const transitions: Record<string, string[]> = {
-        AVAILABLE: ["INSTALLED", "MAINTENANCE", "RETIRED"],
-        INSTALLED: ["MAINTENANCE", "RETURNED"],
-        MAINTENANCE: ["AVAILABLE", "INSTALLED", "RETURNED", "RETIRED"],
-        RETURNED: ["AVAILABLE", "MAINTENANCE", "RETIRED"],
-        RETIRED: [],
-      };
-      if (
-        status !== kiosk.status &&
-        !transitions[kiosk.status]?.includes(status)
-      ) {
-        throw new ApiError(
-          409,
-          `Cannot change kiosk status from ${kiosk.status} to ${status}`,
-        );
-      }
+      // Verify that the requested target belongs to the allowed network.
+      if (!allowedOrganizationIds.includes(organizationId)) throw new ApiError(403,"You are not authorized to deactivate kiosks belonging to this organization",);
 
-      // Business Logic: Location is mandatory when installing
-      if (status === "INSTALLED" && !location && !kiosk.location) {
-        throw new ApiError(
-          400,
-          "Location must be provided when setting status to INSTALLED",
-        );
-      }
+      // Ensure the target organization is active.
+      const target = await tx.organization.findFirst({
+        where: {
+          id: organizationId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      });
 
-      return tx.kiosk.update({
-        where: { id },
-        data: {
-          status,
-          // If setting to available/maintenance from installed, you might want to retain or clear location.
-          // Here we only update if provided, but clear it if physically returned to warehouse.
-          location:
-            status === "RETURNED" || status === "AVAILABLE"
-              ? null
-              : location || kiosk.location,
+      if (!target) throw new ApiError(404, "Target organization not found or inactive");
+
+      // Lock selected kiosks.to avoid concurrent Deactivation
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id
+        FROM "Kiosk"
+        WHERE id IN (${Prisma.join(kioskIds)})
+        FOR UPDATE
+      `;
+
+      if (locked.length !== kioskIds.length) throw new ApiError(409,"One or more selected kiosks cannot be deactivated");
+
+      // Fetch eligible kiosks.
+      const kiosks = await tx.kiosk.findMany({
+        where: {
+          id: { in: kioskIds },
+          currentOrgId: target.id,
+          status: {
+            in: ["AVAILABLE","RETURNED","MAINTENANCE","INSTALLED",],
+          },
+          reservedOrderId: null,
         },
         select: {
           id: true,
           machineCode: true,
-          status: true,
-          location: true,
+          model: true,
         },
       });
+
+      if (kiosks.length !== kioskIds.length) throw new ApiError(409,"One or more selected kiosks are unavailable or cannot be deactivated",);
+      
+
+      // Retire kiosks without deleting ownership or transaction history.
+      await tx.kiosk.updateMany({
+        where: {
+          id: { in: kioskIds },
+          currentOrgId: target.id,
+          status: {
+            in: ["AVAILABLE","RETURNED","MAINTENANCE","INSTALLED",],
+          },
+          reservedOrderId: null,
+        },
+        data: {
+          status: "RETIRED",
+        },
+      });
+
+      return {kiosks,organization: target};
     });
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { kiosk: updatedKiosk },
-          "Kiosk status updated successfully",
-        ),
-      );
+    res.status(200).json(new ApiResponse(200,result,"Kiosks deactivated successfully",));
   },
 );
 
-export const getInventorySummary = asyncHandler(
-  async (req: Request, res: Response) => {
+export const getInventorySummary = asyncHandler(async (req: Request, res: Response) => {
     const currentOrgId = req.membership!.organizationId;
     const orgType = req.membership!.type;
 
@@ -487,14 +360,6 @@ export const getInventorySummary = asyncHandler(
       {} as Record<string, number>,
     );
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { summary: formattedSummary },
-          "Inventory summary fetched",
-        ),
-      );
+    res.status(200).json(new ApiResponse(200,{ summary: formattedSummary },"Inventory summary fetched",),);
   },
 );

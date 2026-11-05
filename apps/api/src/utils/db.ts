@@ -26,3 +26,5 @@ export const prisma = new PrismaClient({
     timeout: 30000,
   },
 });
+
+export type { Prisma } from "../generated/prisma/client.js";
