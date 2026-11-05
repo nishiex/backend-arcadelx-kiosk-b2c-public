@@ -37,10 +37,32 @@ const kioskDisplaySelect = {
     orderBy: [{ assignedFrom: "desc" }, { id: "desc" }],
     take: 1,
     select: {
+      assignedFrom: true,
       organization: { select: { id: true, name: true, type: true } },
     },
   },
 } satisfies Prisma.KioskSelect;
+
+/**
+ * What a Distributor may see: the machines it still holds, plus the machines it placed with a
+ * direct child organization. The child half is anchored on the assignment ledger, so a machine
+ * that never passed through this Distributor is not disclosed to it even if the child later
+ * changed hands. Company (everything) and Partner (own stock) keep their existing scopes.
+ */
+async function distributorInventoryScope(organizationId: string): Promise<Prisma.KioskWhereInput> {
+  const children = await prisma.organization.findMany({
+    where: { parentOrgId: organizationId, isActive: true },
+    select: { id: true },
+  });
+  const childIds = children.map(child => child.id);
+  if (!childIds.length) return { currentOrgId: organizationId };
+  return {
+    OR: [
+      { currentOrgId: organizationId },
+      { currentOrgId: { in: childIds }, assignments: { some: { organizationId } } },
+    ],
+  };
+}
 
 // Helper to format ADLX-2026-A001
 function formatMachineCode(sequenceNumber: number, year: number): string {
@@ -118,17 +140,13 @@ export const getKiosks = asyncHandler(async (req: Request, res: Response) => {
   const currentOrgId = req.membership!.organizationId;
   const orgType = req.membership!.type;
 
-  // Company sees all machines. Distributors see their own inventory plus direct Partners'
-  // inventory so they can review what was transferred down their network.
+  // Company sees all machines. Distributors see their own inventory plus the machines they
+  // placed with a child org, so they can review what was transferred down their network.
   let query: Prisma.KioskWhereInput = { currentOrgId };
   if (orgType === "COMPANY") {
     query = {};
   } else if (orgType === "DISTRIBUTOR") {
-    const partners = await prisma.organization.findMany({
-      where: { parentOrgId: currentOrgId, type: "PARTNER", isActive: true },
-      select: { id: true },
-    });
-    query = { currentOrgId: { in: [currentOrgId, ...partners.map(partner => partner.id)] } };
+    query = await distributorInventoryScope(currentOrgId);
   }
 
   const kiosks = await prisma.kiosk.findMany({
@@ -139,6 +157,7 @@ export const getKiosks = asyncHandler(async (req: Request, res: Response) => {
   const inventory = kiosks.map(({ assignments, ...kiosk }) => ({
     ...kiosk,
     assignedOrg: assignments[0]?.organization ?? null,
+    assignedAt: assignments[0]?.assignedFrom ?? null,
   }));
 
   res
@@ -163,9 +182,16 @@ export const getKioskById = asyncHandler(
 
     if (!kiosk) throw new ApiError(404, "Kiosk not found");
 
-    // Authorization wall: Prevent Dist/Partner from viewing other orgs' machines via direct URL
-    if (orgType !== "COMPANY" && kiosk.currentOrgId !== currentOrgId) {
-      throw new ApiError(403, "Unauthorized to view this machine");
+    // Authorization wall: prevent Dist/Partner from viewing other orgs' machines via direct URL.
+    // A Distributor also reaches the machines it placed with a direct child, matching the list
+    // it just clicked through from.
+    if (orgType !== "COMPANY") {
+      const scope =
+        orgType === "DISTRIBUTOR"
+          ? await distributorInventoryScope(currentOrgId)
+          : { currentOrgId };
+      const visible = await prisma.kiosk.count({ where: { id, ...scope } });
+      if (!visible) throw new ApiError(403, "Unauthorized to view this machine");
     }
     const { assignments, ...details } = kiosk;
 
@@ -178,6 +204,7 @@ export const getKioskById = asyncHandler(
             kiosk: {
               ...details,
               assignedOrg: assignments[0]?.organization ?? null,
+              assignedAt: assignments[0]?.assignedFrom ?? null,
             },
           },
           "Kiosk fetched successfully",

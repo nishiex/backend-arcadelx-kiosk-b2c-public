@@ -170,6 +170,8 @@ export type Kiosk = {
   currentOrg: OrgRef | null;
   /** Sub-org from the open assignment ledger row, when a holder placed it further. */
   assignedOrg: OrgRef | null;
+  /** Start of the open assignment window — when the machine reached its current holder. */
+  assignedAt?: string | null;
 };
 
 export type UnpairedKiosk = {

@@ -19,8 +19,24 @@ function pageNumbers(page: number, totalPages: number): (number | "start-gap" | 
   return [1, "start-gap", page - 1, page, page + 1, "end-gap", totalPages]
 }
 
+/** Assignment dates are timestamps; render them as a stable, locale-fixed label. */
+function formatAssignedAt(value?: string | null): string {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+}
+
 /** Renders the real holder org (and sub-org, if placed further) for a kiosk. */
-function AssignedCell({ k }: { k: Kiosk }) {
+function AssignedCell({
+  k,
+  myOrgId,
+  viewerIsDistributor,
+}: {
+  k: Kiosk
+  myOrgId?: string
+  viewerIsDistributor: boolean
+}) {
   // No holder org at all → in unassigned pool.
   if (!k.currentOrgId && !k.assignedOrg) {
     return <span className="text-muted-foreground">Unassigned</span>
@@ -37,26 +53,45 @@ function AssignedCell({ k }: { k: Kiosk }) {
     return <span className="text-muted-foreground">Unassigned</span>
   }
 
-  const primary = holder?.name ?? sub?.name
+  // A Distributor reads its own shelf as inventory, not as an org it assigned to.
+  if (viewerIsDistributor && holder?.id && holder.id === myOrgId) {
+    return <span className="text-muted-foreground">Your inventory</span>
+  }
+
+  const primary = holder ?? sub
+  const typeLabel =
+    primary?.type === "PARTNER" ? "Partner" : primary?.type === "DISTRIBUTOR" ? "Distributor" : null
   return (
     <div>
-      <div className="font-medium">{primary}</div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{primary?.name}</span>
+        {typeLabel && (
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {typeLabel}
+          </span>
+        )}
+      </div>
       {sub && <div className="text-xs text-muted-foreground">↳ {sub.name}</div>}
     </div>
   )
 }
 
 export default function KiosksScreen() {
-  const { isCompany, canTransact, orgType } = useMe()
+  const { isCompany, canTransact, isMasterAdmin, orgType, me } = useMe()
+  const myOrgId = me?.membership?.organizationId
 
   // Apply ownership before search, model options and local pagination.
-  const { data, isLoading, isFetching, isError, refetch } = useOwnedKiosks()
+  // Whoever runs the network sees where the fleet went: a Distributor its placed machines, the
+  // Company master admin the whole chain down to Partners. Everyone else keeps their own stock.
+  const { data, isLoading, isFetching, isError, refetch } = useOwnedKiosks({
+    includeNetworkInventory: orgType === "DISTRIBUTOR" || isMasterAdmin,
+  })
 
   const [q, setQ] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
   // Machines only start charging once a kiosk is paired to hardware, so the default
-  // view is the fleet that is actually live. Unpaired rows stay one click away.
+  // view is the fleet that is actually live. Unpaired rows stay one selection away.
   const [pairedOnly, setPairedOnly] = React.useState(true)
   const [selected, setSelected] = React.useState<Kiosk | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
@@ -119,18 +154,19 @@ export default function KiosksScreen() {
             />
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={pairedOnly}
+            Pairing
+            <select
+              value={pairedOnly ? "paired" : "all"}
               disabled={isLoading || isError}
               onChange={(e) => {
-                setPairedOnly(e.target.checked)
+                setPairedOnly(e.target.value === "paired")
                 setPage(1)
               }}
-              className="h-4 w-4 rounded border-input accent-foreground"
-            />
-            Paired only
-            <span className="tabular-nums">({pairedKiosks.length}/{kiosks.length})</span>
+              className="rounded-lg border border-input bg-background px-2.5 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+            >
+              <option value="paired">Paired only ({pairedKiosks.length}/{kiosks.length})</option>
+              <option value="all">All machines ({kiosks.length})</option>
+            </select>
           </label>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Rows per page
@@ -172,7 +208,7 @@ export default function KiosksScreen() {
             className="py-12"
             message={
               pairedOnly && kiosks.length > 0
-                ? 'No paired machines match your filters. Untick "Paired only" to see every machine.'
+                ? 'No paired machines match your filters. Choose "All machines" to see every machine.'
                 : "No machines match your filters."
             }
             icon={<Search size={28} />}
@@ -186,6 +222,7 @@ export default function KiosksScreen() {
                   <th className="px-4 py-3 font-medium">Pairing</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Assigned To</th>
+                  <th className="px-4 py-3 font-medium">Assigned</th>
                   <th className="px-4 py-3 font-medium">Location</th>
                   <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
@@ -215,7 +252,12 @@ export default function KiosksScreen() {
                     <td className="px-4 py-3">
                       <StatusBadge status={k.status} />
                     </td>
-                    <td className="px-4 py-3"><AssignedCell k={k} /></td>
+                    <td className="px-4 py-3">
+                      <AssignedCell k={k} myOrgId={myOrgId} viewerIsDistributor={orgType === "DISTRIBUTOR"} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 tabular-nums text-xs text-muted-foreground">
+                      {formatAssignedAt(k.assignedAt)}
+                    </td>
                     <td className="px-4 py-3">{typeof k.location === "string" ? k.location : <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-3 text-right">
                       <button
