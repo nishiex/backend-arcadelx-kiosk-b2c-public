@@ -1,5 +1,5 @@
 import {Router} from "express";
-import { generateInviteCode,getPendingRequests,handleJoinRequest,updateMemberRole,removeMember } from "../controllers/membership.controller";
+import { generateInviteCode,getActiveMembers,getPendingRequests,handleJoinRequest,updateMemberRole,removeMember } from "../controllers/membership.controller";
 import {requireAuth,loadMembership,requireRole,requireOrgType,} from "../middlewares/auth";
 
 const router = Router();
@@ -10,6 +10,8 @@ router.use(requireAuth, loadMembership);
 router.use(requireOrgType("COMPANY"),requireRole("OWNER", "ADMIN"));
 
 router.post("/generateInviteCode", generateInviteCode);
+
+router.get("/", getActiveMembers);
 
 router.get("/requests", getPendingRequests);
 

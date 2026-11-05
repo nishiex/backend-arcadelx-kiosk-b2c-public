@@ -4,7 +4,7 @@ import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useQuery } from "@tanstack/react-query"
 import { Building2, CalendarDays, Cpu, Gamepad2, Mail, MapPin, Phone, Search, Undo2, X } from "lucide-react"
-import { deactivateKiosks, fetchAgreementsForChild, fetchKiosks, type Distributor } from "@/lib/backend-api"
+import { deactivateKiosks, fetchAgreementsForChild, fetchKiosks, fetchKiosksForOrganization, type Distributor } from "@/lib/backend-api"
 import { fetchLauncherGames } from "@/lib/devices-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState } from "@/components/dashboard/ui"
@@ -73,7 +73,12 @@ function PartnerAgreementAndMachines({
   kiosks: Awaited<ReturnType<typeof fetchKiosks>> | undefined
 }) {
   const [agreementPage, setAgreementPage] = React.useState(1)
-  const assigned = (kiosks ?? []).filter((kiosk) => kiosk.currentOrgId === partner.id)
+  const partnerKiosks = useQuery({
+    queryKey: ["partner-kiosks", partner.id],
+    queryFn: () => fetchKiosksForOrganization(partner.id),
+    staleTime: 10_000,
+  })
+  const assigned = partnerKiosks.data ?? (kiosks ?? []).filter((kiosk) => kiosk.currentOrgId === partner.id)
   // The request list only carries approvals in flight. An agreement that is already
   // active has no request row, so the terms have to come from the agreements endpoint or
   // the panel reads "No requests" while the Partner is plainly operating.
@@ -126,7 +131,11 @@ function PartnerAgreementAndMachines({
             {assigned.length} machine{assigned.length === 1 ? "" : "s"}
           </span>
         </div>
-        {!assigned.length ? (
+          {partnerKiosks.isLoading ? (
+            <p role="status" className="text-xs text-muted-foreground">Loading assigned machines…</p>
+          ) : partnerKiosks.isError ? (
+            <p role="alert" className="text-xs text-destructive">Couldn&apos;t load this Partner&apos;s machines.</p>
+          ) : !assigned.length ? (
           <p className="text-xs text-muted-foreground">No machines are currently assigned to this Partner.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -162,7 +171,7 @@ function PartnerAgreementAndMachines({
  * the artwork kiosks display. `needsUpdate` marks a game whose price differs from the fleet
  * catalogue (an override in effect), which is exactly the row an operator has to review.
  */
-function GamesPricing({ machines }: { machines: Awaited<ReturnType<typeof fetchKiosks>> }) {
+export function GamesPricing({ machines }: { machines: Awaited<ReturnType<typeof fetchKiosks>> }) {
   const [selected, setSelected] = React.useState(machines[0]?.externalDeviceId ?? machines[0]?.machineCode ?? "")
   const [onlyNeedsUpdate, setOnlyNeedsUpdate] = React.useState(false)
   React.useEffect(() => {
@@ -406,7 +415,7 @@ export default function DistributorViewMoreDialog({
   const [machineStatus, setMachineStatus] = React.useState<string>("ALL")
   const kiosks = useQuery({
     queryKey: ["distributor-kiosks", distributor.id],
-    queryFn: fetchKiosks,
+    queryFn: () => fetchKiosksForOrganization(distributor.id),
     enabled: open && tab === "kiosks",
     staleTime: 10_000,
   })

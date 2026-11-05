@@ -2,13 +2,15 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowDownWideNarrow, ArrowUpWideNarrow, Download, FileText, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, Download, ExternalLink, FileText, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
   fetchDeductionRates,
   fetchMachineRevenue,
   fetchMothershipPayments,
+  downloadMothershipPaymentsExport,
+  openMothershipPaymentsInGoogleSheets,
   syncMothershipPayments,
   updateDeductionRates,
   type DeductionRates,
@@ -203,6 +205,9 @@ export default function RevenueScreen() {
       }
     },
   })
+  const csvPaymentExport = useMutation({ mutationFn: () => downloadMothershipPaymentsExport("csv"), onSuccess: () => toast.success("Mothership payments CSV downloaded"), onError: (error: Error) => toast.error(error.message) })
+  const pdfPaymentExport = useMutation({ mutationFn: () => downloadMothershipPaymentsExport("pdf"), onSuccess: () => toast.success("Mothership payments PDF downloaded"), onError: (error: Error) => toast.error(error.message) })
+  const googleSheetPaymentExport = useMutation({ mutationFn: openMothershipPaymentsInGoogleSheets, onSuccess: () => toast.success("CSV copied. Paste it into the opened Google Sheet."), onError: (error: Error) => toast.error(error.message) })
   const syncPendingRef = React.useRef(syncPaymentsPending)
   React.useEffect(() => {
     syncPendingRef.current = syncPaymentsPending
@@ -434,7 +439,7 @@ export default function RevenueScreen() {
               <div><label htmlFor="payment-to" className="mb-1 block text-xs font-medium text-muted-foreground">To (IST)</label><input id="payment-to" className={selectClass} type="date" value={paymentTo} onChange={e => { setPaymentTo(e.target.value); setPaymentsPage(1) }}/></div>
               <button className={`${buttonClass} inline-flex items-center gap-1.5`} onClick={resetPaymentFilters}><SlidersHorizontal size={14}/>Reset filters</button>
             </div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{filteredPayments.length} matching records in latest {payments.data.total} · fetched {new Date(payments.data.fetchedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</span><div className="flex items-center gap-2"><label htmlFor="payment-sort">Sort by</label><select id="payment-sort" className={`${selectClass} py-1.5`} value={paymentSort} onChange={e => { setPaymentSort(e.target.value as typeof paymentSort); setPaymentsPage(1) }}><option value="date">Payment date</option><option value="amount">Amount</option></select><button className="rounded-md border border-border p-1.5 hover:bg-muted" aria-label={paymentSortDesc ? "Descending sort; reverse order" : "Ascending sort; reverse order"} onClick={() => setPaymentSortDesc(value => !value)}>{paymentSortDesc ? <ArrowDownWideNarrow size={15}/> : <ArrowUpWideNarrow size={15}/>}</button></div></div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{filteredPayments.length} matching records in latest {payments.data.total} · fetched {new Date(payments.data.fetchedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</span><div className="flex flex-wrap items-center gap-2"><label htmlFor="payment-sort">Sort by</label><select id="payment-sort" className={`${selectClass} py-1.5`} value={paymentSort} onChange={e => { setPaymentSort(e.target.value as typeof paymentSort); setPaymentsPage(1) }}><option value="date">Payment date</option><option value="amount">Amount</option></select><button className="rounded-md border border-border p-1.5 hover:bg-muted" aria-label={paymentSortDesc ? "Descending sort; reverse order" : "Ascending sort; reverse order"} onClick={() => setPaymentSortDesc(value => !value)}>{paymentSortDesc ? <ArrowDownWideNarrow size={15}/> : <ArrowUpWideNarrow size={15}/>}</button><button type="button" className={buttonClass} disabled={csvPaymentExport.isPending} onClick={() => csvPaymentExport.mutate()}>{csvPaymentExport.isPending ? "Exporting…" : <><Download size={14} className="mr-1 inline" />CSV</>}</button><button type="button" className={buttonClass} disabled={pdfPaymentExport.isPending} onClick={() => pdfPaymentExport.mutate()}>{pdfPaymentExport.isPending ? "Exporting…" : <><FileText size={14} className="mr-1 inline" />PDF</>}</button><button type="button" className={buttonClass} disabled={googleSheetPaymentExport.isPending} onClick={() => googleSheetPaymentExport.mutate()}>{googleSheetPaymentExport.isPending ? "Opening…" : <><ExternalLink size={14} className="mr-1 inline" />Google Sheet</>}</button></div></div>
             {!filteredPayments.length ? <EmptyState message="No payments match these filters. Adjust or reset the filters to explore the latest feed."/> : <div className="overflow-x-auto rounded-lg border border-border/70">
               <table className="w-full min-w-[800px] text-sm whitespace-nowrap">
                 <caption className="sr-only">
@@ -442,7 +447,7 @@ export default function RevenueScreen() {
                 </caption>
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
-                    {["Date", "Transaction", "Device", "Game", "Amount", "Status", "Provider"].map(
+                    {["Date", "Transaction", "Device", "Game", "Amount", "Status", "Provider", "Distributor", "Partner"].map(
                       (label) => (
                         <th scope="col" key={label} className="px-3 py-3 font-medium">
                           {label}
@@ -475,6 +480,8 @@ export default function RevenueScreen() {
                       </td>
                       <td className="px-3 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${payment.status.toLowerCase() === "completed" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : payment.status.toLowerCase() === "pending" ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : payment.status.toLowerCase() === "expired" || payment.status.toLowerCase() === "failed" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-muted text-muted-foreground"}`}>{payment.status}</span></td>
                       <td className="px-3 py-3">{payment.provider ?? "—"}</td>
+                      <td className="px-3 py-3">{payment.distributor_name ?? "—"}</td>
+                      <td className="px-3 py-3">{payment.partner_name ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>

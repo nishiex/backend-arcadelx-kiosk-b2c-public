@@ -10,6 +10,22 @@ import { createMemberInvite } from '../services/member-invite';
 
 const ROLE_WEIGHT: Record<string, number> = { OWNER: 3, ADMIN: 2, MANAGER: 1, STAFF: 0 };
 
+export const getActiveMembers = asyncHandler(async (req: Request, res: Response) => {
+  const members = await prisma.membership.findMany({
+    where: { organizationId: req.membership!.organizationId, status: 'ACTIVE' },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      createdAt: true,
+      user: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: [{ role: 'desc' }, { createdAt: 'asc' }],
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json(new ApiResponse(200, { members }, 'Active members fetched successfully'));
+});
+
 export const generateInviteCode = asyncHandler(async(req:Request,res:Response) => {
     
     const orgId = req.membership!.organizationId;

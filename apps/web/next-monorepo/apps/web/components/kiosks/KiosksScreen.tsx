@@ -1,13 +1,14 @@
 "use client"
 
 import React from "react"
-import { Search, Eye, MonitorSmartphone, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Eye, MonitorSmartphone, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react"
 import { type Kiosk, type OrgRef } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useOwnedKiosks } from "@/hooks/useOwnedKiosks"
 import { Skeleton, ErrorState, EmptyState, StatusBadge } from "@/components/dashboard/ui"
 import AddMachineDialog from "./AddMachineDialog"
 import KioskDetailDialog from "./KioskDetailDialog"
+import { downloadCsv, downloadPdf } from "@/lib/export-utils"
 
 const PAGE_SIZES = [10, 25, 50, 100]
 const pageButtonClass = "inline-flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -25,6 +26,27 @@ function formatAssignedAt(value?: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function exportDate(value?: string | null): string {
+  if (!value) return ""
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0, 10)
+}
+
+function exportOrganizationNames(kiosk: Kiosk) {
+  const holder = kiosk.currentOrg
+  const placed = kiosk.assignedOrg && kiosk.assignedOrg.id !== holder?.id ? kiosk.assignedOrg : null
+  const partner = holder?.type === "PARTNER" ? holder : placed?.type === "PARTNER" ? placed : null
+  const distributor = holder?.type === "DISTRIBUTOR"
+    ? holder
+    : holder?.parentOrg?.type === "DISTRIBUTOR"
+      ? holder.parentOrg
+      : placed?.type === "DISTRIBUTOR"
+        ? placed
+        : placed?.parentOrg?.type === "DISTRIBUTOR" ? placed.parentOrg : null
+  const assignedTo = placed?.name ?? (holder?.type === "COMPANY" ? "" : holder?.name ?? "")
+  return { assignedTo, distributorName: distributor?.name ?? "", partnerName: partner?.name ?? "" }
 }
 
 /** Renders the real holder org (and sub-org, if placed further) for a kiosk. */
@@ -139,6 +161,20 @@ export default function KiosksScreen() {
   const start = (currentPage - 1) * pageSize
   const visibleKiosks = filtered.slice(start, start + pageSize)
 
+  const exportHeaders = [
+    "machine_code", "serial_number", "external_device_id", "status", "assigned_to",
+    "distributor_name", "partner_name", "location", "model", "firmware_version",
+    "hardware_fingerprint", "manufacture_date", "warranty_expiry",
+  ]
+  const exportRows = kiosks.map((kiosk) => {
+    const names = exportOrganizationNames(kiosk)
+    return [
+      kiosk.machineCode, kiosk.serialNumber ?? "", kiosk.externalDeviceId ?? "", kiosk.status,
+      names.assignedTo, names.distributorName, names.partnerName, kiosk.location ?? "", kiosk.model ?? "",
+      kiosk.firmwareVersion ?? "", kiosk.hardwareFingerprint ?? "", exportDate(kiosk.manufactureDate), exportDate(kiosk.warrantyExpiry),
+    ]
+  })
+
   // Re-point the open dialog at the refetched row, so an unpair that happens while it is open
   // updates the status instead of leaving a snapshot on screen.
   const selectedKiosk = selected ? kiosks.find((k) => k.id === selected.id) ?? selected : null
@@ -168,6 +204,10 @@ export default function KiosksScreen() {
             }}
           />
         )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={!exportRows.length} onClick={() => downloadCsv("kiosks.csv", exportHeaders, exportRows)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><Download size={15} /> CSV</button>
+          <button type="button" disabled={!exportRows.length} onClick={() => downloadPdf("kiosks.pdf", "Kiosk Inventory", exportHeaders, exportRows)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><FileText size={15} /> PDF</button>
+        </div>
       </div>
 
       {/* Toolbar + table */}

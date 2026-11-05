@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import * as Dialog from "@radix-ui/react-dialog"
 import { ClipboardList, Loader2, Plus, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
-import { createOrder, fetchKiosks, fetchOrders, fetchPartners, fetchWorkflowReadiness, ORDER_STATUSES, type CreatedOrder, type OrderStatus } from "@/lib/backend-api"
+import { createOrder, fetchDistributors, fetchKiosks, fetchOrders, fetchPartners, fetchWorkflowReadiness, ORDER_STATUSES, type CreatedOrder, type OrderStatus } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Skeleton } from "@/components/dashboard/ui"
 import OrderDetailsDialog from "./OrderDetailsDialog"
@@ -16,31 +16,38 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_STATUS_LABELS, PAYMEN
 
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
 
-function CreatePartnerAllocationDialog({ organizationId, disabled, onCreated }: { organizationId: string; disabled: boolean; onCreated: (order: CreatedOrder) => void }) {
+function CreateAllocationDialog({ organizationId, disabled, companyMode, onCreated }: { organizationId: string; disabled: boolean; companyMode: boolean; onCreated: (order: CreatedOrder) => void }) {
   const [open, setOpen] = React.useState(false)
   const [partnerId, setPartnerId] = React.useState("")
   const [quantity, setQuantity] = React.useState("1")
   const [model, setModel] = React.useState("")
   const partners = useQuery({ queryKey: ["allocation-partners", organizationId], queryFn: fetchPartners, enabled: open })
+  const distributors = useQuery({ queryKey: ["allocation-distributors", organizationId], queryFn: fetchDistributors, enabled: open && companyMode })
   const kiosks = useQuery({ queryKey: ["allocation-kiosks", organizationId], queryFn: fetchKiosks, enabled: open })
-  const available = (kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === organizationId && ["AVAILABLE", "RETURNED", "MAINTENANCE"].includes(kiosk.status))
+  const available = (kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === organizationId && !!kiosk.externalDeviceId && ["AVAILABLE", "INSTALLED"].includes(kiosk.status))
+  const recipients = companyMode
+    ? [
+        ...(distributors.data ?? []).filter(item => item.isActive).map(item => ({ id: item.id, name: item.name, kind: "Distributor", eligible: item.agreementStatus === "ACTIVE" })),
+        ...(partners.data ?? []).map(item => ({ id: item.id, name: item.name, kind: "Partner", eligible: item.agreementStatus === "ACTIVE" })),
+      ]
+    : (partners.data ?? []).filter(item => item.agreementStatus === "ACTIVE").map(item => ({ id: item.id, name: item.name, kind: "Partner", eligible: true }))
   const models = [...new Set(available.map(kiosk => kiosk.model).filter((value): value is string => !!value))]
   const availableCount = available.filter(kiosk => !model || kiosk.model === model).length
   const validQuantity = Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 50
   const mutation = useMutation({
     mutationFn: () => createOrder({ type: "ALLOCATION", targetOrgId: partnerId, quantity: Number(quantity), model: model || undefined }),
-    onSuccess: order => { toast.success("Partner allocation order created"); setOpen(false); onCreated(order) },
+    onSuccess: order => { toast.success(companyMode ? "Allocation order created" : "Partner allocation order created"); setOpen(false); onCreated(order) },
     onError: (error: Error) => toast.error(error.message),
   })
-  const blocked = disabled || !partnerId || !validQuantity || availableCount < Number(quantity) || mutation.isPending
+  const blocked = disabled || !partnerId || !validQuantity || availableCount < Number(quantity) || mutation.isPending || (companyMode && distributors.isLoading)
   return <Dialog.Root open={open} onOpenChange={value => { if (mutation.isPending) return; if (value) { setPartnerId(""); setQuantity("1"); setModel(""); mutation.reset() }; setOpen(value) }}>
-    <Dialog.Trigger asChild><button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"><Plus size={16} />Create Partner Order</button></Dialog.Trigger>
+    <Dialog.Trigger asChild><button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"><Plus size={16} />{companyMode ? "Create Order" : "Create Partner Order"}</button></Dialog.Trigger>
     <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" /><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl">
-      <Dialog.Title className="pr-7 text-lg font-semibold">Create Partner allocation</Dialog.Title>
-      <Dialog.Description className="mt-2 text-sm text-muted-foreground">Create an order to allocate kiosks to a Partner under the active agreement.</Dialog.Description>
+      <Dialog.Title className="pr-7 text-lg font-semibold">{companyMode ? "Create allocation order" : "Create Partner allocation"}</Dialog.Title>
+      <Dialog.Description className="mt-2 text-sm text-muted-foreground">Choose an active organization agreement and allocate kiosks from your available inventory.</Dialog.Description>
       <Dialog.Close aria-label="Close allocation" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"><X size={18} /></Dialog.Close>
       <form className="mt-5 space-y-4" onSubmit={event => { event.preventDefault(); if (!blocked) mutation.mutate() }}>
-        <label className="block space-y-2 text-sm font-medium">Partner<select aria-label="Partner" value={partnerId} onChange={event => setPartnerId(event.target.value)} disabled={mutation.isPending || partners.isLoading} className={control + " w-full"}><option value="">Select a Partner</option>{(partners.data ?? []).filter(partner => partner.agreementStatus === "ACTIVE").map(partner => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></label>
+        <label className="block space-y-2 text-sm font-medium">{companyMode ? "Recipient organization" : "Partner"}<select aria-label={companyMode ? "Recipient organization" : "Partner"} value={partnerId} onChange={event => setPartnerId(event.target.value)} disabled={mutation.isPending || partners.isLoading || distributors.isLoading} className={control + " w-full"}><option value="">Select a {companyMode ? "recipient" : "Partner"}</option>{recipients.map(recipient => <option key={recipient.id} value={recipient.id} disabled={!recipient.eligible}>{recipient.name} ({recipient.kind}){recipient.eligible ? "" : " — active agreement required"}</option>)}</select></label>
         <label className="block space-y-2 text-sm font-medium">Number of kiosks<input aria-label="Number of kiosks" type="number" min={1} max={50} value={quantity} onChange={event => setQuantity(event.target.value)} disabled={mutation.isPending} className={control + " w-full"} /></label>
         <label className="block space-y-2 text-sm font-medium">Model (optional)<select aria-label="Kiosk model" value={model} onChange={event => setModel(event.target.value)} disabled={mutation.isPending || kiosks.isLoading} className={control + " w-full"}><option value="">Any available model</option>{models.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
         <p className="text-xs text-muted-foreground">Available in your inventory: {availableCount} kiosk{availableCount === 1 ? "" : "s"}.</p>
@@ -82,7 +89,8 @@ export default function OrdersScreen() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-2xl font-semibold tracking-tight">Orders &amp; Requests</h1><p className="mt-1 text-sm text-muted-foreground">Track incoming requests and outgoing machine allocations, including completed deliveries.</p></div>
         <div className="flex flex-wrap gap-2">
-          {orgType === "DISTRIBUTOR" && organizationId && <CreatePartnerAllocationDialog organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => { setSearch(""); setStatus(""); setDirection(""); setCreatedMessage(`Allocation order ${order.orderNumber} created for a Partner.`) }} />}
+          {orgType === "DISTRIBUTOR" && organizationId && <CreateAllocationDialog companyMode={false} organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => { setSearch(""); setStatus(""); setDirection(""); setCreatedMessage(`Allocation order ${order.orderNumber} created for a Partner.`) }} />}
+          {isMasterAdmin && orgType === "COMPANY" && organizationId && <CreateAllocationDialog companyMode organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => { setSearch(""); setStatus(""); setDirection(""); setCreatedMessage(`Allocation order ${order.orderNumber} created for the selected organization.`) }} />}
           {canRequest && organizationId && orgType && <CreateOrderDialog key={organizationId} organizationId={organizationId} disabled={orderActionsDisabled} onCreated={order => {
             setSearch(""); setStatus(""); setDirection("")
             setCreatedMessage(`Request ${order.orderNumber} for ${order.quantity} ${order.requestedModel ?? "kiosk"} kiosk(s) submitted for supplier approval.`)

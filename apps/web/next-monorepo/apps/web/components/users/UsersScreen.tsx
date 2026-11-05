@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import {
   MANAGEABLE_ROLES,
   fetchPendingMembers,
+  fetchMembers,
   handleJoinRequest,
   type ManageableRole,
 } from "@/lib/backend-api"
@@ -38,11 +39,17 @@ export default function UsersScreen() {
     enabled: canManageMembers,
     refetchInterval: 10_000,
   })
+  const membersQ = useQuery({
+    queryKey: ["members", organizationId],
+    queryFn: fetchMembers,
+    enabled: canManageMembers,
+  })
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["pending-members"] })
     // Keep the dashboard's "Pending Members" stat in sync.
     qc.invalidateQueries({ queryKey: ["pendingMembers"] })
+    qc.invalidateQueries({ queryKey: ["members", organizationId] })
   }
 
   const approveMut = useMutation({
@@ -57,6 +64,7 @@ export default function UsersScreen() {
   })
 
   const pending = pendingQ.data?.data ?? []
+  const members = membersQ.data ?? []
   const total = pendingQ.data?.meta.total ?? 0
   const totalPages = Math.max(1, pendingQ.data?.meta.totalPages ?? 1)
   // Adjust before rendering children when the scope or last available page changes.
@@ -90,9 +98,12 @@ export default function UsersScreen() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Review and approve people requesting to join your organization.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">View active users and review people requesting to join your organization.</p>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card">
+        <div className="border-b border-border px-4 py-3"><h2 className="text-sm font-semibold tracking-tight">Active Users <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{members.length}</span></h2></div>
+        {membersQ.isLoading ? <div className="p-4"><Skeleton className="h-12 w-full" /></div> : membersQ.isError ? <ErrorState className="py-10" message="Couldn't load active users." onRetry={() => membersQ.refetch()} /> : !members.length ? <EmptyState className="py-10" icon={<UserCog size={30} />} message="No active users found." /> : <ul className="divide-y divide-border/60">{members.map(member => <li key={member.id} className="flex flex-wrap items-center gap-3 px-4 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">{member.user.name.slice(0, 2).toUpperCase()}</span><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{member.user.name}</div><div className="truncate text-xs text-muted-foreground">{member.user.email}</div></div><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{ROLE_LABELS[member.role ?? "STAFF"] ?? member.role ?? "Member"}</span></li>)}</ul>}
       </div>
 
       {error && (
