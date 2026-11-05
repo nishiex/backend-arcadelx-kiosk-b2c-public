@@ -21,8 +21,6 @@ import reportsRoutes from './routes/Reports/reports.routes';
 import auditRoutes from './routes/Audit/audit.routes';
 import workflowRoutes from './routes/Workflow/workflow.routes';
 import analyticsRoutes from './routes/Analytics/analytics.routes';
-import databaseRoutes from './routes/Admin/database.routes';
-import { env } from './config/env';
 import { writeAuditLog } from './services/audit-log.service';
 const app = express();
 
@@ -50,10 +48,6 @@ app.use('/api/agreements', agreementRoutes);
 app.use('/api/kiosks', kioskRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/analytics', analyticsRoutes);
-if (env.NODE_ENV === 'development' && env.LOCAL_DATABASE_WIPE_ENABLED === 'true') {
-  app.use('/api/admin/database', databaseRoutes);
-}
-
 // Crucial: These routes bypass standard JWT auth because they are server-to-server
     app.use('/api/internal', internalRoutes);
 
