@@ -132,6 +132,24 @@
 }
 
 @layer base {
+  /* Static copy should keep the standard arrow cursor. Editable controls restore the
+     text cursor so text entry and selection remain clear. */
+  html {
+    cursor: default;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+  button,
+  a[href],
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  [role="button"] {
+    cursor: pointer;
+  }
   * {
     @apply border-border outline-ring/50;
     }
