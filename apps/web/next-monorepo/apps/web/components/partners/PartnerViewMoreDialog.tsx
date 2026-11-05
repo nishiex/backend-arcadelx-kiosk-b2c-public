@@ -3,59 +3,57 @@
 import React from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { useQuery } from "@tanstack/react-query"
-import { X } from "lucide-react"
-import { fetchKiosks } from "@/lib/backend-api"
+import { Building2, CalendarDays, Cpu, Mail, MapPin, Search, X } from "lucide-react"
+import { fetchAgreementsForChild, fetchKiosks } from "@/lib/backend-api"
 import { EmptyState } from "@/components/dashboard/ui"
+import ReviewRequestList from "@/components/requests/ReviewRequestList"
+import { useMe } from "@/hooks/useMe"
 
-export default function PartnerViewMoreDialog({
-  partner,
-  trigger,
-}: {
-  partner: {
-    id: string
-    name: string
-    state: string | null
-    city: string | null
-    owner: { id: string; name: string; email: string } | null
-    agreementStatus: string | null
-    distributorName?: string | null
-  }
-  trigger: React.ReactElement
-}) {
+type PartnerDetails = { id: string; name: string; state: string | null; city: string | null; pincode?: number | null; address?: string | null; owner: { id: string; name: string; email: string } | null; agreementStatus: string | null; distributorName?: string | null }
+type Tab = "kiosks" | "agreements"
+const TABS: { id: Tab; label: string }[] = [{ id: "kiosks", label: "Kiosks" }, { id: "agreements", label: "Agreements" }]
+const MACHINE_STATUSES = ["AVAILABLE", "RESERVED", "ASSIGNED", "INSTALLED", "MAINTENANCE", "RETURNED", "RETURN_REQUESTED", "RETIRED"]
+const inputClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+const selectClass = "rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+
+function statusTone(status: string) {
+  if (status === "AVAILABLE") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+  if (status === "ASSIGNED" || status === "INSTALLED") return "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+  if (status === "MAINTENANCE" || status === "RETURN_REQUESTED") return "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+  return "bg-muted text-muted-foreground"
+}
+
+function SummaryCard({ label, value, hint, tone, icon: Icon }: { label: string; value: number; hint: string; tone: string; icon: React.ComponentType<{ size?: number }> }) {
+  return <div className="rounded-xl border border-border bg-card p-4"><div className="flex items-start justify-between gap-2"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${tone}`}><Icon size={15} /></span></div><p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{value}</p><p className="mt-0.5 text-xs text-muted-foreground">{hint}</p></div>
+}
+
+function Agreement({ partnerId, canReview }: { partnerId: string; canReview: boolean }) {
+  const [page, setPage] = React.useState(1)
+  const query = useQuery({ queryKey: ["partner-agreement", partnerId], queryFn: () => fetchAgreementsForChild(partnerId) })
+  const row = (query.data ?? []).find(item => item.status === "ACTIVE") ?? query.data?.[0]
+  if (query.isLoading) return <p role="status" className="text-sm text-muted-foreground">Loading agreement…</p>
+  if (query.isError) return <p role="alert" className="text-sm text-destructive">Couldn&apos;t load this Partner&apos;s agreement.</p>
+  if (!row) return canReview ? <ReviewRequestList kind="agreements" page={page} onPageChange={setPage} counterpartyId={partnerId} /> : <EmptyState message="No agreement has been drafted with this Partner yet." />
+  return <dl className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">Status</dt><dd className="mt-0.5 font-medium">{row.status.replaceAll("_", " ").toLowerCase()}</dd></div><div><dt className="text-xs text-muted-foreground">Share</dt><dd className="mt-0.5 tabular-nums">{row.parentSharePct}% / {row.childSharePct}%</dd></div><div><dt className="text-xs text-muted-foreground">Deposit per kiosk</dt><dd className="mt-0.5 tabular-nums">₹{Number(row.depositAmountPerMachine).toLocaleString("en-IN")}</dd></div><div><dt className="text-xs text-muted-foreground">Non-refundable per kiosk</dt><dd className="mt-0.5 tabular-nums">₹{Number(row.nonRefundableAmountPerMachine).toLocaleString("en-IN")}</dd></div><div><dt className="text-xs text-muted-foreground">Effective from</dt><dd className="mt-0.5">{new Date(row.effectiveFrom).toLocaleDateString("en-IN")}</dd></div></dl>
+}
+
+export default function PartnerViewMoreDialog({ partner, trigger }: { partner: PartnerDetails; trigger: React.ReactElement }) {
+  const { canReviewRequests } = useMe()
   const [open, setOpen] = React.useState(false)
-  const kiosks = useQuery({
-    queryKey: ["partner-details-kiosks", partner.id],
-    queryFn: fetchKiosks,
-    enabled: open,
-    staleTime: 10_000,
-  })
+  const [tab, setTab] = React.useState<Tab>("kiosks")
+  const [queryText, setQueryText] = React.useState("")
+  const [machineStatus, setMachineStatus] = React.useState("ALL")
+  const kiosks = useQuery({ queryKey: ["partner-details-kiosks", partner.id], queryFn: fetchKiosks, enabled: open, staleTime: 10_000 })
   const assigned = (kiosks.data ?? []).filter(kiosk => kiosk.currentOrgId === partner.id)
+  const available = assigned.filter(kiosk => kiosk.status === "AVAILABLE").length
+  const inUse = assigned.filter(kiosk => kiosk.status === "ASSIGNED" || kiosk.status === "INSTALLED").length
+  const visible = assigned.filter(kiosk => { const needle = queryText.trim().toLowerCase(); const matches = !needle || [kiosk.machineCode, kiosk.model ?? "", kiosk.location ?? "", kiosk.status].some(value => value.toLowerCase().includes(needle)); return matches && (machineStatus === "ALL" || kiosk.status === machineStatus) })
+  const change = (next: boolean) => { if (next) { setTab("kiosks"); setQueryText(""); setMachineStatus("ALL") }; setOpen(next) }
 
-  return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl sm:p-6">
-          <Dialog.Close aria-label="Close partner details" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"><X size={18} /></Dialog.Close>
-          <Dialog.Title className="pr-10 text-xl font-semibold">{partner.name}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">Partner account details and assigned machines.</Dialog.Description>
-
-          <div className="mt-5 grid gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2">
-            <div><p className="text-xs text-muted-foreground">Owner</p><p className="mt-1 text-sm font-medium">{partner.owner?.name ?? "—"}</p><p className="text-xs text-muted-foreground">{partner.owner?.email ?? "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground">Location</p><p className="mt-1 text-sm font-medium">{[partner.city, partner.state].filter(Boolean).join(", ") || "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground">Distributor</p><p className="mt-1 text-sm font-medium">{partner.distributorName ?? "Direct Company"}</p></div>
-            <div><p className="text-xs text-muted-foreground">Agreement</p><p className="mt-1 text-sm font-medium">{partner.agreementStatus?.replaceAll("_", " ") ?? "Not created"}</p></div>
-          </div>
-
-          <section className="mt-5 rounded-xl border border-border">
-            <div className="border-b border-border px-4 py-3"><h3 className="text-sm font-semibold">Assigned machines</h3></div>
-            {kiosks.isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading assigned machines…</p> : kiosks.isError ? <p className="p-4 text-sm text-destructive">Couldn&apos;t load assigned machines.</p> : !assigned.length ? <EmptyState className="py-8" message="No machines are currently assigned to this Partner." /> : (
-              <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-border text-left text-xs text-muted-foreground"><tr><th className="px-4 py-3 font-medium">Machine</th><th className="px-4 py-3 font-medium">Model</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Location</th></tr></thead><tbody className="divide-y divide-border">{assigned.map(kiosk => <tr key={kiosk.id}><td className="px-4 py-3 font-mono font-medium">{kiosk.machineCode}</td><td className="px-4 py-3">{kiosk.model ?? "—"}</td><td className="px-4 py-3">{kiosk.status.replaceAll("_", " ")}</td><td className="px-4 py-3 text-muted-foreground">{kiosk.location ?? "—"}</td></tr>)}</tbody></table></div>
-            )}
-          </section>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
+  return <Dialog.Root open={open} onOpenChange={change}><Dialog.Trigger asChild>{trigger}</Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" /><Dialog.Content className="fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col overflow-hidden border-0 bg-card text-card-foreground shadow-xl outline-none">
+    <header className="border-b border-border p-5 pr-12 sm:p-6"><div className="flex flex-wrap items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 size={22} /></span><div className="min-w-0 flex-1"><Dialog.Title className="break-words text-xl font-semibold tracking-tight">{partner.name}</Dialog.Title><div className="mt-1.5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">Active</span><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${partner.agreementStatus === "ACTIVE" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>Agreement {partner.agreementStatus?.replaceAll("_", " ").toLowerCase() ?? "not drafted"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">PARTNER</span></div><Dialog.Description className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><MapPin size={13} />{[partner.city, partner.state].filter(Boolean).join(", ") || "No location recorded"}</span><span className="inline-flex items-center gap-1.5"><Mail size={13} />{partner.owner?.email ?? "—"}</span></Dialog.Description></div></div><Dialog.Close aria-label="Close partner details" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"><X size={18} /></Dialog.Close></header>
+    <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto grid w-full max-w-[1600px] gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]"><div className="min-w-0 space-y-5"><div className="grid gap-3 sm:grid-cols-3"><SummaryCard label="Assigned machines" value={assigned.length} hint="Currently held" tone="bg-blue-500/10 text-blue-700 dark:text-blue-300" icon={Cpu} /><SummaryCard label="Available" value={available} hint="Ready for deployment" tone="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" icon={Cpu} /><SummaryCard label="In use" value={inUse} hint="Assigned or installed" tone="bg-amber-500/10 text-amber-700 dark:text-amber-300" icon={CalendarDays} /></div><div className="flex flex-wrap gap-2" role="tablist" aria-label="Partner sections">{TABS.map(item => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${tab === item.id ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-muted"}`}>{item.label}</button>)}</div>
+      {tab === "agreements" ? <Agreement partnerId={partner.id} canReview={canReviewRequests} /> : kiosks.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading assigned kiosks…</p> : kiosks.isError ? <p role="alert" className="text-sm text-destructive">Couldn&apos;t load this Partner&apos;s assigned kiosks.</p> : <section className="overflow-hidden rounded-xl border border-border bg-card"><div className="flex flex-wrap items-center gap-2 border-b border-border p-3"><div className="relative min-w-44 flex-1"><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" value={queryText} onChange={event => setQueryText(event.target.value)} placeholder="Search machine code, model or location…" aria-label="Search assigned machines" className={`${inputClass} pl-9`} /></div><select value={machineStatus} onChange={event => setMachineStatus(event.target.value)} aria-label="Filter machines by status" className={selectClass}><option value="ALL">All statuses</option>{MACHINE_STATUSES.map(status => <option key={status} value={status}>{status.replaceAll("_", " ").toLowerCase()}</option>)}</select><span role="status" className="text-xs text-muted-foreground">{visible.length} of {assigned.length}</span></div>{!assigned.length ? <p className="p-4 text-sm text-muted-foreground">No kiosks are currently assigned to this Partner.</p> : !visible.length ? <p className="p-4 text-sm text-muted-foreground">No machines match these filters.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-border text-left text-xs text-muted-foreground"><tr><th className="px-4 py-3 font-medium">Machine code</th><th className="px-4 py-3 font-medium">Model</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Location</th></tr></thead><tbody className="divide-y divide-border">{visible.map(kiosk => <tr key={kiosk.id} className="hover:bg-muted/40"><td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-medium">{kiosk.machineCode}</td><td className="whitespace-nowrap px-4 py-3">{kiosk.model ?? "—"}</td><td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusTone(kiosk.status)}`}>{kiosk.status.replaceAll("_", " ").toLowerCase()}</span></td><td className="px-4 py-3 text-muted-foreground">{kiosk.location ?? "—"}</td></tr>)}</tbody></table></div>}</section>}
+    </div><aside className="hidden space-y-4 lg:block"><section className="rounded-xl border border-border bg-card p-4"><h3 className="text-sm font-semibold">Partner details</h3><dl className="mt-3 space-y-2.5 text-sm">{[["Owner", partner.owner?.name ?? "—"], ["Email", partner.owner?.email ?? "—"], ["Distributor", partner.distributorName ?? "Direct Company"], ["Location", [partner.address, partner.city, partner.state, partner.pincode].filter(Boolean).join(", ") || "—"]].map(([label, value]) => <div key={label} className="flex items-start justify-between gap-3"><dt className="shrink-0 text-xs text-muted-foreground">{label}</dt><dd className="min-w-0 break-words text-right text-xs font-medium">{value}</dd></div>)}</dl></section><section className="rounded-xl border border-border bg-card p-4"><h3 className="text-sm font-semibold">Agreement</h3><p className="mt-2 text-xs text-muted-foreground">{partner.agreementStatus ? `Current status: ${partner.agreementStatus.replaceAll("_", " ").toLowerCase()}.` : "No agreement has been drafted with this Partner yet."}</p><p className="mt-2 text-xs text-muted-foreground">Open the <strong>Agreements</strong> tab to review the terms.</p></section><section className="rounded-xl border border-border bg-card p-4"><h3 className="text-sm font-semibold">Network</h3><div className="mt-3 flex items-center justify-between"><span className="text-xs text-muted-foreground">Kiosks held</span><span className="text-xs font-medium tabular-nums">{assigned.length}</span></div></section></aside></div></div>
+  </Dialog.Content></Dialog.Portal></Dialog.Root>
 }

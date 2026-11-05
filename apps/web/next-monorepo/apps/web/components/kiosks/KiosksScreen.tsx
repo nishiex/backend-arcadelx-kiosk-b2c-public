@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Search, Eye, MonitorSmartphone, ChevronLeft, ChevronRight } from "lucide-react"
-import { type Kiosk } from "@/lib/backend-api"
+import { type Kiosk, type OrgRef } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { useOwnedKiosks } from "@/hooks/useOwnedKiosks"
 import { Skeleton, ErrorState, EmptyState, StatusBadge } from "@/components/dashboard/ui"
@@ -83,8 +83,9 @@ export default function KiosksScreen() {
   // Apply ownership before search, model options and local pagination.
   // Whoever runs the network sees where the fleet went: a Distributor its placed machines, the
   // Company master admin the whole chain down to Partners. Everyone else keeps their own stock.
+  const showNetworkInventory = orgType === "DISTRIBUTOR" || isMasterAdmin
   const { data, isLoading, isFetching, isError, refetch } = useOwnedKiosks({
-    includeNetworkInventory: orgType === "DISTRIBUTOR" || isMasterAdmin,
+    includeNetworkInventory: showNetworkInventory,
   })
 
   const [q, setQ] = React.useState("")
@@ -93,22 +94,54 @@ export default function KiosksScreen() {
   // Machines only start charging once a kiosk is paired to hardware, so the default
   // view is the fleet that is actually live. Unpaired rows stay one selection away.
   const [pairedOnly, setPairedOnly] = React.useState(true)
+  // Narrows the network view to one child org (or the viewer's own stock). Options are derived
+  // from the rows already loaded, so this needs no extra request.
+  const [assignedTo, setAssignedTo] = React.useState("all")
   const [selected, setSelected] = React.useState<Kiosk | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
 
   const kiosks = data ?? []
   const pairedKiosks = kiosks.filter((k) => !!k.externalDeviceId)
+
+  // Machines held by another org, one option per org. A Distributor with two Partners sees two.
+  const holderOrgs = React.useMemo(() => {
+    const byId = new Map<string, OrgRef>()
+    for (const kiosk of data ?? []) {
+      const org = kiosk.currentOrg
+      if (org && org.id !== myOrgId && org.type === "PARTNER") byId.set(org.id, org)
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [data, myOrgId])
+
+  const holderCounts = React.useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const kiosk of data ?? []) {
+      const id = kiosk.currentOrg?.id
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    return counts
+  }, [data])
+
+  // A refetch can drop the org that was selected; fall back to "all" instead of an empty list.
+  const activeAssignedTo =
+    assignedTo === "all" || holderOrgs.some((org) => org.id === assignedTo) ? assignedTo : "all"
+
   const filtered = kiosks.filter((k) => {
     const matchesSearch = !q || k.machineCode.toLowerCase().includes(q.toLowerCase())
-    return (
-      matchesSearch && (!pairedOnly || !!k.externalDeviceId)
-    )
+    const holderId = k.currentOrg?.id ?? k.assignedOrg?.id ?? null
+    const matchesAssigned =
+      activeAssignedTo === "all" ? true : holderId === activeAssignedTo
+    return matchesSearch && (!pairedOnly || !!k.externalDeviceId) && matchesAssigned
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   // A refetch can reduce the inventory while a later page is selected.
   const currentPage = Math.min(page, totalPages)
   const start = (currentPage - 1) * pageSize
   const visibleKiosks = filtered.slice(start, start + pageSize)
+
+  // Re-point the open dialog at the refetched row, so an unpair that happens while it is open
+  // updates the status instead of leaving a snapshot on screen.
+  const selectedKiosk = selected ? kiosks.find((k) => k.id === selected.id) ?? selected : null
 
   const openDetail = (k: Kiosk) => {
     setSelected(k)
@@ -168,6 +201,47 @@ export default function KiosksScreen() {
               <option value="all">All machines ({kiosks.length})</option>
             </select>
           </label>
+          {orgType === "DISTRIBUTOR" && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Assigned to
+                <select
+                  value={activeAssignedTo}
+                  disabled={!holderOrgs.length}
+                  onChange={(e) => {
+                    setAssignedTo(e.target.value || "all")
+                    setPage(1)
+                  }}
+                  className="rounded-lg border border-input bg-background px-2.5 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+                >
+                  {holderOrgs.length ? (
+                    <>
+                      <option value="all">All partners</option>
+                      {holderOrgs.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name} ({holderCounts.get(org.id) ?? 0})
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value="all">No partner yet</option>
+                  )}
+                </select>
+              </label>
+              {activeAssignedTo !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAssignedTo("all")
+                    setPage(1)
+                  }}
+                  className="rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Rows per page
             <select
@@ -279,7 +353,7 @@ export default function KiosksScreen() {
             <div className="space-y-1 text-xs text-muted-foreground" role="status">
               <p>
                 Showing {filtered.length ? start + 1 : 0}–{start + visibleKiosks.length} of {filtered.length} machines
-                {(q || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
+                {(q || activeAssignedTo !== "all" || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
                   ` (filtered from ${kiosks.length})`}
               </p>
               <p>Page {currentPage} of {totalPages}{isFetching && " · Updating..."}</p>
@@ -325,7 +399,7 @@ export default function KiosksScreen() {
       </div>
 
       <KioskDetailDialog
-        kiosk={selected}
+        kiosk={selectedKiosk}
         open={detailOpen}
         onOpenChange={setDetailOpen}
         canEdit={canTransact}
