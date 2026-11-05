@@ -148,7 +148,7 @@ export type KioskStatus = (typeof KIOSK_STATUSES)[number];
 // here while remaining valid KioskStatus values for display of existing kiosks.
 
 /** Minimal, non-sensitive org reference returned alongside a kiosk. */
-export type OrgRef = { id: string; name: string; type: OrgType };
+export type OrgRef = { id: string; name: string; type: OrgType; parentOrg?: OrgRef | null };
 export type NetworkKioskRef = { machineCode: string; model: string | null };
 export type NetworkOrgRef = OrgRef & { kiosks?: NetworkKioskRef[] };
 
@@ -581,16 +581,25 @@ export async function fetchMe(): Promise<Me> {
   return json.user;
 }
 
-export async function fetchKiosks(): Promise<Kiosk[]> {
+async function fetchKiosksScoped(organizationId?: string): Promise<Kiosk[]> {
   const kiosks: Kiosk[] = [];
   for (let page = 1; page <= 100; page += 1) {
     const params = new URLSearchParams({ page: String(page), limit: '100' });
+    if (organizationId) params.set('organizationId', organizationId);
     const res = await apiFetch(`/api/kiosks?${params}`, { credentials: 'include' });
     const json = await handleRes<{ kiosks: Kiosk[]; meta?: { totalPages?: number } }>(res);
     kiosks.push(...json.kiosks);
     if (!json.meta?.totalPages || page >= json.meta.totalPages) break;
   }
   return kiosks;
+}
+
+export async function fetchKiosks(): Promise<Kiosk[]> {
+  return fetchKiosksScoped();
+}
+
+export async function fetchKiosksForOrganization(organizationId: string): Promise<Kiosk[]> {
+  return fetchKiosksScoped(organizationId);
 }
 
 export async function deactivateKiosks(input: { organizationId: string; kioskIds: string[] }) {
@@ -696,6 +705,21 @@ export async function fetchMothershipPayments(page = 1, signal?: AbortSignal, pa
     signal,
   });
   return handleRes<MothershipPaymentsFeed>(res);
+}
+
+export async function downloadMothershipPaymentsExport(format: 'csv' | 'pdf'): Promise<void> {
+  const res = await apiFetch(`/api/revenue/payments?format=${format}`, { credentials: 'include', cache: 'no-store' });
+  if (!res.ok) { await handleRes(res); return; }
+  const blob = await res.blob(), url = URL.createObjectURL(blob), anchor = document.createElement('a');
+  anchor.href = url; anchor.download = `mothership-payments.${format}`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+}
+
+export async function openMothershipPaymentsInGoogleSheets(): Promise<void> {
+  const sheetWindow = window.open('https://docs.google.com/spreadsheets/create', '_blank', 'noopener,noreferrer');
+  if (!sheetWindow) throw new Error('Google Sheets could not be opened. Please allow pop-ups for this site.');
+  const res = await apiFetch('/api/revenue/payments?format=csv', { credentials: 'include', cache: 'no-store' });
+  if (!res.ok) { await handleRes(res); return; }
+  await navigator.clipboard.writeText(await res.text());
 }
 
 export type MothershipSyncResult = {
@@ -937,15 +961,13 @@ export async function assignRole(
 export type OrgMember = {
   id: string;
   role: Role | null;
-  permissionRoleId: string | null;
+  status?: 'ACTIVE' | 'PENDING' | 'REJECTED';
+  createdAt?: string;
+  permissionRoleId?: string | null;
   user: { id: string; name: string; email: string };
-  permissionRole: { id: string; name: string } | null;
+  permissionRole?: { id: string; name: string } | null;
 };
 
-// NOTE: `GET /api/members` is NOT implemented on the backend (the members router
-// only exposes /generateInviteCode, /requests, /:id/role and DELETE /:id). This
-// would 404. Only the gated, backend-less Roles screen references it — keep that
-// gate until an active-member roster endpoint ships.
 export async function fetchMembers(): Promise<OrgMember[]> {
   const res = await apiFetch('/api/members', { credentials: 'include' });
   const json = await handleRes<{ members: OrgMember[] }>(res);
@@ -1003,17 +1025,8 @@ export async function fetchAgreements(page = 1, signal?: AbortSignal): Promise<A
  * beyond the first page once other relationship history exists.
  */
 export async function fetchAgreementsForChild(childOrgId: string, signal?: AbortSignal): Promise<Agreement[]> {
-  const rows: Agreement[] = [];
-  let page = 1;
-  let totalPages = 1;
-  do {
-    const data = await fetchAgreements(page, signal);
-    rows.push(...data.agreements.filter(agreement => agreement.childOrg.id === childOrgId));
-    const reported = data.meta?.totalPages;
-    totalPages = Number.isFinite(reported) && reported > 0 ? reported : 1;
-    page++;
-  } while (page <= totalPages && page <= MAX_PAGES);
-  return rows;
+  const res = await apiFetch(`/api/agreements/child/${encodeURIComponent(childOrgId)}`, { signal, credentials: 'include', cache: 'no-store' });
+  return (await handleRes<{ agreements: Agreement[] }>(res)).agreements;
 }
 
 /**

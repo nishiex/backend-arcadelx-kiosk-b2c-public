@@ -8,11 +8,34 @@ import { indiaCalendar, revenueMonth } from '../../services/Revenue/revenue-peri
 import { RANGE_CONFIG, bucketKey, bucketLabel, rangeBuckets, rangeFilterStart, sqlBucket } from '../../services/Revenue/revenue-series';
 import { getMothershipPayments, syncRevenueData } from '../../services/Revenue/revenueTransaction.services';
 import { syncDevices } from '../../services/Revenue/deviceSync.service';
+import { mothershipPaymentsCsv, mothershipPaymentsPdf, type MothershipPaymentExportRow } from '../../services/Revenue/mothership-payment-export';
 
 let revenueSyncInFlight: Promise<{ devices: Awaited<ReturnType<typeof syncDevices>> | null; transactions: Awaited<ReturnType<typeof syncRevenueData>> }> | null = null;
 
+async function enrichPaymentExportRows(payments: Awaited<ReturnType<typeof getMothershipPayments>>['payments']): Promise<MothershipPaymentExportRow[]> {
+  const identifiers = [...new Set(payments.map((payment) => payment.device_id).filter(Boolean))];
+  const baseRows = payments.map((payment) => ({ ...payment, payment_date: payment.created_at.slice(0, 10), distributor_name: null, partner_name: null }));
+  if (!identifiers.length) return baseRows;
+  try {
+    const kiosks = await prisma.kiosk.findMany({
+      where: { OR: [{ externalDeviceId: { in: identifiers } }, { machineCode: { in: identifiers } }] },
+      select: { externalDeviceId: true, machineCode: true, currentOrg: { select: { name: true, type: true } }, assignments: { select: { assignedFrom: true, assignedTo: true, organization: { select: { name: true, type: true } } } } },
+    });
+    const byIdentifier = new Map<string, (typeof kiosks)[number]>();
+    for (const kiosk of kiosks) { if (kiosk.externalDeviceId) byIdentifier.set(kiosk.externalDeviceId, kiosk); byIdentifier.set(kiosk.machineCode, kiosk); }
+    return baseRows.map((payment) => {
+      const kiosk = byIdentifier.get(payment.device_id), occurredAt = new Date(payment.created_at);
+      const assignment = kiosk?.assignments.filter((row) => row.assignedFrom <= occurredAt && (row.assignedTo === null || row.assignedTo > occurredAt)).sort((a, b) => b.assignedFrom.getTime() - a.assignedFrom.getTime())[0];
+      const organization = assignment?.organization ?? kiosk?.currentOrg;
+      return { ...payment, distributor_name: organization?.type === 'DISTRIBUTOR' ? organization.name : null, partner_name: organization?.type === 'PARTNER' ? organization.name : null };
+    });
+  } catch { return baseRows; }
+}
+
 export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
   const { page, pageSize } = MothershipPaymentsQuerySchema.parse(req.query);
+  const format = typeof req.query.format === 'string' ? req.query.format.toLowerCase() : 'json';
+  if (!['json', 'csv', 'pdf'].includes(format)) throw new ApiError(400, 'format must be json, csv, or pdf');
   const result = await getMothershipPayments();
 
   // This endpoint is already restricted to Company Owners/Admins by the router.
@@ -21,8 +44,11 @@ export const getMothershipPaymentsFeed = asyncHandler(async (req, res) => {
   // upstream payment feed appear empty in production.
   const payments = result.payments
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const enrichedPayments = await enrichPaymentExportRows(payments);
   const total = payments.length;
-  const pagePayments = payments.slice((page - 1) * pageSize, page * pageSize);
+  if (format === 'csv') { res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', 'attachment; filename="mothership-payments.csv"'); return res.send(mothershipPaymentsCsv(enrichedPayments)); }
+  if (format === 'pdf') { res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', 'attachment; filename="mothership-payments.pdf"'); return res.send(await mothershipPaymentsPdf(enrichedPayments)); }
+  const pagePayments = enrichedPayments.slice((page - 1) * pageSize, page * pageSize);
   res.json(
     new ApiResponse(
       200,

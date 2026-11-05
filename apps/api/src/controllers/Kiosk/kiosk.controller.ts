@@ -16,13 +16,13 @@ const kioskDisplaySelect = {
   status: true,
   location: true,
   currentOrgId: true,
-  currentOrg: { select: { id: true, name: true, type: true } },
+  currentOrg: { select: { id: true, name: true, type: true, parentOrg: { select: { id: true, name: true, type: true } } } },
   assignments: {
     where: { assignedTo: null },
     orderBy: [{ assignedFrom: "desc" }, { id: "desc" }],
     take: 1,
     select: {
-      organization: { select: { id: true, name: true, type: true } },
+      organization: { select: { id: true, name: true, type: true, parentOrg: { select: { id: true, name: true, type: true } } } },
     },
   },
 } satisfies Prisma.KioskSelect;
