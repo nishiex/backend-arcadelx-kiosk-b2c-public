@@ -166,14 +166,22 @@ export default function KiosksScreen() {
     "distributor_name", "partner_name", "location", "model", "firmware_version",
     "hardware_fingerprint", "manufacture_date", "warranty_expiry",
   ]
-  const exportRows = kiosks.map((kiosk) => {
+  const exportRow = (kiosk: Kiosk) => {
     const names = exportOrganizationNames(kiosk)
     return [
       kiosk.machineCode, kiosk.serialNumber ?? "", kiosk.externalDeviceId ?? "", kiosk.status,
       names.assignedTo, names.distributorName, names.partnerName, kiosk.location ?? "", kiosk.model ?? "",
       kiosk.firmwareVersion ?? "", kiosk.hardwareFingerprint ?? "", exportDate(kiosk.manufactureDate), exportDate(kiosk.warrantyExpiry),
     ]
-  })
+  }
+  // Exports follow the visible search, pairing and assignment filters so an operator
+  // never receives rows that are hidden by the table they are reviewing.
+  const exportRows = filtered.map(exportRow)
+  const pdfHeaders = [
+    "Machine code", "Serial number", "Device ID", "Status", "Assigned to",
+    "Distributor", "Partner", "Location", "Model", "Firmware", "Hardware ID",
+    "Manufactured", "Warranty ends",
+  ]
 
   // Re-point the open dialog at the refetched row, so an unpair that happens while it is open
   // updates the status instead of leaving a snapshot on screen.
@@ -187,26 +195,26 @@ export default function KiosksScreen() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Machines</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage and monitor every kiosk in the {orgType === "COMPANY" ? "company's" : "your"} fleet.
           </p>
         </div>
-        {isCompany && (
-          <AddMachineDialog
-            onMinted={() => {
-              // Freshly minted machines have no hardware yet, so reveal the unpaired ones
-              // the operator just created instead of leaving the list looking unchanged.
-              setPairedOnly(false)
-              setPage(1)
-            }}
-          />
-        )}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {isCompany && (
+            <AddMachineDialog
+              onMinted={() => {
+                // Freshly minted machines have no hardware yet, so reveal the unpaired ones
+                // the operator just created instead of leaving the list looking unchanged.
+                setPairedOnly(false)
+                setPage(1)
+              }}
+            />
+          )}
           <button type="button" disabled={!exportRows.length} onClick={() => downloadCsv("kiosks.csv", exportHeaders, exportRows)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><Download size={15} /> CSV</button>
-          <button type="button" disabled={!exportRows.length} onClick={() => downloadPdf("kiosks.pdf", "Kiosk Inventory", exportHeaders, exportRows)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><FileText size={15} /> PDF</button>
+          <button type="button" disabled={!exportRows.length} onClick={() => downloadPdf("kiosks.pdf", "Kiosk Inventory", pdfHeaders, exportRows)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"><FileText size={15} /> PDF</button>
         </div>
       </div>
 
@@ -329,15 +337,15 @@ export default function KiosksScreen() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="min-w-[980px] w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Machine Code</th>
+                  <th className="min-w-56 px-4 py-3 font-medium">Machine Code</th>
                   <th className="px-4 py-3 font-medium">Pairing</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Assigned To</th>
+                  <th className="min-w-40 px-4 py-3 font-medium">Assigned To</th>
                   <th className="px-4 py-3 font-medium">Assigned</th>
-                  <th className="px-4 py-3 font-medium">Location</th>
+                  <th className="min-w-56 px-4 py-3 font-medium">Location</th>
                   <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
@@ -372,7 +380,7 @@ export default function KiosksScreen() {
                     <td className="whitespace-nowrap px-4 py-3 tabular-nums text-xs text-muted-foreground">
                       {formatAssignedAt(k.assignedAt)}
                     </td>
-                    <td className="px-4 py-3">{typeof k.location === "string" ? k.location : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="max-w-72 px-4 py-3"><span className="block truncate" title={typeof k.location === "string" ? k.location : undefined}>{typeof k.location === "string" ? k.location : <span className="text-muted-foreground">—</span>}</span></td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openDetail(k)}
