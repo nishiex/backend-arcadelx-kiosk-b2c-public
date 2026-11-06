@@ -9,8 +9,14 @@ const PORT = Number(env.PORT);
 
 let pricingJobs: { close: () => Promise<void> } | undefined;
 if (env.EOD_PRICE_JOBS_ENABLED === 'true') {
-  const { startDevicePricingJobs } = await import('./workers/devicePricing.worker.js');
-  pricingJobs = await startDevicePricingJobs();
+  try {
+    const { startDevicePricingJobs } = await import('./workers/devicePricing.worker.js');
+    pricingJobs = await startDevicePricingJobs();
+  } catch (error) {
+    // Device-price scheduling is optional infrastructure. The API must remain
+    // available for login and normal operations when Redis is offline.
+    console.error('[EOD pricing] scheduler unavailable; scheduled price updates are paused', error);
+  }
 }
 
 if (process.env.REVENUE_JOBS_ENABLED === 'true') {

@@ -488,6 +488,7 @@ model EodDevicePriceUpdate {
   gameId                String
   displayName           String
   businessDate          DateTime            @db.Date
+  scheduledTime         String              @default("00:00") @db.VarChar(5)
   price                 Decimal             @db.Decimal(10, 2)
   replayPrice           Decimal             @db.Decimal(10, 2)
   status                EodDevicePriceStatus @default(PENDING)

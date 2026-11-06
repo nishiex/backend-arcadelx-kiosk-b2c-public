@@ -1,0 +1,2 @@
+ALTER TABLE "EodDevicePriceUpdate"
+ADD COLUMN "scheduledTime" VARCHAR(5) NOT NULL DEFAULT '00:00';
