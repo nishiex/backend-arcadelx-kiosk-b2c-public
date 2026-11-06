@@ -12,7 +12,7 @@ function validatePricingTime(time: string): string {
 }
 
 export function getEodPricingTime(): string {
-  return eodPricingTime;
+  return validatePricingTime(eodPricingTime);
 }
 
 export function businessDate(now = new Date()): string {
@@ -32,6 +32,11 @@ function wallClockToInstant(wallClock: string): Date {
   const part = (type: string) => rendered.find(item => item.type === type)!.value;
   const renderedAsUtc = Date.parse(`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}Z`);
   return new Date(guess.getTime() - (renderedAsUtc - guess.getTime()));
+}
+
+/** Whether today's EOD cut-off has been reached in the business timezone. */
+export function isEodDue(now = new Date(), runTime = getEodPricingTime()): boolean {
+  return wallClockToInstant(`${businessDate(now)}T${runTime}`).getTime() <= now.getTime();
 }
 
 /**
@@ -80,11 +85,17 @@ export async function assertDeviceNotRetired(deviceId: string) {
   }
 }
 
-export async function scheduleEodDevicePrice(input: { deviceId: string; gameId: string; displayName: string; price: number; replayPrice: number; createdById: string; scheduledDate?: string }) {
+export async function scheduleEodDevicePrice(input: { deviceId: string; gameId: string; displayName: string; price: number; replayPrice: number; createdById: string; scheduledDate?: string; scheduledTime?: string }) {
   await assertDeviceNotRetired(input.deviceId);
-  const selectedDate = input.scheduledDate ?? businessDate();
+  const selectedTime = validatePricingTime(input.scheduledTime ?? getEodPricingTime());
+  // Requests created without an explicit date (for example after approval) are
+  // scheduled for the next available default EOD run, never applied immediately.
+  const selectedDate = input.scheduledDate ?? businessDate(new Date(nextEod()));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) throw new Error('Scheduled date must use YYYY-MM-DD');
   if (selectedDate < businessDate()) throw new Error('Scheduled date cannot be in the past');
+  if (selectedDate === businessDate() && isEodDue(new Date(), selectedTime)) {
+    throw new Error('Scheduled time has already passed; choose a future time or use Apply now');
+  }
   const day = new Date(`${selectedDate}T00:00:00.000Z`);
   return prisma.eodDevicePriceUpdate.upsert({
     where: { deviceId_gameId_businessDate: { deviceId: input.deviceId, gameId: input.gameId, businessDate: day } },
@@ -97,11 +108,12 @@ export async function scheduleEodDevicePrice(input: { deviceId: string; gameId: 
       displayName: input.displayName,
       price: input.price,
       replayPrice: input.replayPrice,
+      scheduledTime: selectedTime,
       createdById: input.createdById,
       businessDate: day,
       status: 'PENDING',
     },
-    update: { displayName: input.displayName, price: input.price, replayPrice: input.replayPrice, status: 'PENDING', processingAt: null, lastError: null, appliedAt: null, verifiedPrice: null, verifiedReplayPrice: null },
+    update: { displayName: input.displayName, price: input.price, replayPrice: input.replayPrice, scheduledTime: selectedTime, status: 'PENDING', processingAt: null, lastError: null, appliedAt: null, verifiedPrice: null, verifiedReplayPrice: null },
   });
 }
 
@@ -133,7 +145,17 @@ export async function processEodUpdate(id: string) {
   const row = await prisma.eodDevicePriceUpdate.findUniqueOrThrow({ where: { id } });
   try {
     await assertDeviceNotRetired(row.deviceId);
-    const result = await setDeviceGamePrice(row.deviceId, row.gameId, { price: Number(row.price), replay_price: Number(row.replayPrice), scope: 'DEVICE' });
+    // Mothership stages every device write. Flush its queue and read the device back so
+    // an EOD row is never recorded as APPLIED while the kiosk still has the old price.
+    const result = await setDeviceGamePrice(row.deviceId, row.gameId, {
+      price: Number(row.price),
+      replay_price: Number(row.replayPrice),
+      scope: 'DEVICE',
+      apply_now: true,
+    });
+    if (result.status !== 'APPLIED') {
+      throw new Error('Mothership did not apply and verify the scheduled device price');
+    }
     const applied = await prisma.eodDevicePriceUpdate.updateMany({
       where: { id, status: 'PROCESSING', processingAt: leaseAt },
       data: { status: 'APPLIED', processingAt: null, appliedAt: new Date(), lastError: null, verifiedPrice: result.price, verifiedReplayPrice: result.replayPrice },
@@ -155,7 +177,7 @@ export async function pricingStatus(deviceId: string, gameId: string) {
     where: { deviceId, gameId },
     orderBy: [{ businessDate: 'desc' }, { createdAt: 'desc' }],
   });
-  return update ? { id: update.id, businessDate: update.businessDate.toISOString().slice(0, 10), status: update.status, price: Number(update.price), replayPrice: Number(update.replayPrice), attempts: update.attempts, lastError: update.lastError, appliedAt: update.appliedAt, createdAt: update.createdAt } : null;
+  return update ? { id: update.id, businessDate: update.businessDate.toISOString().slice(0, 10), scheduledTime: update.scheduledTime, status: update.status, price: Number(update.price), replayPrice: Number(update.replayPrice), attempts: update.attempts, lastError: update.lastError, appliedAt: update.appliedAt, createdAt: update.createdAt } : null;
 }
 
 /**
@@ -193,12 +215,15 @@ export async function markScheduledUpdatesSuperseded(
 export async function applyPendingEodUpdates() {
   const recovered = await recoverStaleEodUpdates();
   const today = new Date(`${businessDate()}T00:00:00.000Z`);
-  const pending = await prisma.eodDevicePriceUpdate.findMany({
+  const candidates = await prisma.eodDevicePriceUpdate.findMany({
     where: { status: { in: ['PENDING', 'FAILED'] }, businessDate: { lte: today }, attempts: { lt: 8 } },
-    select: { id: true },
+    select: { id: true, businessDate: true, scheduledTime: true },
     orderBy: { createdAt: 'asc' },
   });
 
+  const pending = candidates.filter(update =>
+    update.businessDate < today || (update.businessDate.getTime() === today.getTime() && isEodDue(new Date(), update.scheduledTime)),
+  );
   let applied = 0;
   let failed = 0;
   let skipped = 0;

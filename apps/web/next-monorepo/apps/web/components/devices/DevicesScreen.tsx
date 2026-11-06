@@ -62,7 +62,7 @@ function gameDiffersFromCatalog(game: GamePriceView): boolean {
 function EodStatus({ update }: { update: EodPriceUpdate }) {
   const label = update.status === "PENDING" ? "Scheduled" : update.status === "PROCESSING" ? "Applying" : update.status === "APPLIED" ? "Applied" : "Failed"
   const tone = update.status === "FAILED" ? "text-destructive" : update.status === "APPLIED" ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"
-  return <span className={`text-xs font-medium ${tone}`} title={update.lastError ?? undefined}>{label}: {inr.format(update.price)}</span>
+  return <span className={`text-xs font-medium ${tone}`} title={update.lastError ?? undefined}>{label}: {inr.format(update.price)} · {update.businessDate} {update.scheduledTime}</span>
 }
 
 const TABS = [
@@ -848,6 +848,7 @@ function DeviceGamePriceEditor({
   const [price, setPrice] = React.useState(String(scheduledUpdate?.price ?? game.effectivePrice))
   const [replayPrice, setReplayPrice] = React.useState(String(scheduledUpdate?.replayPrice ?? game.effectiveReplayPrice))
   const [scheduledDate, setScheduledDate] = React.useState(scheduledUpdate?.businessDate ?? defaultScheduledDate())
+  const [scheduledTime, setScheduledTime] = React.useState(scheduledUpdate?.scheduledTime ?? eodMeta.runTime)
   const [confirmingCatalog, setConfirmingCatalog] = React.useState(false)
   const requestMutation = useMutation({
     mutationFn: () => requestDeviceGamePrice(deviceId, game.gameId, {
@@ -880,12 +881,13 @@ function DeviceGamePriceEditor({
         price: Number(price),
         replay_price: Number(replayPrice),
         scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
         scope: "DEVICE",
       }),
     onSuccess: async result => {
       toast.success(
         result.status === "PENDING"
-          ? `${result.displayName} scheduled for ${result.scheduledDate ?? scheduledDate} at the EOD run (${eodMeta.runTime} ${eodMeta.timezone}) on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
+          ? `${result.displayName} scheduled for ${result.scheduledDate ?? scheduledDate} at ${result.scheduledTime ?? scheduledTime} ${eodMeta.timezone} on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
           : `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
       )
       await onSaved()
@@ -936,9 +938,9 @@ function DeviceGamePriceEditor({
         <p className="text-sm text-muted-foreground">
           {requestOnly
             ? "Your request will be sent to the Company master admin for approval."
-            : <>Current live price: <span className="font-medium text-foreground">{inr.format(game.effectivePrice)}</span> / replay {inr.format(game.effectiveReplayPrice)}. The price below is the scheduled EOD price; it will apply to only <span className="font-mono text-xs">{deviceId}</span> on its scheduled date at the EOD run ({eodMeta.runTime} {eodMeta.timezone}).</>}
+            : <>Current live price: <span className="font-medium text-foreground">{inr.format(game.effectivePrice)}</span> / replay {inr.format(game.effectiveReplayPrice)}. The price below is scheduled for only <span className="font-mono text-xs">{deviceId}</span> at the selected date and time.</>}
         </p>
-        {!requestOnly && <p role="note" className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"><strong>Apply now</strong> changes this device immediately. <strong>Scheduled</strong> applies it on the selected calendar date at the EOD run ({eodMeta.runTime} {eodMeta.timezone}).</p>}
+        {!requestOnly && <p role="note" className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"><strong>Apply now</strong> changes this device immediately. <strong>Scheduled</strong> applies it at the selected date and time ({eodMeta.timezone}) after device verification.</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">
@@ -969,20 +971,17 @@ function DeviceGamePriceEditor({
         </label>
       </div>
       {!requestOnly && (
-        <label className="mt-4 block space-y-1.5 text-sm">
-          <span>Scheduled date</span>
-          <input
-            type="date"
-            required
-            className={inputClass}
-            min={localDateKey(new Date())}
-            value={scheduledDate}
-            onChange={event => setScheduledDate(event.target.value)}
-          />
-          <span className="block text-xs text-muted-foreground">
-            Applied on the selected date at the EOD run ({eodMeta.runTime} {eodMeta.timezone}).
-          </span>
-        </label>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1.5 text-sm">
+            <span>Scheduled date</span>
+            <input type="date" required className={inputClass} min={localDateKey(new Date())} value={scheduledDate} onChange={event => setScheduledDate(event.target.value)} />
+          </label>
+          <label className="space-y-1.5 text-sm">
+            <span>Scheduled time</span>
+            <input type="time" required className={inputClass} value={scheduledTime} onChange={event => setScheduledTime(event.target.value)} />
+          </label>
+          <span className="block text-xs text-muted-foreground sm:col-span-2">Applied at the selected date and time ({eodMeta.timezone}). Default: {eodMeta.runTime}.</span>
+        </div>
       )}
       {(requestMutation.isError || catalogMutation.isError || deviceMutation.isError || applyNowMutation.isError) && (
         <p role="alert" className="mt-3 text-sm text-destructive">

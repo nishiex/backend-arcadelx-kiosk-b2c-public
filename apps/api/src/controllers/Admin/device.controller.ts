@@ -190,13 +190,14 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
       price: body.data.price, replayPrice: body.data.replay_price ?? game.effectiveReplayPrice, createdById: req.user!.id,
       ...(body.data.scheduled_date ? { scheduledDate: body.data.scheduled_date } : {}),
+      ...(body.data.scheduled_time ? { scheduledTime: body.data.scheduled_time } : {}),
     });
     const scheduledDate = update.businessDate.toISOString().slice(0, 10);
     return res.status(202).json(new ApiResponse(202, {
       deviceId: params.data.deviceId, gameId: game.gameId, displayName: game.displayName,
       currentPrice: game.effectivePrice, currentReplayPrice: game.effectiveReplayPrice,
       price: Number(update.price), replayPrice: Number(update.replayPrice), status: update.status,
-      scheduledDate, scheduledFor: eodRunForDate(scheduledDate), timezone: BUSINESS_TIMEZONE, updateId: update.id,
+      scheduledDate, scheduledTime: update.scheduledTime, scheduledFor: eodRunForDate(scheduledDate, new Date(), update.scheduledTime), timezone: BUSINESS_TIMEZONE, updateId: update.id,
     }, 'Device game price scheduled for EOD application'));
   }
   const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));

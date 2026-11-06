@@ -172,7 +172,7 @@ export async function fetchDevicePrices(
   return handleRes<{ deviceId: string; games: GamePriceView[]; kioskStatus: string | null; eod: Record<string, EodPriceUpdate | null>; eodMeta: { timezone: string; runTime: string; nextExecutionAt: string } }>(res)
 }
 
-export type EodPriceUpdate = { id: string; businessDate: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
+export type EodPriceUpdate = { id: string; businessDate: string; scheduledTime: string; status: "PENDING" | "PROCESSING" | "APPLIED" | "FAILED"; price: number; replayPrice: number; attempts: number; lastError: string | null; appliedAt: string | null; createdAt: string }
 
 export type ResetDevicePricesResult = {
   deviceId: string
@@ -199,6 +199,7 @@ export type SetDeviceGamePriceResult = {
   appliedNow?: boolean
   supersededSchedules?: number
   scheduledDate?: string
+  scheduledTime?: string
   updateId?: string
 }
 
@@ -267,7 +268,7 @@ export async function rejectDevicePriceRequest(requestId: string, reason: string
 export async function setDeviceGamePrice(
   deviceId: string,
   gameId: string,
-  input: { price: number; replay_price: number; scheduled_date?: string; scope?: "DEVICE" | "GAME_CATALOG"; apply_now?: boolean }
+  input: { price: number; replay_price: number; scheduled_date?: string; scheduled_time?: string; scope?: "DEVICE" | "GAME_CATALOG"; apply_now?: boolean }
 ): Promise<SetDeviceGamePriceResult> {
   const res = await apiFetch(
     `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/price`,
