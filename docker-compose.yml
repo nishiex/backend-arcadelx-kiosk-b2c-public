@@ -25,9 +25,9 @@ services:
       INVOICES_DIR: /app/apps/api/invoices
       # Never let destructive maintenance endpoints into a container by accident.
       LOCAL_DATABASE_WIPE_ENABLED: "false"
-      # In development the in-process EOD timer starts anyway (apps/api/src/server.ts);
-      # this flag only governs the non-development path.
-      EOD_PRICE_JOBS_ENABLED: "false"
+      # Let the Jenkins-provisioned .env enable scheduled price updates. Keep the
+      # safe default off for local stacks that do not intentionally use Redis jobs.
+      EOD_PRICE_JOBS_ENABLED: ${EOD_PRICE_JOBS_ENABLED:-false}
     extra_hosts:
       # Makes host.docker.internal available on Linux too, for a DB on the host.
       - "host.docker.internal:host-gateway"
