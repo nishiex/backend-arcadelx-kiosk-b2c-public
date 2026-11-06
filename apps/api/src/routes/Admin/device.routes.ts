@@ -36,7 +36,7 @@ router.use(requireAuth, loadMembership);
 
 // Company admins review Distributor requests; Distributor admins review requests from
 // their connected Partners. Partners never receive an approval action.
-router.get('/price-requests', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), getDevicePriceRequests);
+router.get('/price-requests', requireOrgType('COMPANY', 'DISTRIBUTOR', 'PARTNER'), requireRole('OWNER', 'ADMIN', 'MANAGER'), getDevicePriceRequests);
 router.patch('/price-requests/:requestId/approve', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), approveDevicePriceRequest);
 router.patch('/price-requests/:requestId/reject', requireOrgType('COMPANY'), requireRole('OWNER', 'ADMIN'), rejectDevicePriceRequest);
 

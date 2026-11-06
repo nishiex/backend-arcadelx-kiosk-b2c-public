@@ -282,7 +282,7 @@ function serializePriceRequest(request: {
 }
 
 export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Response) => {
-  assertPriceRequestReviewer(req);
+  assertPriceRequestViewer(req);
   // A crashed approval must not leave a request invisible forever.
   await prisma.devicePriceRequest.updateMany({
     where: {
@@ -291,14 +291,14 @@ export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Res
     },
     data: { status: 'PENDING', processingAt: null, reviewNote: 'Previous approval attempt timed out; ready to retry.' },
   });
-  const requests = await prisma.devicePriceRequest.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
+  const requestInclude = {
       requesterOrg: { select: { id: true, name: true, type: true } },
       requestedBy: { select: { id: true, name: true, email: true } },
       reviewedBy: { select: { id: true, name: true } },
-    },
-  });
+  } as const;
+  const requests = req.membership!.type === 'COMPANY'
+    ? await prisma.devicePriceRequest.findMany({ orderBy: { createdAt: 'desc' }, include: requestInclude })
+    : await prisma.devicePriceRequest.findMany({ where: { requesterOrgId: req.membership!.organizationId }, orderBy: { createdAt: 'desc' }, include: requestInclude });
   const visibleRequests = [];
   for (const request of requests) {
     // A Distributor also sees its own submissions read-only so it can tell what is still
@@ -340,8 +340,17 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
     }
     const ownedKiosk = await prisma.kiosk.findFirst({
       where: {
-        currentOrgId: { in: requesterOrgIds },
-        OR: [{ externalDeviceId: request.deviceId }, { machineCode: request.deviceId }],
+        AND: [
+          { OR: [{ externalDeviceId: request.deviceId }, { machineCode: request.deviceId }] },
+          // currentOrgId is the fast path, but the active assignment ledger is the
+          // source of truth for machines moved through Distributor/Partner delivery.
+          {
+            OR: [
+              { currentOrgId: { in: requesterOrgIds } },
+              { assignments: { some: { organizationId: { in: requesterOrgIds }, assignedTo: null } } },
+            ],
+          },
+        ],
       },
       select: { id: true, status: true },
     });
@@ -386,6 +395,12 @@ export const rejectDevicePriceRequest = asyncHandler(async (req: Request, res: R
 function assertPriceRequestReviewer(req: Request) {
   if (!req.membership || !['COMPANY', 'DISTRIBUTOR'].includes(req.membership.type) || !['OWNER', 'ADMIN'].includes(req.membership.role)) {
     throw new ApiError(403, 'Only Company or Distributor admins can review price requests');
+  }
+}
+
+function assertPriceRequestViewer(req: Request) {
+  if (!req.membership || !['COMPANY', 'DISTRIBUTOR', 'PARTNER'].includes(req.membership.type) || !['OWNER', 'ADMIN', 'MANAGER'].includes(req.membership.role)) {
+    throw new ApiError(403, 'Only organization owners, admins, or managers can view price requests');
   }
 }
 
