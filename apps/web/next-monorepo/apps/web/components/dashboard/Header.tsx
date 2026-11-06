@@ -41,6 +41,9 @@ export default function Header() {
   const bellRef = React.useRef<HTMLButtonElement>(null)
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
   const canReview = me?.membership?.status === "ACTIVE" && isOwnerOrAdmin
+  const canViewPriceRequests = me?.membership?.status === "ACTIVE" &&
+    (isOwnerOrAdmin || role === "MANAGER") &&
+    ["COMPANY", "DISTRIBUTOR", "PARTNER"].includes(me.membership.organization.type)
   // A Company reviews connections and agreements per distributor under Distributors →
   // View More. Everyone else uses the Requests page, which is the only surface their org
   // type can reach -- Distributors is COMPANY-only, and accepting a connection requires
@@ -89,7 +92,7 @@ export default function Header() {
   const priceRequests = useQuery({
     queryKey: ["device-price-requests", "header"],
     queryFn: fetchDevicePriceRequests,
-    enabled: canReview && isCompany,
+    enabled: canViewPriceRequests,
     refetchInterval: 10_000,
   })
 
@@ -158,6 +161,27 @@ export default function Header() {
     })
   }
 
+  // Requesters do not need email or a separate notification table: while their
+  // dashboard is open, poll their own request status and announce a new decision.
+  const previousPriceStatuses = React.useRef<Map<string, string> | null>(null)
+  React.useEffect(() => {
+    const requests = priceRequests.data?.requests
+    if (!requests) return
+    const current = new Map(requests.map(request => [request.id, request.status]))
+    const previous = previousPriceStatuses.current
+    if (previous && !isCompany) {
+      requests.forEach(request => {
+        const oldStatus = previous.get(request.id)
+        if (oldStatus && oldStatus !== request.status && request.status === "APPROVED") {
+          toast.success("Price request approved", { description: `${request.displayName} on ${request.deviceId}` })
+        } else if (oldStatus && oldStatus !== request.status && request.status === "REJECTED") {
+          toast.error("Price request rejected", { description: `${request.displayName} on ${request.deviceId}` })
+        }
+      })
+    }
+    previousPriceStatuses.current = current
+  }, [priceRequests.data, isCompany])
+
   const total = notices.reduce((sum, notice) => sum + notice.count, 0)
   // "All caught up" may only appear once every queue we asked about has answered;
   // otherwise an in-flight request reads as no outstanding work. Disabled queries
@@ -165,8 +189,9 @@ export default function Header() {
   const queuesLoading =
     loadingMe ||
     (canManageMembers && members.isLoading) ||
-    (canReview &&
-      (incomingConnections.isLoading || pendingAgreements.isLoading || readiness.isLoading || orders.isLoading || priceRequests.isLoading))
+      (canReview &&
+      (incomingConnections.isLoading || pendingAgreements.isLoading || readiness.isLoading || orders.isLoading)) ||
+    (canViewPriceRequests && priceRequests.isLoading)
 
   // Surface every pending notification as a popup when it first arrives or grows.
   // Keep the bell/dropdown as the persistent detail view, but do not make users open it
