@@ -41,6 +41,10 @@ export type Permissions = {
   canViewRevenue: boolean
   /** Payment gateway administration is COMPANY + OWNER/ADMIN only. */
   canManageGateways: boolean
+  /** Company video ads: any active Company member may read the library. */
+  canViewAds: boolean
+  /** Uploading, editing and deleting ads is COMPANY + OWNER/ADMIN only. */
+  canManageAds: boolean
   /** Devices are visible for the current org; Company fleet visibility is master-admin only. */
   canViewDevices: boolean
   /** Company master admins may apply prices; other orgs may submit requests. */
@@ -112,6 +116,8 @@ export function useMe(): Permissions {
       (isOwnerOrAdmin || role === "MANAGER") &&
       (isCompany || isDistributor || orgType === "PARTNER"),
     canManageGateways: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
+    canViewAds: !isError && me?.membership?.status === "ACTIVE" && isCompany,
+    canManageAds: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     /**
      * The Mothership device fleet is operational data the whole network already sees, so it
      * matches the revenue read scope: COMPANY/DISTRIBUTOR/PARTNER OWNER/ADMIN/MANAGER.

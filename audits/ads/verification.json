@@ -1,0 +1,292 @@
+{
+  "verifiedAt": "2026-11-12T08:11:21.569Z",
+  "database": "arcadelx_ads_verify (localhost:5433, scratch)",
+  "uploadRoot": "C:\\Users\\Abcom\\AppData\\Local\\Temp\\arcadelx-ads-verify-1794471076586",
+  "limits": {
+    "maxVideoSizeBytes": 1048576,
+    "maxChunkSizeBytes": 262144
+  },
+  "passed": 36,
+  "failed": 0,
+  "failures": [],
+  "checks": [
+    {
+      "name": "anonymous list is rejected",
+      "ok": true,
+      "detail": 401
+    },
+    {
+      "name": "company owner can log in",
+      "ok": true,
+      "detail": 200
+    },
+    {
+      "name": "a company admin can log in",
+      "ok": true,
+      "detail": 200
+    },
+    {
+      "name": "distributor can log in",
+      "ok": true,
+      "detail": 200
+    },
+    {
+      "name": "distributor is refused by the COMPANY gate",
+      "ok": true,
+      "detail": 403
+    },
+    {
+      "name": "upload config reflects the configured limits",
+      "ok": true,
+      "detail": {
+        "maxVideoSizeBytes": 1048576,
+        "maxChunkSizeBytes": 262144,
+        "allowedMimeTypes": [
+          "video/mp4",
+          "video/webm",
+          "video/quicktime",
+          "video/x-msvideo",
+          "video/x-matroska"
+        ],
+        "allowedExtensions": [
+          ".mp4",
+          ".webm",
+          ".mov",
+          ".avi",
+          ".mkv"
+        ]
+      }
+    },
+    {
+      "name": "oversized video is rejected with 413",
+      "ok": true,
+      "detail": 413
+    },
+    {
+      "name": "non-video MIME type is rejected",
+      "ok": true,
+      "detail": 400
+    },
+    {
+      "name": "extension/MIME mismatch is rejected as 415",
+      "ok": true,
+      "detail": 415
+    },
+    {
+      "name": "upload starts with three chunks",
+      "ok": true,
+      "detail": {
+        "uploadId": "5090e12b-120d-4f60-b8b0-25a450cc0416",
+        "chunkSize": 262144,
+        "totalChunks": 3,
+        "totalSize": 700000,
+        "maxVideoSizeBytes": 1048576,
+        "expiresInMs": 21600000
+      }
+    },
+    {
+      "name": "out-of-order chunks are accepted",
+      "ok": true,
+      "detail": [
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "name": "a retried chunk is idempotent",
+      "ok": true,
+      "detail": {
+        "uploadId": "5090e12b-120d-4f60-b8b0-25a450cc0416",
+        "receivedChunks": 3,
+        "totalChunks": 3,
+        "complete": true
+      }
+    },
+    {
+      "name": "a short chunk is rejected",
+      "ok": true,
+      "detail": 400
+    },
+    {
+      "name": "an anonymous chunk write is rejected",
+      "ok": true,
+      "detail": 401
+    },
+    {
+      "name": "an upload session is bound to the user who created it",
+      "ok": true,
+      "detail": 404
+    },
+    {
+      "name": "ad is created from the upload session",
+      "ok": true,
+      "detail": {
+        "statusCode": 201,
+        "data": {
+          "id": "685cc8b0-ad47-4c82-a672-04be11c176f6",
+          "title": "Summer promo",
+          "description": "Played on the front-row machines",
+          "originalFilename": "clip.mp4",
+          "mimeType": "video/mp4",
+          "videoSizeBytes": 700000,
+          "durationSeconds": null,
+          "status": "ACTIVE",
+          "videoUrl": "/api/ads/685cc8b0-ad47-4c82-a672-04be11c176f6/video",
+          "kioskIds": [
+            "a6062373-975f-4d44-9974-898c56b1969d"
+          ],
+          "createdAt": "2026-11-12T08:11:20.791Z",
+          "updatedAt": "2026-11-12T08:11:20.791Z"
+        },
+        "message": "Ad created",
+        "success": true
+      }
+    },
+    {
+      "name": "server-derived size and kiosk assignment are returned",
+      "ok": true,
+      "detail": {
+        "id": "685cc8b0-ad47-4c82-a672-04be11c176f6",
+        "title": "Summer promo",
+        "description": "Played on the front-row machines",
+        "originalFilename": "clip.mp4",
+        "mimeType": "video/mp4",
+        "videoSizeBytes": 700000,
+        "durationSeconds": null,
+        "status": "ACTIVE",
+        "videoUrl": "/api/ads/685cc8b0-ad47-4c82-a672-04be11c176f6/video",
+        "kioskIds": [
+          "a6062373-975f-4d44-9974-898c56b1969d"
+        ],
+        "createdAt": "2026-11-12T08:11:20.791Z",
+        "updatedAt": "2026-11-12T08:11:20.791Z"
+      }
+    },
+    {
+      "name": "stored filename is server-minted and path-safe",
+      "ok": true,
+      "detail": "703180c9-4a56-41d1-b272-e7511d27fdf1-1794471080785.mp4"
+    },
+    {
+      "name": "full video streams with the stored type and exact length",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "type": "video/mp4",
+        "length": 700000
+      }
+    },
+    {
+      "name": "a byte range returns 206 with the requested slice",
+      "ok": true,
+      "detail": {
+        "status": 206,
+        "range": "bytes 100-199/700000",
+        "length": 100
+      }
+    },
+    {
+      "name": "a suffix range returns the tail of the file",
+      "ok": true,
+      "detail": {
+        "status": 206,
+        "length": 100
+      }
+    },
+    {
+      "name": "an out-of-bounds range is rejected with 416",
+      "ok": true,
+      "detail": 416
+    },
+    {
+      "name": "the owning company sees its ad",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "a distributor cannot read a company ad",
+      "ok": true,
+      "detail": 403
+    },
+    {
+      "name": "a distributor cannot stream a company video",
+      "ok": true,
+      "detail": 403
+    },
+    {
+      "name": "an ad cannot be attached to a distributor-owned kiosk",
+      "ok": true,
+      "detail": {
+        "status": 400,
+        "message": "Kiosks are not owned by this organization: fe70502d-31a9-4e23-b636-9d7306cd0f20"
+      }
+    },
+    {
+      "name": "the rejected create left no orphaned video file",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "assignment to another company's kiosk is rejected",
+      "ok": true,
+      "detail": 400
+    },
+    {
+      "name": "assignment to a retired kiosk is rejected",
+      "ok": true,
+      "detail": 400
+    },
+    {
+      "name": "update replaces metadata and clears assignments with []",
+      "ok": true,
+      "detail": {
+        "id": "685cc8b0-ad47-4c82-a672-04be11c176f6",
+        "title": "Summer promo v2",
+        "description": "Played on the front-row machines",
+        "originalFilename": "clip.mp4",
+        "mimeType": "video/mp4",
+        "videoSizeBytes": 700000,
+        "durationSeconds": null,
+        "status": "ACTIVE",
+        "videoUrl": "/api/ads/685cc8b0-ad47-4c82-a672-04be11c176f6/video",
+        "kioskIds": [],
+        "createdAt": "2026-11-12T08:11:20.791Z",
+        "updatedAt": "2026-11-12T08:11:21.064Z"
+      }
+    },
+    {
+      "name": "an empty update is rejected",
+      "ok": true,
+      "detail": 400
+    },
+    {
+      "name": "an abandoned upload is swept and its chunks stop being accepted",
+      "ok": true,
+      "detail": {
+        "removed": 2,
+        "status": 404
+      }
+    },
+    {
+      "name": "ad is deleted",
+      "ok": true,
+      "detail": 200
+    },
+    {
+      "name": "the stored video file is removed from disk",
+      "ok": true,
+      "detail": "C:\\Users\\Abcom\\AppData\\Local\\Temp\\arcadelx-ads-verify-1794471076586\\703180c9-4a56-41d1-b272-e7511d27fdf1-1794471080785.mp4"
+    },
+    {
+      "name": "the deleted ad is no longer readable",
+      "ok": true,
+      "detail": 404
+    },
+    {
+      "name": "deleting twice returns 404",
+      "ok": true,
+      "detail": 404
+    }
+  ]
+}

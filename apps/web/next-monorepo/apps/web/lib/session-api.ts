@@ -25,13 +25,17 @@ export function waitForSessionRefresh(): Promise<boolean> {
   return refreshing ?? Promise.resolve(true)
 }
 
-export async function sessionApiFetch(input: string, init?: RequestInit): Promise<Response> {
+export async function sessionApiFetch(
+  input: string,
+  init?: RequestInit,
+  options?: { silent?: boolean },
+): Promise<Response> {
   const opts: RequestInit = { credentials: "include", ...init }
   // Every dashboard request must have a client-side deadline. Without this, a
   // stalled upstream request leaves React Query mutations pending indefinitely,
   // which makes action buttons look like the whole screen has frozen.
   if (!opts.signal) opts.signal = AbortSignal.timeout(API_REQUEST_TIMEOUT_MS)
-  const mutationToast = beginMutationToast(opts)
+  const mutationToast = options?.silent ? null : beginMutationToast(opts)
   try {
     const response = await fetch(input, opts)
     if (response.status !== 401 || /\/api\/auth\/(login|refresh|logout)/.test(input)) return response
