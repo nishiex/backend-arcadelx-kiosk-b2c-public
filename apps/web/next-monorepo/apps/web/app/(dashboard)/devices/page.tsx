@@ -1,9 +1,6 @@
-import DevicesScreen from "@/components/devices/DevicesScreen"
+import { permanentRedirect } from "next/navigation"
 
-export const metadata = {
-  title: "Devices · ArcadeLX",
-}
-
-export default function DevicesPage() {
-  return <DevicesScreen />
+/** Keeps bookmarks and links to the former Devices URL working. */
+export default function DevicesRedirectPage() {
+  permanentRedirect("/device-management")
 }
