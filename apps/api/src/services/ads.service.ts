@@ -305,6 +305,9 @@ export async function writeChunk(input: ChunkInput): Promise<{
   uploadId: string;
   receivedChunks: number;
   totalChunks: number;
+  /** Echoed so a single-call client can size its next request without reading the session. */
+  chunkSize: number;
+  totalSize: number;
   complete: boolean;
 }> {
   await ensureStorageReady();
@@ -342,6 +345,8 @@ export async function writeChunk(input: ChunkInput): Promise<{
     uploadId: session.uploadId,
     receivedChunks: session.received.length,
     totalChunks: session.totalChunks,
+    chunkSize: session.chunkSize,
+    totalSize: session.totalSize,
     complete: session.received.length === session.totalChunks,
   };
 }

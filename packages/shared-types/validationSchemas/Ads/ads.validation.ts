@@ -22,6 +22,10 @@ export const UpdateAdSchema = z
     // Omitted: keep the current assignments. []: detach from every kiosk.
     // [...]: replace the set with exactly these kiosks.
     kioskIds: KioskIdListSchema.optional(),
+    // A finished upload session whose bytes replace this ad's video. The stored filename,
+    // size and MIME type all come from that session, exactly like create — never from the
+    // body. Without this field the existing video is left untouched.
+    uploadId: z.string().uuid().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: 'No fields to update' });
 export type UpdateAdInput = z.infer<typeof UpdateAdSchema>;

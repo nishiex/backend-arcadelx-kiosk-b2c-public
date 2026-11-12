@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { createReadStream } from 'node:fs';
+import { Readable } from 'node:stream';
 import { prisma } from '../../utils/db';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
@@ -43,6 +44,10 @@ function toAdResponse(ad: AdWithKiosks) {
     durationSeconds: ad.durationSeconds,
     status: ad.status,
     videoUrl: `/api/ads/${ad.id}/video`,
+    // The mobile contract plays videos as `/api/v1/ads/files/<filename>`, so the list has to
+    // say which filename a row is addressed by. This is the server-minted on-disk name, not
+    // a path: the files route re-checks organization scope and re-validates the shape.
+    filename: ad.videoFilename,
     kioskIds: ad.adKiosks.map((link) => link.kioskId),
     createdAt: ad.createdAt,
     updatedAt: ad.updatedAt,
@@ -217,11 +222,11 @@ export const createAd = asyncHandler(async (req: Request, res: Response) => {
 export const updateAd = asyncHandler(async (req: Request, res: Response) => {
   const { id } = AdIdParamSchema.parse(req.params);
   const body = UpdateAdSchema.parse(req.body);
-  const { organizationId } = actor(req);
+  const { organizationId, userId } = actor(req);
 
   const existing = await prisma.ad.findFirst({
     where: { id, organizationId },
-    select: { id: true },
+    select: { id: true, videoFilename: true },
   });
   if (!existing) throw new ApiError(404, 'Ad not found');
 
@@ -230,25 +235,58 @@ export const updateAd = asyncHandler(async (req: Request, res: Response) => {
     ? undefined
     : await resolveOwnedKiosks(organizationId, body.kioskIds);
 
+  // A replacement video is finalised before the row is touched: the stored filename and the
+  // measured size/MIME type come from the upload session, never from the request body.
+  const replacement = body.uploadId
+    ? await ads.completeUpload({ uploadId: body.uploadId, organizationId, userId })
+    : null;
+
   const data: Prisma.AdUpdateInput = {};
   if (body.title !== undefined) data.title = body.title;
   if (body.description !== undefined) data.description = body.description;
   if (body.status !== undefined) data.status = body.status;
+  if (replacement) {
+    data.videoFilename = replacement.videoFilename;
+    data.originalFilename = replacement.originalFilename;
+    data.mimeType = replacement.mimeType;
+    data.videoSizeBytes = replacement.videoSizeBytes;
+  }
 
-  const ad = await prisma.$transaction(async (tx) => {
-    await tx.ad.update({ where: { id }, data });
+  const ad = await prisma
+    .$transaction(async (tx) => {
+      await tx.ad.update({ where: { id }, data });
 
-    if (kioskIds !== undefined) {
-      await tx.adKiosk.deleteMany({ where: { adId: id } });
-      if (kioskIds.length > 0) {
-        await tx.adKiosk.createMany({
-          data: kioskIds.map((kioskId) => ({ adId: id, kioskId })),
-        });
+      if (kioskIds !== undefined) {
+        await tx.adKiosk.deleteMany({ where: { adId: id } });
+        if (kioskIds.length > 0) {
+          await tx.adKiosk.createMany({
+            data: kioskIds.map((kioskId) => ({ adId: id, kioskId })),
+          });
+        }
       }
-    }
 
-    return tx.ad.findUniqueOrThrow({ where: { id }, include: adInclude });
-  });
+      return tx.ad.findUniqueOrThrow({ where: { id }, include: adInclude });
+    })
+    .catch(async (error: unknown) => {
+      // The new bytes are stored but nothing references them; drop them so a failed update
+      // cannot leak storage. The old file is still the one the row points at.
+      if (replacement) {
+        await ads.deleteVideoFile(replacement.videoFilename).catch(() => undefined);
+      }
+      throw error;
+    });
+
+  // Only after the row points at the new file may the old one be removed; the reverse order
+  // would leave an ad referencing a file that no longer exists.
+  if (replacement && existing.videoFilename !== replacement.videoFilename) {
+    await ads.deleteVideoFile(existing.videoFilename).catch((error: unknown) => {
+      console.error('[ads] replaced video could not be deleted', {
+        adId: id,
+        videoFilename: existing.videoFilename,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   return res.status(200).json(new ApiResponse(200, toAdResponse(ad), 'Ad updated'));
 });
@@ -284,6 +322,140 @@ export const deleteAd = asyncHandler(async (req: Request, res: Response) => {
  * so this implements RFC 7233 single-range responses rather than res.sendFile's defaults.
  * The MIME type is the one validated at upload time, never a client-supplied header.
  */
+/**
+ * One multipart chunk for clients written against the mobile contract
+ * (`POST /api/v1/ads/upload-chunk`).
+ *
+ * The session, offsets and validation are the same objects the `/uploads` + `PUT
+ * .../chunks/:index` pair uses; only the transport differs, because mobile clients send a
+ * single multipart request per chunk. The first request carries `filename`, `mimeType` and
+ * `totalSize` and starts the session; later ones carry `uploadId` and `chunkIndex`. The
+ * chunk is whichever file part arrives, so a client is free to name the field `file` or
+ * `chunk`, and aliases (`originalFilename`, `chunk_index`, `total_size`) are accepted for
+ * the snake_case clients.
+ *
+ * Completion is reported, not acted on: creating the ad still happens through
+ * `POST /api/v1/ads` with this `uploadId`, so the row and its metadata are minted in one
+ * place.
+ */
+const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+
+type MultipartChunk = {
+  fields: Map<string, string>;
+  file: { filename: string; mimeType: string; data: Buffer } | null;
+};
+
+async function readMultipartChunk(req: Request): Promise<MultipartChunk> {
+  const contentType = String(req.headers['content-type'] ?? '');
+  if (!contentType.toLowerCase().startsWith('multipart/form-data')) {
+    throw new ApiError(415, 'Expected multipart/form-data');
+  }
+
+  // Reject an oversized body before buffering it. The declared length is the only size the
+  // request states up front; a chunked upload is still bounded by the per-chunk write below.
+  const declaredLength = Number(req.headers['content-length'] ?? 0);
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > ads.maxChunkSizeBytes() + MULTIPART_OVERHEAD_BYTES
+  ) {
+    throw new ApiError(413, 'Chunk exceeds the configured chunk size');
+  }
+
+  // The platform parser, not a new dependency: the Express request is a Node stream and a
+  // WHATWG Request accepts it with `duplex: 'half'`.
+  const request = new globalThis.Request('http://upload.local/chunk', {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body: Readable.toWeb(req) as ReadableStream<Uint8Array>,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' });
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new ApiError(400, 'Malformed multipart body');
+  }
+
+  const fields = new Map<string, string>();
+  let file: MultipartChunk['file'] = null;
+  for (const [name, value] of form.entries()) {
+    if (typeof value === 'string') {
+      fields.set(name, value);
+      continue;
+    }
+    // Only the first file part is the chunk; extra parts are ignored rather than guessed at.
+    if (!file) {
+      file = {
+        filename: value.name || 'chunk',
+        mimeType: value.type || '',
+        data: Buffer.from(await value.arrayBuffer()),
+      };
+    }
+  }
+
+  return { fields, file };
+}
+
+export const uploadChunkMultipart = asyncHandler(async (req: Request, res: Response) => {
+  const { organizationId, userId } = actor(req);
+  const { fields, file } = await readMultipartChunk(req);
+  if (!file || file.data.length === 0) {
+    throw new ApiError(400, 'A chunk file part is required');
+  }
+
+  const chunkIndex = Number(fields.get('chunkIndex') ?? fields.get('chunk_index') ?? '0');
+  if (!Number.isInteger(chunkIndex) || chunkIndex < 0) {
+    throw new ApiError(400, 'chunkIndex must be a non-negative integer');
+  }
+
+  let uploadId = (fields.get('uploadId') ?? fields.get('upload_id') ?? '').trim();
+  let started: Awaited<ReturnType<typeof ads.initUpload>> | null = null;
+
+  if (!uploadId) {
+    const totalSizeRaw = fields.get('totalSize') ?? fields.get('total_size');
+    // A single-part upload sends no totalSize; the chunk itself is the whole video.
+    const totalSize = totalSizeRaw ? Number(totalSizeRaw) : file.data.length;
+    started = await ads.initUpload({
+      organizationId,
+      userId,
+      originalFilename:
+        fields.get('filename') ?? fields.get('originalFilename') ?? file.filename,
+      mimeType: fields.get('mimeType') ?? fields.get('mime_type') ?? file.mimeType,
+      totalSize,
+    });
+    uploadId = started.uploadId;
+  }
+
+  const result = await ads.writeChunk({
+    uploadId,
+    chunkIndex,
+    chunk: file.data,
+    organizationId,
+    userId,
+  });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        uploadId: result.uploadId,
+        chunkIndex,
+        chunkSize: result.chunkSize,
+        totalChunks: result.totalChunks,
+        totalSize: result.totalSize,
+        receivedChunks: result.receivedChunks,
+        complete: result.complete,
+        maxVideoSizeBytes: started?.maxVideoSizeBytes ?? null,
+        expiresInMs: started?.expiresInMs ?? null,
+      },
+      result.complete
+        ? 'Upload complete; create the ad with this uploadId'
+        : 'Chunk stored',
+    ),
+  );
+});
+
 export const streamAdVideo = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = AdIdParamSchema.parse(req.params);
@@ -302,10 +474,18 @@ export const streamAdVideo = asyncHandler(
     const { filePath, size } = await ads.statVideo(ad.videoFilename);
 
     const safeName = ad.originalFilename.replace(/[^\w.\-]+/g, '_') || 'ad.mp4';
+    // `?download=1` turns the same stream into a save-file response. Range handling stays
+    // identical, so a resumable download works exactly like playback.
+    const asAttachment = ['1', 'true', 'yes'].includes(
+      String(req.query.download ?? '').trim().toLowerCase(),
+    );
     res.setHeader('Content-Type', ad.mimeType);
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `${asAttachment ? 'attachment' : 'inline'}; filename="${safeName}"`,
+    );
     res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
 
     const range = req.headers.range;
@@ -359,5 +539,29 @@ export const streamAdVideo = asyncHandler(
       else next(error);
     });
     stream.pipe(res);
+  },
+);
+
+/**
+ * Filename-addressed playback for clients written against the `/api/v1` contract.
+ *
+ * The stored name goes through the storage module's single choke point, so this route
+ * cannot be used to reach another path, and the lookup is organization-scoped: an ad in
+ * another company answers 404 exactly like a missing one. Range handling, headers and MIME
+ * enforcement stay in `streamAdVideo`; this only resolves the id it needs.
+ */
+export const streamAdVideoByFilename = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const filename = ads.assertStoredFilename(String(req.params.filename ?? ''));
+    const { organizationId } = actor(req);
+
+    const ad = await prisma.ad.findFirst({
+      where: { videoFilename: filename, organizationId },
+      select: { id: true },
+    });
+    if (!ad) throw new ApiError(404, 'Ad not found');
+
+    req.params.id = ad.id;
+    await streamAdVideo(req, res, next);
   },
 );

@@ -13,6 +13,7 @@ import {
   SetDeviceGamePriceResultSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
 import {
+  attachLibraryAds,
   getDevicePrices,
   listDevices,
   resetDevicePrices,
@@ -39,7 +40,25 @@ import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, eodRunForDate,
 export const getDevices = asyncHandler(async (_req: Request, res: Response) => {
   const req = _req;
   const { devices: upstreamDevices, lastUpdated } = await listDevices();
-  const devices = await visibleDevices(req, upstreamDevices);
+  const visible = await visibleDevices(req, upstreamDevices);
+  // Each kiosk reports the ad files it holds, but no upstream route serves those bytes.
+  // The one streamable copy this deployment owns is the Company ad library, so resolve
+  // every reported name against it. A non-Company caller owns no ads, so the lookup is
+  // simply empty and nothing leaks: the URLs are only minted for rows found in the
+  // caller's own organization.
+  const reportedFiles = [
+    ...new Set(visible.flatMap((device) => device.ads.map((ad) => ad.file.trim()))),
+  ].filter(Boolean);
+  const library = reportedFiles.length
+    ? await prisma.ad.findMany({
+        where: {
+          organizationId: req.membership!.organizationId,
+          originalFilename: { in: reportedFiles, mode: 'insensitive' },
+        },
+        select: { id: true, originalFilename: true, videoFilename: true, status: true },
+      })
+    : [];
+  const devices = attachLibraryAds(visible, library);
   res
     .status(200)
     .json(
