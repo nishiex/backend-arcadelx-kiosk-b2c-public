@@ -51,7 +51,7 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone } },
   // Hardware as Mothership reports it. Read scope matches revenue; the price write inside
   // is COMPANY OWNER/ADMIN only.
-  { kind: "link", item: { name: "Devices", href: "/devices", icon: Cpu, show: (p) => p.canViewDevices } },
+  { kind: "link", item: { name: "Devices", href: "/device-management", icon: Cpu, show: (p) => p.canViewDevices } },
   {
     kind: "link",
     item: {

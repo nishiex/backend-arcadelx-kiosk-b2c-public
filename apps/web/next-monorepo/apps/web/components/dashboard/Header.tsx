@@ -155,7 +155,7 @@ export default function Header() {
     notices.push({
       key: "device-price-requests",
       label: "Game price requests",
-      href: "/devices",
+      href: "/device-management",
       count: pendingPriceRequests,
       icon: <Bell size={15} />,
     })
@@ -226,7 +226,7 @@ export default function Header() {
   const searchItems = [
     { label: "Dashboard", keywords: "home overview", href: "/", icon: <LayoutDashboard size={15} /> },
     { label: "Orders", keywords: "orders delivery", href: "/orders", icon: <ClipboardList size={15} /> },
-    { label: "Devices", keywords: "devices kiosks machines", href: "/devices", icon: <Monitor size={15} /> },
+    { label: "Devices", keywords: "devices kiosks machines", href: "/device-management", icon: <Monitor size={15} /> },
     { label: "Partners", keywords: "partners businesses", href: "/partners", icon: <UsersRound size={15} /> },
     { label: "Distributors", keywords: "distributors network", href: "/distributors", icon: <Building2 size={15} /> },
     { label: "Agreements", keywords: "agreements contracts", href: "/agreements", icon: <ScrollText size={15} /> },
