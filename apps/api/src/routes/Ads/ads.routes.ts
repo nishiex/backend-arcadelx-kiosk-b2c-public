@@ -9,8 +9,10 @@ import {
   initUpload,
   listAds,
   streamAdVideo,
+  streamAdVideoByFilename,
   updateAd,
   uploadChunk,
+  uploadChunkMultipart,
 } from '../../controllers/Ads/ad.controller';
 import { maxChunkSizeBytes } from '../../services/ads.service';
 
@@ -22,6 +24,10 @@ router.use(requireAuth, loadMembership, requireOrgType('COMPANY'));
 // Reads: any active Company member may inspect the library and preview a video.
 router.get('/config', getUploadConfig);
 router.get('/', listAds);
+// Filename-addressed playback for the `/api/v1` contract. Registered before `/:id/video`
+// so the literal `files` segment can never be read as an ad id.
+router.get('/files/:filename', streamAdVideoByFilename);
+router.post('/files', requireRole('OWNER', 'ADMIN'), uploadChunkMultipart);
 router.get('/:id', getAd);
 router.get('/:id/video', streamAdVideo);
 
@@ -38,8 +44,16 @@ router.put(
 );
 
 router.post('/', requireRole('OWNER', 'ADMIN'), createAd);
+// Mobile contract: one multipart request per chunk. Registers before `/:id` routes and
+// delegates to the same session helpers as the raw-bytes route above.
+router.post('/upload-chunk', requireRole('OWNER', 'ADMIN'), uploadChunkMultipart);
 router.delete('/uploads/:uploadId', requireRole('OWNER', 'ADMIN'), discardUploadSession);
 router.patch('/:id', requireRole('OWNER', 'ADMIN'), updateAd);
 router.delete('/:id', requireRole('OWNER', 'ADMIN'), deleteAd);
+
+// Compatibility aliases for clients that carry the action in the path. They delegate to
+// the PATCH/DELETE handlers above, so there is still exactly one implementation each.
+router.post('/:id/update', requireRole('OWNER', 'ADMIN'), updateAd);
+router.post('/:id/delete', requireRole('OWNER', 'ADMIN'), deleteAd);
 
 export default router;

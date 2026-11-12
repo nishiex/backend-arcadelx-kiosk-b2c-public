@@ -4,6 +4,7 @@ import {
   DevicePricesResponseSchema,
   GameCatalogResponseSchema,
   LauncherGamesResponseSchema,
+  type DeviceAdView,
   type DeviceView,
   type GamePriceView,
   type ResetDevicePricesResult,
@@ -147,8 +148,80 @@ export async function listDevices(): Promise<{ devices: DeviceView[]; lastUpdate
     lastSeen: device.last_seen ?? null,
     location: device.location ?? null,
     publicIp: device.public_ip ?? null,
+    // Reported ad files, metadata only until the controller resolves them against the
+    // Company ad library (this service has no organization in scope).
+    ads: (device.ads ?? []).map((ad) => ({
+      file: ad.file,
+      title: ad.title?.trim() || ad.file,
+      sizeBytes: ad.size ?? null,
+      version: ad.version ?? null,
+      managed: ad.managed === true,
+      startDate: ad.start_date?.trim() ? ad.start_date : null,
+      expiresOn: ad.expires_on?.trim() ? ad.expires_on : null,
+      inLibrary: false,
+      adId: null,
+      status: null,
+      playUrl: null,
+      downloadUrl: null,
+    })),
   }));
   return { devices, lastUpdated: null };
+}
+
+/** One ad in the Company library, as the fleet enrichment needs it. */
+export type LibraryAdMatch = {
+  id: string;
+  originalFilename: string;
+  videoFilename: string;
+  status: 'ACTIVE' | 'INACTIVE';
+};
+
+const libraryKey = (value: string): string => value.trim().toLowerCase();
+
+/**
+ * Resolve every device-reported ad file against the Company ad library.
+ *
+ * The kiosk names its files itself ("beat saber.webm"); the library stores the name the
+ * uploader used plus a server-minted on-disk name. Matching is therefore by original
+ * filename, case-insensitively, because the two sides are written by different systems.
+ *
+ * Only a matched file gets URLs. An unmatched one stays metadata with `inLibrary: false`:
+ * those bytes live on that machine and no route here can serve them, so a link that 404s
+ * would be worse than saying plainly that the file is not in the library.
+ *
+ * Re-uploading the same video leaves several rows with one name, so an ACTIVE row wins and
+ * the result never depends on database order.
+ */
+export function attachLibraryAds(
+  devices: DeviceView[],
+  library: LibraryAdMatch[],
+): DeviceView[] {
+  const byFilename = new Map<string, LibraryAdMatch>();
+  for (const ad of library) {
+    const key = libraryKey(ad.originalFilename);
+    if (!key) continue;
+    const existing = byFilename.get(key);
+    if (!existing || (existing.status !== 'ACTIVE' && ad.status === 'ACTIVE')) {
+      byFilename.set(key, ad);
+    }
+  }
+
+  return devices.map((device) => ({
+    ...device,
+    ads: device.ads.map((ad): DeviceAdView => {
+      const match = byFilename.get(libraryKey(ad.file));
+      if (!match) return ad;
+      const playUrl = `/api/ads/files/${encodeURIComponent(match.videoFilename)}`;
+      return {
+        ...ad,
+        inLibrary: true,
+        adId: match.id,
+        status: match.status,
+        playUrl,
+        downloadUrl: `${playUrl}?download=1`,
+      };
+    }),
+  }));
 }
 
 /** `has_override` arrives as 0/1; normalise to a real boolean. */

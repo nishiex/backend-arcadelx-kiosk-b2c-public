@@ -133,11 +133,16 @@ async function main(): Promise<void> {
   const { prisma } = await import('../../apps/api/src/utils/db');
   const bcrypt = (await import('bcryptjs')).default;
   const adsService = await import('../../apps/api/src/services/ads.service');
+  const { attachLibraryAds } = await import('../../apps/api/src/services/Mothership/devices.service');
 
   const server = app.listen(4010, '127.0.0.1');
   await new Promise<void>((resolve) => server.once('listening', () => resolve()));
 
   const suffix = Date.now();
+  // A fixed contact made an interrupted run block every later one on User_contact_key.
+  // 9 + 8 digits + slot keeps it a unique ten-digit value per run.
+  const contactBase = `9${String(suffix).slice(-8).padStart(8, '0')}`;
+  const contactFor = (slot: number) => `${contactBase}${slot}`;
   const createdUserIds: string[] = [];
   const createdOrgIds: string[] = [];
   const createdKioskIds: string[] = [];
@@ -182,7 +187,7 @@ async function main(): Promise<void> {
       return { email, password, orgId: org.id };
     }
 
-    const distributor = await makeCompany('dist', 'DISTRIBUTOR', '9000000003');
+    const distributor = await makeCompany('dist', 'DISTRIBUTOR', contactFor(3));
 
     // A second OWNER/ADMIN inside the same company: needed to prove that an upload
     // session is bound to the user who created it, not merely to the organization.
@@ -200,7 +205,7 @@ async function main(): Promise<void> {
       return { email, password };
     }
 
-    const adminA = await makeCompanyMember(companyA, 'ADMIN', '9000000005');
+    const adminA = await makeCompanyMember(companyA, 'ADMIN', contactFor(5));
 
     async function makeKiosk(orgId: string, label: string, status: 'AVAILABLE' | 'RETIRED') {
       const kiosk = await prisma.kiosk.create({
@@ -509,6 +514,509 @@ async function main(): Promise<void> {
     );
     check('an empty update is rejected', emptyUpdate.status === 400, emptyUpdate.status);
 
+    // ── /api/v1 aliases ────────────────────────────────────────────────────────
+    // The mobile contract addresses the same operations under /api/v1. These checks prove
+    // each alias reaches the existing handler instead of a second implementation.
+    const v1Filename = stored ? stored.videoFilename : '';
+
+    const v1Config = await api('/api/v1/ads/config', { method: 'GET' }, ownerA.cookie);
+    check('v1 config alias answers with the upload limits', v1Config.status === 200, v1Config.status);
+
+    const v1List = await json(await api('/api/v1/ads', { method: 'GET' }, ownerA.cookie));
+    check(
+      'v1 list alias returns the library',
+      v1List?.data?.items?.some((item: { id: string }) => item.id === adId) === true,
+      v1List?.data?.total,
+    );
+    const listedAd = v1List?.data?.items?.find((item: { id: string }) => item.id === adId);
+    check(
+      'the ad list exposes the filename the files route addresses',
+      !!stored && listedAd?.filename === stored.videoFilename,
+      listedAd?.filename,
+    );
+
+    const v1Update = await api(
+      `/api/v1/ads/${adId}/update`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Summer promo via v1' }),
+      },
+      ownerA.cookie,
+    );
+    const v1UpdateBody = await json(v1Update);
+    check(
+      'v1 POST /:id/update edits the ad',
+      v1Update.status === 200 && v1UpdateBody?.data?.title === 'Summer promo via v1',
+      v1UpdateBody?.data?.title,
+    );
+
+    // Replacing the video is part of the same update contract: the upload session supplies
+    // the bytes and metadata, and the previous file must be gone afterwards. A dedicated ad
+    // is used so the delete checks further down still describe the main fixture.
+    const originalUpload = await uploadVideo(ownerA.cookie, {
+      totalSize: 800,
+      filename: 'original.mp4',
+    });
+    const replaceCreate = await api(
+      '/api/v1/ads',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Replace me', uploadId: originalUpload.uploadId, kioskIds: [] }),
+      },
+      ownerA.cookie,
+    );
+    const replaceCreateBody = await json(replaceCreate);
+    const replaceAdId: string | undefined = replaceCreateBody?.data?.id;
+    if (replaceAdId) createdAdIds.push(replaceAdId);
+    const beforeReplace = replaceAdId
+      ? await prisma.ad.findUniqueOrThrow({ where: { id: replaceAdId } })
+      : null;
+
+    const freshUpload = await uploadVideo(ownerA.cookie, {
+      totalSize: 1200,
+      filename: 'replacement.mp4',
+    });
+    const replaceUpdate = await api(
+      `/api/v1/ads/${replaceAdId}/update`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ uploadId: freshUpload.uploadId, title: 'Replace me (new video)' }),
+      },
+      ownerA.cookie,
+    );
+    const replaceBody = await json(replaceUpdate);
+    const afterReplace = replaceAdId
+      ? await prisma.ad.findUniqueOrThrow({ where: { id: replaceAdId } })
+      : null;
+    check(
+      'v1 POST /:id/update replaces the video from an upload session',
+      replaceUpdate.status === 200 &&
+        replaceBody?.data?.videoSizeBytes === 1200 &&
+        replaceBody?.data?.originalFilename === 'replacement.mp4' &&
+        !!beforeReplace &&
+        replaceBody?.data?.filename !== beforeReplace.videoFilename,
+      {
+        status: replaceUpdate.status,
+        filename: replaceBody?.data?.filename,
+        size: replaceBody?.data?.videoSizeBytes,
+      },
+    );
+    check(
+      'the replaced file is deleted and the new one is on disk',
+      !!beforeReplace &&
+        !!afterReplace &&
+        !fs.existsSync(path.join(UPLOAD_ROOT, beforeReplace.videoFilename)) &&
+        fs.existsSync(path.join(UPLOAD_ROOT, afterReplace.videoFilename)),
+      afterReplace?.videoFilename,
+    );
+
+    const replacedStream = afterReplace
+      ? await api(
+          `/api/v1/ads/files/${encodeURIComponent(afterReplace.videoFilename)}`,
+          { method: 'GET' },
+          ownerA.cookie,
+        )
+      : null;
+    const replacedBytes = replacedStream ? Buffer.from(await replacedStream.arrayBuffer()) : Buffer.alloc(0);
+    check(
+      'the replacement bytes are the ones served',
+      replacedStream?.status === 200 && replacedBytes.equals(freshUpload.bytes),
+      { status: replacedStream?.status, length: replacedBytes.length },
+    );
+
+    const unknownReplacement = await api(
+      `/api/v1/ads/${replaceAdId}/update`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ uploadId: '00000000-0000-4000-8000-000000000000' }),
+      },
+      ownerA.cookie,
+    );
+    const afterFailedReplace = replaceAdId
+      ? await prisma.ad.findUniqueOrThrow({ where: { id: replaceAdId } })
+      : null;
+    check(
+      'an unknown replacement upload is rejected and the ad keeps its video',
+      unknownReplacement.status === 404 &&
+        !!afterReplace &&
+        afterFailedReplace?.videoFilename === afterReplace.videoFilename,
+      { status: unknownReplacement.status },
+    );
+
+    const deleteReplaced = await api(`/api/v1/ads/${replaceAdId}/delete`, { method: 'POST' }, ownerA.cookie);
+    const deletedRow = replaceAdId
+      ? await prisma.ad.findUnique({ where: { id: replaceAdId } })
+      : null;
+    check(
+      'v1 POST /:id/delete removes the row and the replacement file',
+      deleteReplaced.status === 200 &&
+        deletedRow === null &&
+        !!afterReplace &&
+        !fs.existsSync(path.join(UPLOAD_ROOT, afterReplace.videoFilename)),
+      { status: deleteReplaced.status },
+    );
+
+    const v1Video = await api(`/api/v1/ads/files/${v1Filename}`, { method: 'GET' }, ownerA.cookie);
+    const v1VideoBytes = Buffer.from(await v1Video.arrayBuffer());
+    check(
+      'v1 file route streams by stored filename',
+      v1Video.status === 200 && v1VideoBytes.length === 700_000,
+      { status: v1Video.status, length: v1VideoBytes.length },
+    );
+
+    const unknownFile = await api(
+      '/api/v1/ads/files/00000000-0000-0000-0000-000000000000-1.mp4',
+      { method: 'GET' },
+      ownerA.cookie,
+    );
+    check('v1 file route hides an unknown filename', unknownFile.status === 404, unknownFile.status);
+
+    const v1Range = await api(
+      `/api/v1/ads/files/${encodeURIComponent(v1Filename)}`,
+      { method: 'GET', headers: { range: 'bytes=100-199' } },
+      ownerA.cookie,
+    );
+    const v1RangeBytes = Buffer.from(await v1Range.arrayBuffer());
+    check(
+      'v1 file route honours a byte range for seeking',
+      v1Range.status === 206 &&
+        v1Range.headers.get('content-range') === 'bytes 100-199/700000' &&
+        v1RangeBytes.equals(upload.bytes.subarray(100, 200)),
+      {
+        status: v1Range.status,
+        range: v1Range.headers.get('content-range'),
+        length: v1RangeBytes.length,
+      },
+    );
+
+    const v1Headers = await api(
+      `/api/v1/ads/files/${encodeURIComponent(v1Filename)}`,
+      { method: 'GET' },
+      ownerA.cookie,
+    );
+    check(
+      'v1 file route advertises inline playback with the stored type',
+      v1Headers.status === 200 &&
+        v1Headers.headers.get('content-type') === 'video/mp4' &&
+        v1Headers.headers.get('accept-ranges') === 'bytes' &&
+        (v1Headers.headers.get('content-disposition') ?? '').startsWith('inline;') &&
+        v1Headers.headers.get('x-content-type-options') === 'nosniff',
+      {
+        type: v1Headers.headers.get('content-type'),
+        ranges: v1Headers.headers.get('accept-ranges'),
+        disposition: v1Headers.headers.get('content-disposition'),
+      },
+    );
+
+    const traversal = await api(
+      `/api/v1/ads/files/${encodeURIComponent('../app.ts')}`,
+      { method: 'GET' },
+      ownerA.cookie,
+    );
+    check('v1 file route rejects a path-like filename', traversal.status === 400, traversal.status);
+
+    const distributorFile = await api(
+      `/api/v1/ads/files/${encodeURIComponent(v1Filename)}`,
+      { method: 'GET' },
+      distributorLogin.cookie,
+    );
+    check(
+      'v1 file route is closed to a distributor',
+      distributorFile.status === 403,
+      distributorFile.status,
+    );
+
+    const v1Upload = await uploadVideo(ownerA.cookie, { totalSize: 1000 });
+    const v1Create = await api(
+      '/api/v1/ads',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'v1 throwaway', uploadId: v1Upload.uploadId, kioskIds: [] }),
+      },
+      ownerA.cookie,
+    );
+    const v1CreateBody = await json(v1Create);
+    const v1AdId: string | undefined = v1CreateBody?.data?.id;
+    if (v1AdId) createdAdIds.push(v1AdId);
+    check('v1 create alias creates an ad', v1Create.status === 201 && !!v1AdId, v1Create.status);
+
+    const v1Delete = await api(`/api/v1/ads/${v1AdId}/delete`, { method: 'POST' }, ownerA.cookie);
+    check('v1 POST /:id/delete deletes the ad', v1Delete.status === 200, v1Delete.status);
+
+    const v1Gone = await api(`/api/ads/${v1AdId}`, { method: 'GET' }, ownerA.cookie);
+    check('the ad deleted through the v1 alias is gone', v1Gone.status === 404, v1Gone.status);
+
+    // ── Multipart chunk contract (`POST /api/v1/ads/upload-chunk`) ──────────────
+    // The mobile contract sends one multipart request per chunk instead of raw bytes. It
+    // must drive the same resumable session, so these checks upload a whole video through
+    // it and then create the ad from that session.
+    const multipartBytes = crypto.randomBytes(600_000);
+    const multipartChunkSize = 256 * 1024;
+    const multipartTotalChunks = Math.ceil(multipartBytes.length / multipartChunkSize);
+
+    async function sendMultipartChunk(
+      fields: Record<string, string>,
+      data: Buffer,
+    ): Promise<Response> {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) form.set(key, value);
+      form.set('file', new Blob([new Uint8Array(data)]), 'chunk.bin');
+      return api('/api/v1/ads/upload-chunk', { method: 'POST', body: form }, ownerA.cookie);
+    }
+
+    const firstChunk = await sendMultipartChunk(
+      {
+        filename: 'Multipart Clip.mp4',
+        mimeType: 'video/mp4',
+        totalSize: String(multipartBytes.length),
+        chunkIndex: '0',
+      },
+      multipartBytes.subarray(0, multipartChunkSize),
+    );
+    const firstChunkBody = await json(firstChunk);
+    const multipartUploadId: string | undefined = firstChunkBody?.data?.uploadId;
+    check(
+      'upload-chunk starts a session from the first multipart chunk',
+      firstChunk.status === 200 &&
+        !!multipartUploadId &&
+        firstChunkBody?.data?.totalChunks === multipartTotalChunks &&
+        firstChunkBody?.data?.complete === false,
+      firstChunkBody?.data,
+    );
+
+    let lastChunkBody: any = null;
+    for (let index = 1; index < multipartTotalChunks; index += 1) {
+      const start = index * multipartChunkSize;
+      const end = Math.min(start + multipartChunkSize, multipartBytes.length);
+      const response = await sendMultipartChunk(
+        { uploadId: multipartUploadId ?? '', chunkIndex: String(index) },
+        multipartBytes.subarray(start, end),
+      );
+      lastChunkBody = await json(response);
+    }
+    check(
+      'upload-chunk reports completion on the last chunk',
+      lastChunkBody?.data?.complete === true &&
+        lastChunkBody?.data?.receivedChunks === multipartTotalChunks,
+      lastChunkBody?.data,
+    );
+
+    const multipartCreate = await api(
+      '/api/v1/ads',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Multipart clip', uploadId: multipartUploadId, kioskIds: [] }),
+      },
+      ownerA.cookie,
+    );
+    const multipartCreateBody = await json(multipartCreate);
+    const multipartAdId: string | undefined = multipartCreateBody?.data?.id;
+    if (multipartAdId) createdAdIds.push(multipartAdId);
+    check(
+      'the ad created from multipart chunks keeps the declared byte length',
+      multipartCreate.status === 201 && multipartCreateBody?.data?.videoSizeBytes === 600_000,
+      { status: multipartCreate.status, size: multipartCreateBody?.data?.videoSizeBytes },
+    );
+
+    const notMultipart = await api(
+      '/api/v1/ads/upload-chunk',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ uploadId: 'x' }),
+      },
+      ownerA.cookie,
+    );
+    check('upload-chunk rejects a non-multipart body', notMultipart.status === 415, notMultipart.status);
+
+    const anonymousMultipart = await api('/api/v1/ads/upload-chunk', { method: 'POST', body: new FormData() });
+    check('upload-chunk is auth-gated', anonymousMultipart.status === 401, anonymousMultipart.status);
+
+    const filesAliasAnon = await api('/api/v1/ads/files', { method: 'POST', body: new FormData() });
+    check('POST /api/v1/ads/files is auth-gated', filesAliasAnon.status === 401, filesAliasAnon.status);
+
+    const singleFileForm = new FormData();
+    const singleFileBytes = crypto.randomBytes(5000);
+    singleFileForm.set('file', new Blob([new Uint8Array(singleFileBytes)]), 'single.mp4');
+    singleFileForm.set('mimeType', 'video/mp4');
+    const filesAliasUpload = await api('/api/v1/ads/files', { method: 'POST', body: singleFileForm }, ownerA.cookie);
+    const filesAliasUploadBody = await json(filesAliasUpload);
+    check(
+      'POST /api/v1/ads/files accepts a single-file multipart upload',
+      filesAliasUpload.status === 200 && filesAliasUploadBody?.data?.complete === true,
+      filesAliasUploadBody?.data,
+    );
+
+    // ── Device-reported ad files ────────────────────────────────────────────────
+    // Mothership reports a kiosk's ad files by name and serves no bytes for them, so the
+    // fleet endpoint resolves each name against this account's ad library. These checks
+    // cover that resolution and the download response without calling the upstream host.
+    const kioskUpload = await uploadVideo(ownerA.cookie, {
+      totalSize: 1000,
+      filename: 'Kiosk Promo.MP4',
+    });
+    const kioskCreate = await api(
+      '/api/ads',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Kiosk promo', uploadId: kioskUpload.uploadId, kioskIds: [kioskA.id] }),
+      },
+      ownerA.cookie,
+    );
+    const kioskCreateBody = await json(kioskCreate);
+    const kioskAdId: string | undefined = kioskCreateBody?.data?.id;
+    if (kioskAdId) createdAdIds.push(kioskAdId);
+    const kioskStored = kioskAdId
+      ? await prisma.ad.findUniqueOrThrow({ where: { id: kioskAdId } })
+      : null;
+    check(
+      'an ad can be uploaded under a kiosk-style filename',
+      kioskCreate.status === 201 && !!kioskStored,
+      kioskCreate.status,
+    );
+
+    const libraryWhere = (name: string) => ({
+      organizationId: companyA,
+      originalFilename: { in: [name], mode: 'insensitive' as const },
+    });
+    const librarySelect = {
+      id: true,
+      originalFilename: true,
+      videoFilename: true,
+      status: true,
+    } as const;
+
+    const libraryRows = await prisma.ad.findMany({
+      where: libraryWhere('kiosk promo.mp4'),
+      select: librarySelect,
+    });
+    check(
+      'library lookup matches a reported name case-insensitively',
+      libraryRows.length === 1 && libraryRows[0]?.id === kioskAdId,
+      libraryRows.map((row) => row.originalFilename),
+    );
+
+    const deviceView = (files: string[]) => ({
+      deviceId: 'ADLX-VERIFY-1',
+      hardwareUuid: null,
+      headscaleIp: null,
+      isOnline: false,
+      kioskNumber: null,
+      lastSeen: null,
+      location: null,
+      publicIp: null,
+      ads: files.map((file) => ({
+        file,
+        title: file,
+        sizeBytes: 1000,
+        version: 0,
+        managed: false,
+        startDate: null,
+        expiresOn: null,
+        inLibrary: false,
+        adId: null,
+        status: null,
+        playUrl: null,
+        downloadUrl: null,
+      })),
+    });
+
+    const resolved = attachLibraryAds(
+      [deviceView(['KIOSK PROMO.MP4', 'not-in-library.webm'])],
+      libraryRows,
+    )[0];
+    const matched = resolved?.ads.find((ad) => ad.file === 'KIOSK PROMO.MP4');
+    const unmatched = resolved?.ads.find((ad) => ad.file === 'not-in-library.webm');
+    check(
+      'a reported file present in the library is marked playable',
+      matched?.inLibrary === true && matched?.adId === kioskAdId && matched?.status === 'ACTIVE',
+      matched,
+    );
+    check(
+      'the play URL addresses the stored copy',
+      matched?.playUrl === `/api/ads/files/${encodeURIComponent(kioskStored?.videoFilename ?? '')}`,
+      matched?.playUrl,
+    );
+    check(
+      'the download URL adds the attachment flag',
+      matched?.downloadUrl === `${matched?.playUrl}?download=1`,
+      matched?.downloadUrl,
+    );
+    check(
+      'a reported file with no library copy gets no URLs',
+      unmatched?.inLibrary === false && unmatched?.playUrl === null && unmatched?.downloadUrl === null,
+      unmatched,
+    );
+
+    // A re-upload leaves two rows sharing one name; the ACTIVE row must win regardless of
+    // the order the database returns them in.
+    const duplicateUpload = await uploadVideo(ownerA.cookie, {
+      totalSize: 1000,
+      filename: 'kiosk promo.mp4',
+    });
+    const duplicateCreate = await api(
+      '/api/ads',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Kiosk promo (copy)', uploadId: duplicateUpload.uploadId, kioskIds: [] }),
+      },
+      ownerA.cookie,
+    );
+    const duplicateBody = await json(duplicateCreate);
+    const duplicateId: string | undefined = duplicateBody?.data?.id;
+    if (duplicateId) {
+      createdAdIds.push(duplicateId);
+      await prisma.ad.update({ where: { id: duplicateId }, data: { status: 'INACTIVE' } });
+    }
+    const withDuplicate = await prisma.ad.findMany({
+      where: libraryWhere('kiosk promo.mp4'),
+      select: librarySelect,
+    });
+    const preferred = attachLibraryAds(
+      [deviceView(['kiosk promo.mp4'])],
+      withDuplicate,
+    )[0];
+    check(
+      'the ACTIVE duplicate wins over an inactive one',
+      withDuplicate.length === 2 && preferred?.ads[0]?.adId === kioskAdId,
+      { rows: withDuplicate.length, chosen: preferred?.ads[0]?.adId },
+    );
+
+    const storedName = encodeURIComponent(kioskStored?.videoFilename ?? '');
+    const download = await api(`/api/ads/files/${storedName}?download=1`, { method: 'GET' }, ownerA.cookie);
+    const downloadBytes = Buffer.from(await download.arrayBuffer());
+    check(
+      'the download flag turns playback into a file download',
+      download.status === 200 &&
+        (download.headers.get('content-disposition') ?? '').startsWith('attachment;') &&
+        downloadBytes.equals(kioskUpload.bytes),
+      {
+        status: download.status,
+        disposition: download.headers.get('content-disposition'),
+        length: downloadBytes.length,
+      },
+    );
+
+    const inline = await api(`/api/ads/files/${storedName}`, { method: 'GET' }, ownerA.cookie);
+    check(
+      'playback stays inline without the flag',
+      inline.status === 200 && (inline.headers.get('content-disposition') ?? '').startsWith('inline;'),
+      inline.headers.get('content-disposition'),
+    );
+
+    // The alias must be gated before it reaches Mothership: an anonymous call is answered
+    // locally, so this never depends on the upstream host being reachable.
+    const anonymousDevices = await api('/api/v1/devices', { method: 'GET' });
+    check('the v1 devices alias is auth-gated', anonymousDevices.status === 401, anonymousDevices.status);
+
     // ── Upload expiry ───────────────────────────────────────────────────────────
     const expired = await uploadVideo(ownerA.cookie, { totalSize: 1000 });
     const removed = await adsService.cleanupExpiredUploads(0);
@@ -546,7 +1054,10 @@ async function main(): Promise<void> {
     await prisma.adKiosk.deleteMany({ where: { adId: { in: createdAdIds } } }).catch(() => undefined);
     await prisma.ad.deleteMany({ where: { id: { in: createdAdIds } } }).catch(() => undefined);
     await prisma.kiosk.deleteMany({ where: { id: { in: createdKioskIds } } }).catch(() => undefined);
-    await prisma.membership.deleteMany({ where: { organizationId: { in: createdOrgIds } } }).catch(() => undefined);
+    // Delete memberships by user, not by organization: the extra member belongs to the
+    // seeded company, so scoping by created organizations left that row behind and its
+    // foreign key then blocked the user delete, leaving fixtures for the next run.
+    await prisma.membership.deleteMany({ where: { userId: { in: createdUserIds } } }).catch(() => undefined);
     await prisma.organization.deleteMany({ where: { id: { in: createdOrgIds } } }).catch(() => undefined);
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } }).catch(() => undefined);
 

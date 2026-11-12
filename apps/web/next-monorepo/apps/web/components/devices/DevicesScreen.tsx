@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Cpu, Gamepad2, RefreshCw, Search } from "lucide-react"
+import { Cpu, Download, Gamepad2, Play, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -16,6 +16,7 @@ import {
   resetAllDevicePrices,
   resetDevicePrices,
   setDeviceGamePrice,
+  type DeviceAdView,
   type DeviceView,
   type GamePriceView,
   type EodPriceUpdate,
@@ -342,6 +343,9 @@ function FleetTab({
   busy: boolean
   onPickPricing: (deviceId: string) => void
 }) {
+  // One device open at a time: the ad list can be long and the fleet view is the index.
+  const [openAds, setOpenAds] = useState<string | null>(null)
+  const [playing, setPlaying] = useState<DeviceAdView | null>(null)
   if (!devices.length) {
     return (
       <EmptyState
@@ -367,12 +371,14 @@ function FleetTab({
               <th className="px-4 py-3 font-medium">Location</th>
               <th className="px-4 py-3 font-medium">Last seen</th>
               <th className="px-4 py-3 font-medium">Hardware UUID</th>
+              <th className="px-4 py-3 font-medium">Ads</th>
               <th className="px-4 py-3 text-right font-medium">Pricing</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {devices.map(device => (
-              <tr key={device.deviceId} className="hover:bg-muted/40">
+              <React.Fragment key={device.deviceId}>
+              <tr className="hover:bg-muted/40">
                 <td className="px-4 py-3 font-mono text-xs font-medium">{device.deviceId}</td>
                 <td className="px-4 py-3">
                   <OnlineDot online={device.isOnline} />
@@ -384,6 +390,22 @@ function FleetTab({
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                   {device.hardwareUuid ?? "—"}
                 </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    aria-expanded={openAds === device.deviceId}
+                    onClick={() =>
+                      setOpenAds(current =>
+                        current === device.deviceId ? null : device.deviceId,
+                      )
+                    }
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                  >
+                    {device.ads.length
+                      ? `${device.ads.length} file${device.ads.length === 1 ? "" : "s"}`
+                      : "None"}
+                  </button>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"
@@ -394,6 +416,143 @@ function FleetTab({
                   </button>
                 </td>
               </tr>
+              {openAds === device.deviceId && (
+                <tr>
+                  <td colSpan={7} className="bg-muted/20 px-4 py-4">
+                    <DeviceAdsPanel device={device} onPlay={setPlaying} />
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {playing && <AdPreviewDialog ad={playing} onClose={() => setPlaying(null)} />}
+    </div>
+  )
+}
+
+/** File sizes from the kiosk are bytes; show the largest unit that stays readable. */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
+  if (bytes < 1024) return `${Math.round(bytes)} B`
+  const units = ["KB", "MB", "GB", "TB"] as const
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit] ?? "KB"}`
+}
+
+/**
+ * The ad files one kiosk reports, with playback and download where this deployment owns a
+ * copy.
+ *
+ * Mothership reports names and sizes only and serves no bytes for them, so a file is
+ * playable solely when the Company ad library holds the same original filename. Rather
+ * than hide the rest, each row states which side it is on: an operator looking for a video
+ * needs to know whether to upload it here or go to the machine.
+ */
+function DeviceAdsPanel({
+  device,
+  onPlay,
+}: {
+  device: DeviceView
+  onPlay: (ad: DeviceAdView) => void
+}) {
+  if (!device.ads.length) {
+    return <p className="text-sm text-muted-foreground">This kiosk reports no ad files.</p>
+  }
+  const playable = device.ads.filter(ad => ad.playUrl).length
+  // With nothing playable the column would be a stack of dashes, so it is not rendered at
+  // all. A dead control on every row reads like a broken feature.
+  const hasPlayable = playable > 0
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-medium">
+          Ad files on <span className="font-mono text-xs">{device.deviceId}</span>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {playable} of {device.ads.length} playable from your ad library
+        </p>
+      </div>
+      {playable === 0 && (
+        <p
+          role="note"
+          className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
+        >
+          These files live on the kiosk. Mothership reports their names but serves no copy,
+          so upload the same video under <span className="font-medium">Ads</span> to play or
+          download it from here.
+        </p>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-border bg-background">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="px-3 py-2 font-medium">Title</th>
+              <th className="px-3 py-2 font-medium">File</th>
+              <th className="px-3 py-2 font-medium">Size</th>
+              <th className="px-3 py-2 font-medium">Library</th>
+              {hasPlayable && (
+                <th className="px-3 py-2 text-right font-medium">Play / download</th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {device.ads.map(ad => (
+              <tr key={ad.file}>
+                <td className="px-3 py-2 font-medium">{ad.title}</td>
+                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{ad.file}</td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                  {ad.sizeBytes != null ? formatBytes(ad.sizeBytes) : "—"}
+                </td>
+                <td className="px-3 py-2">
+                  {ad.inLibrary ? (
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      In library
+                    </span>
+                  ) : (
+                    <span
+                      title="No stored copy in this account's ad library"
+                      className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                    >
+                      On kiosk only
+                    </span>
+                  )}
+                </td>
+                {hasPlayable && (
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {ad.playUrl && (
+                      <button
+                        type="button"
+                        onClick={() => onPlay(ad)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+                      >
+                        <Play size={13} /> Play
+                      </button>
+                    )}
+                    {ad.downloadUrl && (
+                      <a
+                        href={ad.downloadUrl}
+                        download
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+                      >
+                        <Download size={13} /> Download
+                      </a>
+                    )}
+                    {!ad.playUrl && !ad.downloadUrl && (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </td>
+                )}
+              </tr>
             ))}
           </tbody>
         </table>
@@ -402,7 +561,62 @@ function FleetTab({
   )
 }
 
-/** Mothership exposes a UUID plus an optional kiosk number; lead with whatever a human can read. */
+/** Plays a library copy of a kiosk's ad file, with the same download one click away. */
+function AdPreviewDialog({ ad, onClose }: { ad: DeviceAdView; onClose: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Playing ${ad.title}`}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl rounded-2xl border border-border bg-card p-4 shadow-xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">{ad.title}</h3>
+            <p className="text-xs text-muted-foreground">
+              {ad.file}
+              {ad.sizeBytes != null ? ` · ${formatBytes(ad.sizeBytes)}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close player"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {ad.playUrl && (
+          <video
+            key={ad.playUrl}
+            src={ad.playUrl}
+            controls
+            autoPlay
+            playsInline
+            className="aspect-video w-full rounded-lg bg-black"
+          />
+        )}
+        {ad.downloadUrl && (
+          <div className="mt-3 flex justify-end">
+            <a
+              href={ad.downloadUrl}
+              download
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <Download size={14} /> Download
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 function deviceLabel(device: DeviceView): string {
   return device.kioskNumber != null ? `Kiosk #${device.kioskNumber}` : `Device ${device.deviceId.slice(0, 8)}`
 }

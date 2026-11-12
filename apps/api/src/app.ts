@@ -49,6 +49,10 @@ app.use('/api/agreements', agreementRoutes);
 app.use('/api/kiosks', kioskRoutes);
 // Company video ads: library, resumable upload and range-aware playback (COMPANY only).
 app.use('/api/ads', adsRoutes);
+// Same surface for clients written against the `/api/v1` contract (mobile spec): the same
+// router, so no handler is duplicated. `POST /upload-chunk` is intentionally absent --
+// uploads stay chunked through `/uploads` + `PUT .../chunks/:index`.
+app.use('/api/v1/ads', adsRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/analytics', analyticsRoutes);
 // Crucial: These routes bypass standard JWT auth because they are server-to-server
@@ -63,6 +67,7 @@ app.use('/api/admin/gateways', adminGatewayRoutes);
 // COMPANY/DISTRIBUTOR/PARTNER; the price write is limited to COMPANY OWNER/ADMIN inside
 // the router, because it changes what a live kiosk charges.
 app.use('/api/devices', deviceRoutes);
+app.use('/api/v1/devices', deviceRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/audit-logs', auditRoutes);
 //Health Endpoints

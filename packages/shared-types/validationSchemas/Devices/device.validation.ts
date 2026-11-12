@@ -34,6 +34,24 @@ export const DeviceGameParamsSchema = z.object({
   gameId: z.string().trim().min(1).max(120),
 });
 
+/**
+ * One ad file a kiosk reports as present on the machine.
+ *
+ * Confirmed against the live fleet on 2026-11-12: `file` is the name the kiosk stores
+ * locally ("beat saber.webm"), `managed` is false for files placed on the device outside
+ * Mothership's ad library, and the date fields arrive as empty strings when unset. No
+ * byte-serving route exists upstream, so this is metadata only.
+ */
+const UpstreamDeviceAdSchema = z.object({
+  file: z.string(),
+  title: z.string().optional(),
+  size: z.number().optional(),
+  version: z.number().optional(),
+  managed: z.boolean().optional(),
+  start_date: z.string().nullable().optional(),
+  expires_on: z.string().nullable().optional(),
+});
+
 /** One device as reported by the Mothership device feed (raw upstream shape). */
 const UpstreamDeviceSchema = z.object({
   device_id: z.string(),
@@ -44,6 +62,7 @@ const UpstreamDeviceSchema = z.object({
   last_seen: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
   public_ip: z.string().nullable().optional(),
+  ads: z.array(UpstreamDeviceAdSchema).optional(),
 });
 
 /** Current Mothership fleet response (`GET /api/v1/devices`). */
@@ -193,6 +212,32 @@ export const LauncherGamesResponseSchema = z.object({
 /** One upstream catalog entry (`GET /api/v1/games`), as parsed by the schema above. */
 export type UpstreamCatalogGame = z.infer<typeof UpstreamCatalogGameSchema>;
 
+/**
+ * One ad file on a device, normalised for the dashboard.
+ *
+ * Playback needs bytes, and Mothership exposes none for a device's files. The only
+ * streamable copy this deployment owns is the Company ad library, so each file is
+ * resolved against it by original filename. `inLibrary` is the honest answer to "can this
+ * be played or downloaded from here", and the URLs are null when it is false rather than
+ * pointing at a route that would 404.
+ */
+export const DeviceAdViewSchema = z.object({
+  file: z.string(),
+  title: z.string(),
+  sizeBytes: z.number().nullable(),
+  version: z.number().nullable(),
+  /** Mothership manages this file; false means it was placed on the kiosk directly. */
+  managed: z.boolean(),
+  startDate: z.string().nullable(),
+  expiresOn: z.string().nullable(),
+  /** The Company ad library holds a streamable copy with this original filename. */
+  inLibrary: z.boolean(),
+  adId: z.string().nullable(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).nullable(),
+  playUrl: z.string().nullable(),
+  downloadUrl: z.string().nullable(),
+});
+
 /** A device as this API returns it (normalised, camelCase). */
 export const DeviceViewSchema = z.object({
   deviceId: z.string(),
@@ -203,6 +248,8 @@ export const DeviceViewSchema = z.object({
   lastSeen: z.string().nullable(),
   location: z.string().nullable(),
   publicIp: z.string().nullable(),
+  /** Ad files the kiosk reports, with playback resolved against the ad library. */
+  ads: z.array(DeviceAdViewSchema),
 });
 
 /**
@@ -245,4 +292,5 @@ export const GamePriceViewSchema = z.object({
 });
 
 export type DeviceView = z.infer<typeof DeviceViewSchema>;
+export type DeviceAdView = z.infer<typeof DeviceAdViewSchema>;
 export type GamePriceView = z.infer<typeof GamePriceViewSchema>;

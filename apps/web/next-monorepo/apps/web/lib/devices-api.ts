@@ -73,6 +73,24 @@ async function handleRes<T>(res: Response): Promise<T> {
   return envelope?.data as T
 }
 
+/** One ad file a kiosk reports, with playback resolved against the Company ad library. */
+export type DeviceAdView = {
+  file: string
+  title: string
+  sizeBytes: number | null
+  version: number | null
+  /** Mothership manages the file; false means it was placed on the kiosk directly. */
+  managed: boolean
+  startDate: string | null
+  expiresOn: string | null
+  /** The ad library holds a streamable copy, so Play and Download are available. */
+  inLibrary: boolean
+  adId: string | null
+  status: "ACTIVE" | "INACTIVE" | null
+  playUrl: string | null
+  downloadUrl: string | null
+}
+
 /** One device as the API returns it (normalised, camelCase). */
 export type DeviceView = {
   deviceId: string
@@ -83,6 +101,8 @@ export type DeviceView = {
   lastSeen: string | null
   location: string | null
   publicIp: string | null
+  /** Ad files the kiosk reports; empty when it reports none. */
+  ads: DeviceAdView[]
 }
 
 /**
@@ -160,7 +180,18 @@ export async function fetchDevices(): Promise<{
   total: number
 }> {
   const res = await apiFetch("/api/devices", { cache: "no-store" })
-  return handleRes<{ devices: DeviceView[]; lastUpdated: string | null; total: number }>(res)
+  const data = await handleRes<{
+    devices: DeviceView[]
+    lastUpdated: string | null
+    total: number
+  }>(res)
+  // `ads` is newer than the fleet payload, and a dashboard deploy can outrun the API it
+  // talks to. Normalise it here: a missing field must degrade to "no ads reported", not
+  // throw inside the table and take the whole Devices screen down with it.
+  return {
+    ...data,
+    devices: (data.devices ?? []).map(device => ({ ...device, ads: device.ads ?? [] })),
+  }
 }
 
 export async function fetchDevicePrices(
