@@ -29,6 +29,13 @@ export const errorHandler = (
       .status(400)
       .json({ success: false, message: "Invalid JSON body", errors: null });
   }
+  // Body-parser rejects an oversized raw upload before the route runs. Without this the
+  // request would fall through to the generic 500 handler.
+  if (err && typeof err === "object" && err.type === "entity.too.large") {
+    return res
+      .status(413)
+      .json({ success: false, message: "Request body is too large", errors: null });
+  }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (["P2002", "P2003", "P2004", "P2034"].includes(err.code)) {
       return res

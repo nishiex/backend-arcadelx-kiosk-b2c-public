@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Share2,
   ScrollText,
+  Clapperboard,
   Waypoints,
   type LucideIcon,
 } from "lucide-react"
@@ -68,6 +69,9 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
   { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
+  // Company video ads. Reads are open to every active Company member; OWNER/ADMIN
+  // additionally get upload, edit and delete inside the screen.
+  { kind: "link", item: { name: "Ads", href: "/ads", icon: Clapperboard, show: (p) => p.canViewAds } },
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;
   // it is intentionally not a second tab on the Requests page.

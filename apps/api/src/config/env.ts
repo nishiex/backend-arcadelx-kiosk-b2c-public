@@ -17,6 +17,11 @@ const envSchema = z.object({
   INTERNAL_API_SECRET: z.string().min(32, "Internal API secret must be at least 32 characters"),
   NODE_ENV: z.enum(['development', 'test', 'production']),
   INVOICES_DIR: z.string().optional(),
+  // Ad videos. Storage must be an absolute path on persistent storage in production;
+  // the service refuses to write inside the deploy directory there.
+  ADS_UPLOAD_DIR: z.string().trim().optional(),
+  ADS_MAX_VIDEO_SIZE: z.string().regex(/^[1-9]\d*$/).optional(),
+  ADS_MAX_CHUNK_SIZE: z.string().regex(/^[1-9]\d*$/).optional(),
   MAILJET_API_KEY: z.string().optional(),
   MAILJET_SECRET_KEY: z.string().optional(),
   MAIL_FROM_EMAIL: z.string().optional(),
@@ -37,6 +42,11 @@ const envSchema = z.object({
 const productionSchema = envSchema.extend({
   LOCAL_DATABASE_WIPE_ENABLED: z.literal('false').default('false'),
   INVOICES_DIR: z.string().refine(path.isAbsolute, 'Use an absolute path on persistent storage'),
+  ADS_UPLOAD_DIR: z
+    .string()
+    .trim()
+    .refine(path.isAbsolute, 'Use an absolute path on persistent storage')
+    .optional(),
   MAILJET_API_KEY: z.string().min(1),
   MAILJET_SECRET_KEY: z.string().min(1),
   MAIL_FROM_EMAIL: z.string().email(),
