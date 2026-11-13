@@ -115,7 +115,10 @@ export default function KiosksScreen() {
   const [pageSize, setPageSize] = React.useState(10)
   // Machines only start charging once a kiosk is paired to hardware, so the default
   // view is the fleet that is actually live. Unpaired rows stay one selection away.
-  const [pairedOnly, setPairedOnly] = React.useState(true)
+  // Pairing filter has three states: unpaired machines are the queue an operator works
+  // through after minting or before pairing hardware, and they used to be reachable only
+  // by choosing "All machines" and reading the badges.
+  const [pairing, setPairing] = React.useState<"paired" | "unpaired" | "all">("paired")
   // Narrows the network view to one child org (or the viewer's own stock). Options are derived
   // from the rows already loaded, so this needs no extra request.
   const [assignedTo, setAssignedTo] = React.useState("all")
@@ -124,6 +127,7 @@ export default function KiosksScreen() {
 
   const kiosks = data ?? []
   const pairedKiosks = kiosks.filter((k) => !!k.externalDeviceId)
+  const unpairedKiosks = kiosks.filter((k) => !k.externalDeviceId)
 
   // Machines held by another org, one option per org. A Distributor with two Partners sees two.
   const holderOrgs = React.useMemo(() => {
@@ -153,7 +157,10 @@ export default function KiosksScreen() {
     const holderId = k.currentOrg?.id ?? k.assignedOrg?.id ?? null
     const matchesAssigned =
       activeAssignedTo === "all" ? true : holderId === activeAssignedTo
-    return matchesSearch && (!pairedOnly || !!k.externalDeviceId) && matchesAssigned
+    const matchesPairing =
+      pairing === "all" ||
+      (pairing === "paired" ? !!k.externalDeviceId : !k.externalDeviceId)
+    return matchesSearch && matchesPairing && matchesAssigned
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   // A refetch can reduce the inventory while a later page is selected.
@@ -206,9 +213,9 @@ export default function KiosksScreen() {
           {isCompany && (
             <AddMachineDialog
               onMinted={() => {
-                // Freshly minted machines have no hardware yet, so reveal the unpaired ones
-                // the operator just created instead of leaving the list looking unchanged.
-                setPairedOnly(false)
+                // Freshly minted machines have no hardware yet, so switch to the unpaired
+                // queue and show exactly what the operator just created.
+                setPairing("unpaired")
                 setPage(1)
               }}
             />
@@ -237,15 +244,16 @@ export default function KiosksScreen() {
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Pairing
             <select
-              value={pairedOnly ? "paired" : "all"}
+              value={pairing}
               disabled={isLoading || isError}
               onChange={(e) => {
-                setPairedOnly(e.target.value === "paired")
+                setPairing(e.target.value as "paired" | "unpaired" | "all")
                 setPage(1)
               }}
               className="rounded-lg border border-input bg-background px-2.5 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40"
             >
-              <option value="paired">Paired only ({pairedKiosks.length}/{kiosks.length})</option>
+              <option value="paired">Paired ({pairedKiosks.length}/{kiosks.length})</option>
+              <option value="unpaired">Unpaired ({unpairedKiosks.length}/{kiosks.length})</option>
               <option value="all">All machines ({kiosks.length})</option>
             </select>
           </label>
@@ -329,8 +337,8 @@ export default function KiosksScreen() {
           <EmptyState
             className="py-12"
             message={
-              pairedOnly && kiosks.length > 0
-                ? 'No paired machines match your filters. Choose "All machines" to see every machine.'
+              pairing !== "all" && kiosks.length > 0
+                ? `No ${pairing} machines match your filters. Choose "All machines" to see every machine.`
                 : "No machines match your filters."
             }
             icon={<Search size={28} />}
@@ -401,7 +409,7 @@ export default function KiosksScreen() {
             <div className="space-y-1 text-xs text-muted-foreground" role="status">
               <p>
                 Showing {filtered.length ? start + 1 : 0}–{start + visibleKiosks.length} of {filtered.length} machines
-                {(q || activeAssignedTo !== "all" || (pairedOnly && pairedKiosks.length !== kiosks.length)) &&
+                {(q || activeAssignedTo !== "all" || pairing !== "all") &&
                   ` (filtered from ${kiosks.length})`}
               </p>
               <p>Page {currentPage} of {totalPages}{isFetching && " · Updating..."}</p>
