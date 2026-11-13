@@ -305,17 +305,23 @@ function PriceRequestQueue({
   )
 }
 
-function OnlineDot({ online }: { online: boolean }) {
+/**
+ * Device state as one value.
+ *
+ * An online cabinet is "Currently active"; an offline one shows when it was last heard
+ * from, because "Offline" on its own tells an operator nothing they can act on.
+ */
+function OnlineDot({ online, lastSeen }: { online: boolean; lastSeen: string | null }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
         online
           ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
           : "bg-muted text-muted-foreground"
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground"}`} />
-      {online ? "Online" : "Offline"}
+      {online ? "Currently active" : when(lastSeen)}
     </span>
   )
 }
@@ -381,7 +387,7 @@ function FleetTab({
               <tr className="hover:bg-muted/40">
                 <td className="px-4 py-3 font-mono text-xs font-medium">{device.deviceId}</td>
                 <td className="px-4 py-3">
-                  <OnlineDot online={device.isOnline} />
+                  <OnlineDot online={device.isOnline} lastSeen={device.lastSeen} />
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{device.location ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
@@ -694,9 +700,11 @@ function DevicePicker({
                 />
                 <span className="font-medium">{deviceLabel(device)}</span>
                 <span className="font-mono text-xs text-muted-foreground">{device.deviceId.slice(0, 8)}…</span>
-                <OnlineDot online={device.isOnline} />
+                <OnlineDot online={device.isOnline} lastSeen={device.lastSeen} />
                 <span className="text-xs text-muted-foreground">{device.location ?? "No location"}</span>
-                <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">Seen {when(device.lastSeen)}</span>
+                {device.isOnline && (
+                  <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">Seen {when(device.lastSeen)}</span>
+                )}
               </label>
             )
           })
