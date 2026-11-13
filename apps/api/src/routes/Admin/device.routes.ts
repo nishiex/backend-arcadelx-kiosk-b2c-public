@@ -72,6 +72,23 @@ router.post(
   resetPricesForDevice,
 );
 
+// The same operation with the verb in the path. Clients that address the reset as a
+// DELETE on the device's prices (rather than a POST on /reset) reach the identical
+// handler, so there is still one implementation and one set of guards.
+router.delete(
+  '/:deviceId/prices/reset',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  resetPricesForDevice,
+);
+
+router.delete(
+  '/:deviceId/prices',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  resetPricesForDevice,
+);
+
 // Price writes are gated to Company OWNER/ADMIN. `scope: 'GAME_CATALOG'` in the body updates
 // the game's catalog price for every kiosk; a device write never falls back to it.
 router.post(
