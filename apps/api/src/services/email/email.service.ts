@@ -7,12 +7,14 @@ const mailjet = Mailjet.apiConnect(
   process.env.MAILJET_SECRET_KEY!
 );
 
-type SendEmailParams = {
+export type SendEmailParams = {
   to: string;
   toName?: string;
   subject: string;
   text: string;
   html: string;
+  /** Stable provider id used to de-duplicate deliveries. */
+  customId?: string;
   attachment?: {
     filename: string;
     base64Content: string;
@@ -38,7 +40,9 @@ export const sendEmail = async ({
   toName,
   subject,
   text,
-  html,attachment
+  html,
+  attachment,
+  customId
 }: SendEmailParams) => {
 
   const finalText = text + TEXT_DISCLAIMER;
@@ -53,6 +57,7 @@ export const sendEmail = async ({
     .request({
       Messages: [
         {
+          ...(customId ? { CustomID: customId } : {}),
           From: {
             Email: process.env.MAIL_FROM_EMAIL!,
             Name: process.env.MAIL_FROM_NAME!,
@@ -97,4 +102,31 @@ export const sendEmail = async ({
     });
 
   return request.body;
+};
+
+/**
+ * Checks Mailjet for a message with the given CustomID.
+ * Returns null when the provider query is unsupported or fails, so callers fall back to sending.
+ */
+export const checkEmailDelivery = async (
+  customId: string
+): Promise<{ delivered: boolean; deliveredAt?: Date; messageId?: string } | null> => {
+  if (!customId) return null;
+  try {
+    const response: any = await (mailjet as any)
+      .get('message', { version: 'v3' })
+      .request({ CustomID: customId });
+
+    if (response?.body?.Count > 0 && response?.body?.Data?.[0]) {
+      const msg = response.body.Data[0];
+      return {
+        delivered: true,
+        deliveredAt: msg.ArrivedAt ? new Date(msg.ArrivedAt) : new Date(),
+        messageId: String(msg.ID),
+      };
+    }
+    return { delivered: false };
+  } catch {
+    return null;
+  }
 };

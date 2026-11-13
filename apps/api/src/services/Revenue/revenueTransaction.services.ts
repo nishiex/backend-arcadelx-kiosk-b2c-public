@@ -58,6 +58,8 @@ const recordSchema = z.object({
     .union([z.string(), z.number()])
     .transform(String)
     .pipe(z.string().regex(/^\d{1,8}(\.\d{1,2})?$/)),
+  // Upstream attribution key; IP royalties match it against IpProfile.sourceKey.
+  source: z.string().trim().max(120).nullish().transform((value) => value ?? null),
   currency: z.literal("INR").default("INR"),
   updated_at: z.coerce.date(),
 });
@@ -146,6 +148,7 @@ export async function syncRevenueData() {
           data: pending.map(({ kioskId, record }) => ({
             kioskId,
             gameId: record.game_id,
+            source: record.source,
             amount: record.amount,
             currency: record.currency,
             externalTransactionId: record.txnid,
