@@ -30,7 +30,7 @@ export const PAYMENT_STATUS_STYLES: Record<KioskOrder["paymentStatus"], string> 
   REFUNDED: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
 }
 
-const orgLabels: Record<OrgType, string> = { COMPANY: "Company", DISTRIBUTOR: "Distributor", PARTNER: "Partner" }
+const orgLabels: Record<OrgType, string> = { COMPANY: "Company", DISTRIBUTOR: "Distributor", PARTNER: "Partner", IP_PARTY: "IP Party" }
 export const orderDate = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value))
 export const orderMoney = (value: number) => new Intl.NumberFormat("en-IN", {
   style: "currency",
