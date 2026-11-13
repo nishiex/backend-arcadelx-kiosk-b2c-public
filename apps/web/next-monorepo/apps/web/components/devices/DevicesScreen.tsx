@@ -43,11 +43,17 @@ function defaultScheduledDate() {
 }
 
 /** Only an explicit upstream override is resetable; catalog drift is not. */
+/**
+ * What the reset can clear: the reported override fields, or a price that simply is not
+ * the catalog price. Counting only the fields left the button disabled on devices whose
+ * override Mothership applied without flagging it.
+ */
 function gameHasOverride(game: GamePriceView): boolean {
   return (
     game.hasOverride ||
     game.overridePrice !== null ||
-    game.overrideReplayPrice !== null
+    game.overrideReplayPrice !== null ||
+    game.differsFromCatalog
   )
 }
 
@@ -839,7 +845,7 @@ function GamePriceTable({
         <p role="status" className="text-sm text-muted-foreground">
           {games.length} game{games.length === 1 ? "" : "s"} on{" "}
           <span className="font-mono text-xs">{deviceId}</span>
-          {overrides > 0 && ` · ${overrides} with a price override`}
+          {overrides > 0 && ` · ${overrides} not at catalog price`}
         </p>
         {canWrite && (
           <div className="flex flex-wrap items-center gap-2">
