@@ -305,23 +305,32 @@ function PriceRequestQueue({
   )
 }
 
-/**
- * Device state as one value.
- *
- * An online cabinet is "Currently active"; an offline one shows when it was last heard
- * from, because "Offline" on its own tells an operator nothing they can act on.
- */
-function OnlineDot({ online, lastSeen }: { online: boolean; lastSeen: string | null }) {
+function OnlineDot({ online }: { online: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
         online
           ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
           : "bg-muted text-muted-foreground"
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground"}`} />
-      {online ? "Currently active" : when(lastSeen)}
+      {online ? "Online" : "Offline"}
+    </span>
+  )
+}
+
+/**
+ * The Last seen column doubles as the device state: a cabinet that is online reads
+ * "Currently active" in the same emerald pill, one that is not shows the moment it was
+ * last heard from. State keeps its own Online/Offline pill.
+ */
+function LastSeen({ online, lastSeen }: { online: boolean; lastSeen: string | null }) {
+  if (!online) return <span className="whitespace-nowrap">{when(lastSeen)}</span>
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      Currently active
     </span>
   )
 }
@@ -387,11 +396,11 @@ function FleetTab({
               <tr className="hover:bg-muted/40">
                 <td className="px-4 py-3 font-mono text-xs font-medium">{device.deviceId}</td>
                 <td className="px-4 py-3">
-                  <OnlineDot online={device.isOnline} lastSeen={device.lastSeen} />
+                  <OnlineDot online={device.isOnline} />
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{device.location ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                  {when(device.lastSeen)}
+                  <LastSeen online={device.isOnline} lastSeen={device.lastSeen} />
                 </td>
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                   {device.hardwareUuid ?? "—"}
@@ -700,11 +709,9 @@ function DevicePicker({
                 />
                 <span className="font-medium">{deviceLabel(device)}</span>
                 <span className="font-mono text-xs text-muted-foreground">{device.deviceId.slice(0, 8)}…</span>
-                <OnlineDot online={device.isOnline} lastSeen={device.lastSeen} />
+                <OnlineDot online={device.isOnline} />
                 <span className="text-xs text-muted-foreground">{device.location ?? "No location"}</span>
-                {device.isOnline && (
-                  <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">Seen {when(device.lastSeen)}</span>
-                )}
+                <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">Seen {when(device.lastSeen)}</span>
               </label>
             )
           })
