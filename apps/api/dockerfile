@@ -47,7 +47,7 @@ COPY --from=builder --chown=node:node /app/apps/api/tsconfig.json ./tsconfig.jso
 COPY --from=builder --chown=node:node /app/apps/api/src ./src
 COPY --from=builder --chown=node:node /app/packages /app/packages
 
-RUN mkdir -p invoices && chown node:node invoices
+RUN mkdir -p invoices uploads/ads && chown -R node:node invoices uploads
 
 USER node
 

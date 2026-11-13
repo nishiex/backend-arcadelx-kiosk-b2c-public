@@ -38,7 +38,11 @@ services:
       - "4000:4000"
     volumes:
       - ./apps/api/invoices:/app/apps/api/invoices
-      - ./apps/api/uploads:/app/apps/api/uploads
+      # Named volume, not a bind mount. Docker seeds a fresh named volume from the image
+      # directory, which the Dockerfile owns as `node`; a missing host bind directory is
+      # created root:root 755 instead, and the API runs as uid 1000, so every upload
+      # failed with EACCES and surfaced as HTTP 500.
+      - api_uploads:/app/apps/api/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -70,3 +74,4 @@ services:
 
 volumes:
   redis_data:
+  api_uploads:
