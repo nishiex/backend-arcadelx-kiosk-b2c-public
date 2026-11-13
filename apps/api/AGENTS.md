@@ -820,3 +820,61 @@ Verification lives in `audits/deploy/` and the full runbook in `audits/deploy/RE
 `verify-vercel-bundle.mjs` (8/8) proves the bundle boots outside the project, and
 `verify-api-against-supabase.mjs` (7/7) proves the production server reaches Supabase,
 authenticates the seeded owner and starts no worker.
+
+## Kiosk ad delivery (2026-11-13)
+
+Assigning an ad in the console writes an `AdKiosk` row and nothing else: the console's
+"Assigned to" list says which cabinet *should* carry the ad, not which one is playing it.
+Until now there was no route a machine could call, so a freshly assigned ad never reached
+the hardware -- `/api/ads` and `/api/ads/files/:filename` both require a signed-in member,
+and a cabinet has no session.
+
+Two routes close that gap, mounted on the existing server-to-server surface and therefore
+guarded by `X-Internal-Api-Key` (`middlewares/internal.auth.ts`, the secret the kiosk broker
+already holds for pairing):
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/internal/kiosks/:machineCode/ads` | Manifest of the ACTIVE ads assigned to that cabinet |
+| `GET /api/internal/ads/files/:filename?kioskId=<machine code or hardware UUID>` | The bytes behind a manifest entry, Range-aware |
+
+`machineCode` accepts the printed code (`ADLX-2026-A010`) or Mothership's hardware UUID,
+because both are what a device knows about itself. `downloadPath` in the manifest is
+relative and already carries `kioskId`, so a client only needs its API base URL.
+
+Three rules this feed keeps, each of which protects a different failure:
+
+1. **The manifest is the playlist, and it is the whole playlist.** Only `ACTIVE` ads appear,
+   so deactivating an ad removes it at the next poll and the kiosk deletes the local copy it
+   no longer finds. A `RETIRED` cabinet answers 200 with an empty list -- it is known, it just
+   must not play anything -- and its downloads 404.
+2. **The file route re-checks the assignment on every request.** It never trusts a filename
+   from an earlier manifest, so unassigning an ad revokes the bytes immediately, not at the
+   next manifest cycle, and the endpoint cannot be used to walk the library. An ad that is
+   not assigned to this cabinet answers 404 exactly like a missing file.
+3. **Polling is cheap and correct.** The manifest sends an `ETag` derived from the kiosk and
+   the ids/timestamps of its ads; a poll carrying `If-None-Match` gets 304 while the playlist
+   is unchanged. It is still `Cache-Control: no-cache`, because the answer is per-cabinet and
+   changes the moment an assignment is edited.
+
+Byte serving is single-sourced. `controllers/Ads/ad-video.ts` owns the transfer (MIME
+enforcement, `Content-Disposition`, Range parsing, 416 answers); the member routes
+(`/api/ads/:id/video`, `/api/ads/files/:filename`) and the kiosk route all delegate to it, so
+a fix to one surface cannot leave the other behind. `streamAdVideo` now only resolves the row
+and calls it.
+
+Verified on 2026-11-13 over real HTTP against the configured development database, driving
+the actual routers (23/23 checks): guard rejection without/with a wrong key; manifest lists
+exactly the assigned ACTIVE ads; 304 on the version tag; unknown machine code 404; hardware
+UUID resolves to the same cabinet; whole-file download with the recorded byte length; `0-99`
+and suffix ranges answer 206 with the right slice and `Content-Range`; an unsatisfiable range
+answers 416 rather than being clamped; member playback is still 401 anonymous; unassigning
+revokes both the manifest entry and the bytes, and re-assigning restores them; an `INACTIVE`
+ad disappears from the manifest and stops downloading; a `RETIRED` cabinet gets an empty
+manifest and 404s. The fixture ad used for the transfer checks was removed afterwards
+(`Ad`/`AdKiosk` counts back to zero, no file left in `uploads/ads`).
+
+The console card now reads "Assigned to" instead of "Playing on", with a tooltip stating that
+the kiosk picks the ad up at its next sync; the old label claimed playback the backend never
+performed. What remains outside this repo is the player: the kiosk app must poll the manifest,
+download `downloadPath` entries and delete files it no longer finds.

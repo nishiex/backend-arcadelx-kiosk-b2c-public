@@ -18,18 +18,22 @@ import { maxChunkSizeBytes } from '../../services/ads.service';
 
 const router = Router();
 
-// Ads are Company content: every route is scoped to the caller's Company membership.
-router.use(requireAuth, loadMembership, requireOrgType('COMPANY'));
+// Authentication and active membership required on all ad routes.
+router.use(requireAuth, loadMembership);
+
+// Playback routes: any member of the network (Company, Distributor, or Partner) can stream
+// ad videos that their kiosks run.
+router.get('/files/:filename', streamAdVideoByFilename);
+router.get('/:id/video', streamAdVideo);
+
+// Library inspection and ad management are Company content.
+router.use(requireOrgType('COMPANY'));
 
 // Reads: any active Company member may inspect the library and preview a video.
 router.get('/config', getUploadConfig);
 router.get('/', listAds);
-// Filename-addressed playback for the `/api/v1` contract. Registered before `/:id/video`
-// so the literal `files` segment can never be read as an ad id.
-router.get('/files/:filename', streamAdVideoByFilename);
 router.post('/files', requireRole('OWNER', 'ADMIN'), uploadChunkMultipart);
 router.get('/:id', getAd);
-router.get('/:id/video', streamAdVideo);
 
 // Writes: OWNER/ADMIN only, matching the Company batch-kiosk and gateway mutations.
 router.post('/uploads', requireRole('OWNER', 'ADMIN'), initUpload);
