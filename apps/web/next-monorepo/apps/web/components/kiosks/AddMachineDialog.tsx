@@ -27,13 +27,16 @@ const inputCls =
  */
 export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }) {
   const [open, setOpen] = React.useState(false)
-  const [count, setCount] = React.useState(1)
+  // The field holds text, not a number. Clamping on every keystroke rewrote the box the
+  // moment it was cleared, so the operator could never replace the 1 -- only append to it.
+  const [countText, setCountText] = React.useState("1")
+  const count = Number(countText)
   const queryClient = useQueryClient()
 
   // Reset the form each time the dialog opens.
   React.useEffect(() => {
     if (open) {
-      setCount(1)
+      setCountText("1")
     }
   }, [open])
 
@@ -53,7 +56,7 @@ export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to mint machines"),
   })
 
-  const valid = count >= 1 && count <= 100
+  const valid = Number.isInteger(count) && count >= 1 && count <= 100
 
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
@@ -85,9 +88,21 @@ export default function AddMachineDialog({ onMinted }: { onMinted?: () => void }
                 type="number"
                 min={1}
                 max={100}
+                inputMode="numeric"
                 className={inputCls}
-                value={count}
-                onChange={(e) => setCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                value={countText}
+                onChange={(e) => setCountText(e.target.value.replace(/[^\d]/g, ""))}
+                onBlur={() => {
+                  // Clamp once the operator has finished, never mid-typing.
+                  const entered = Number(countText)
+                  setCountText(
+                    String(
+                      Number.isFinite(entered)
+                        ? Math.min(100, Math.max(1, Math.trunc(entered)))
+                        : 1,
+                    ),
+                  )
+                }}
               />
             </Field>
           </div>
