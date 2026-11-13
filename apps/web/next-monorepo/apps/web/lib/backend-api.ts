@@ -102,7 +102,7 @@ export async function fetchAnalyticsSummary(signal?: AbortSignal): Promise<Analy
 }
 
 // ---- Auth / identity ----
-export type OrgType = 'COMPANY' | 'DISTRIBUTOR' | 'PARTNER';
+export type OrgType = 'COMPANY' | 'DISTRIBUTOR' | 'PARTNER' | 'IP_PARTY';
 export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF';
 
 export type Organization = {
@@ -132,6 +132,8 @@ export type Me = {
   id: string;
   email: string;
   name: string;
+  /** Set for accounts created with a temporary password (IP parties). */
+  mustChangePassword?: boolean;
   membership: Membership | null;
   /** Effective permission keys as "MODULE:ACTION" (empty when not active). */
   permissions: string[];
@@ -194,7 +196,7 @@ export async function pairKioskDevice(machineCode: string, externalDeviceId: str
   return handleRes<{ kiosk: { machineCode: string; externalDeviceId: string; model: string | null } }>(res);
 }
 
-const handleRes = async <T,>(res: Response): Promise<T> => {
+export const handleRes = async <T,>(res: Response): Promise<T> => {
   const text = await res.text();
   let json: ApiResponse<T> | { message?: string } | null = null;
   try {
@@ -215,7 +217,7 @@ const handleRes = async <T,>(res: Response): Promise<T> => {
 // returns 401; we transparently hit the refresh endpoint once (single-flighted
 // so concurrent calls share one refresh) and replay the original request. If
 // refresh fails the user is genuinely logged out and the 401 propagates.
-async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return sessionApiFetch(input, init);
 }
 

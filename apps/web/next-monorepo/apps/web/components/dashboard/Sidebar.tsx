@@ -21,6 +21,7 @@ import {
   Share2,
   ScrollText,
   Clapperboard,
+  Handshake,
   Waypoints,
   type LucideIcon,
 } from "lucide-react"
@@ -72,6 +73,8 @@ const NAV: NavEntry[] = [
   // Company video ads. Reads are open to every active Company member; OWNER/ADMIN
   // additionally get upload, edit and delete inside the screen.
   { kind: "link", item: { name: "Ads", href: "/ads", icon: Clapperboard, show: (p) => p.canViewAds } },
+  // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
+  { kind: "link", item: { name: "IP Parties", href: "/ip", icon: Handshake, show: (p) => p.isMasterAdmin } },
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;
   // it is intentionally not a second tab on the Requests page.
