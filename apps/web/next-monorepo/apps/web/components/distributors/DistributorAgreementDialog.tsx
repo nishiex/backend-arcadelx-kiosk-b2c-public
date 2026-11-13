@@ -1,10 +1,10 @@
 "use client"
 
 import React from "react"
-import * as Dialog from "@radix-ui/react-dialog"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Loader2, X } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { FullScreenDialog } from "@/components/common/FullScreenDialog"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   createAgreement,
@@ -214,7 +214,7 @@ export default function DistributorAgreementDialog({
   const showForm = !current
 
   return (
-    <Dialog.Root
+    <FullScreenDialog
       open={open}
       onOpenChange={value => {
         if (busy) return
@@ -227,8 +227,7 @@ export default function DistributorAgreementDialog({
         }
         setOpen(value)
       }}
-    >
-      <Dialog.Trigger asChild>
+      trigger={
         <button
           type="button"
           aria-label={`Agreement for ${distributor.name}`}
@@ -236,22 +235,10 @@ export default function DistributorAgreementDialog({
         >
           Agreement
         </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-xl sm:p-6">
-          <Dialog.Title className="pr-10 text-xl font-semibold">Agreement · {distributor.name}</Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm text-muted-foreground">
-            Commercial terms between your organization and this distributor.
-          </Dialog.Description>
-          <Dialog.Close
-            disabled={busy}
-            aria-label="Close agreement"
-            className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted disabled:opacity-50"
-          >
-            <X size={18} />
-          </Dialog.Close>
-
+      }
+      title={`Agreement · ${distributor.name}`}
+      description="Commercial terms between your organization and this distributor."
+    >
           <div className="mt-5 space-y-5">
             {agreements.isLoading ? (
               <p role="status" className="text-sm text-muted-foreground">
@@ -474,8 +461,6 @@ export default function DistributorAgreementDialog({
               </>
             )}
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    </FullScreenDialog>
   )
 }
