@@ -20,6 +20,7 @@ import {
   resetAllDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
+import { networkOrgIds } from '../../services/network-scope';
 import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, eodRunForDate, getEodPricingTime, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
 
 /**
@@ -42,17 +43,34 @@ export const getDevices = asyncHandler(async (_req: Request, res: Response) => {
   const { devices: upstreamDevices, lastUpdated } = await listDevices();
   const visible = await visibleDevices(req, upstreamDevices);
   // Each kiosk reports the ad files it holds, but no upstream route serves those bytes.
-  // The one streamable copy this deployment owns is the Company ad library, so resolve
-  // every reported name against it. A non-Company caller owns no ads, so the lookup is
-  // simply empty and nothing leaks: the URLs are only minted for rows found in the
-  // caller's own organization.
+  // Resolve reported names against the Company ad library (including for kiosks assigned to
+  // child Distributors and Partners).
+  let companyOrgId = req.membership!.organizationId;
+  if (req.membership!.type !== 'COMPANY') {
+    const org = await prisma.organization.findUnique({
+      where: { id: req.membership!.organizationId },
+      select: { parentOrgId: true, parentOrg: { select: { id: true, type: true, parentOrgId: true } } },
+    });
+    if (org?.parentOrg?.type === 'COMPANY') {
+      companyOrgId = org.parentOrg.id;
+    } else if (org?.parentOrg?.parentOrgId) {
+      companyOrgId = org.parentOrg.parentOrgId;
+    } else {
+      const company = await prisma.organization.findFirst({
+        where: { type: 'COMPANY' },
+        select: { id: true },
+      });
+      if (company) companyOrgId = company.id;
+    }
+  }
+
   const reportedFiles = [
     ...new Set(visible.flatMap((device) => device.ads.map((ad) => ad.file.trim()))),
   ].filter(Boolean);
   const library = reportedFiles.length
     ? await prisma.ad.findMany({
         where: {
-          organizationId: req.membership!.organizationId,
+          organizationId: companyOrgId,
           originalFilename: { in: reportedFiles, mode: 'insensitive' },
         },
         select: { id: true, originalFilename: true, videoFilename: true, status: true },
@@ -246,17 +264,10 @@ function assertCompanyAdmin(req: Request) {
 
 async function visibleDeviceKiosks(req: Request) {
   if (req.membership!.type === 'COMPANY') return null;
-  // A Distributor's fleet covers its direct Partners' machines too, mirroring the kiosk
-  // inventory scope: without the partner rows a Distributor whose own machines are still
-  // in transit sees an empty fleet and can never request a price for a placed machine.
-  const orgIds: string[] = [req.membership!.organizationId];
-  if (req.membership!.type === 'DISTRIBUTOR') {
-    const partners = await prisma.organization.findMany({
-      where: { parentOrgId: req.membership!.organizationId, type: 'PARTNER', isActive: true },
-      select: { id: true },
-    });
-    orgIds.push(...partners.map((partner) => partner.id));
-  }
+  // Own organization plus the network below it, from the same resolver as the kiosk
+  // inventory: a Distributor also sees the machines it placed with its Partners.
+  const orgIds = await networkOrgIds(req.membership!.organizationId, req.membership!.type);
+
   return prisma.kiosk.findMany({
     where: { currentOrgId: { in: orgIds } },
     select: { externalDeviceId: true, machineCode: true },

@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
 import { prisma } from '../../utils/db';
 import { ApiError } from '../../utils/ApiError';
@@ -16,6 +15,8 @@ import {
   UploadInitSchema,
 } from '@shared-types/validationSchemas/Ads/ads.validation';
 import * as ads from '../../services/ads.service';
+import { serveAdVideo } from './ad-video';
+import { networkOrgIds } from '../../services/network-scope';
 
 // Display shape only. The stored filename is intentionally absent: clients address the
 // video through /api/ads/:id/video, which re-checks organization scope on every request.
@@ -54,26 +55,69 @@ function toAdResponse(ad: AdWithKiosks) {
   };
 }
 
+async function resolveAdCompanyOrgId(req: Request): Promise<string> {
+  const membership = req.membership;
+  if (!membership) throw new ApiError(403, 'Organization membership required');
+  if (membership.type === 'COMPANY') return membership.organizationId;
+
+  const org = await prisma.organization.findUnique({
+    where: { id: membership.organizationId },
+    select: { parentOrgId: true, parentOrg: { select: { id: true, type: true, parentOrgId: true } } },
+  });
+  if (org?.parentOrg?.type === 'COMPANY') return org.parentOrg.id;
+  if (org?.parentOrg?.parentOrgId) return org.parentOrg.parentOrgId;
+
+  const company = await prisma.organization.findFirst({
+    where: { type: 'COMPANY' },
+    select: { id: true },
+  });
+  return company?.id ?? membership.organizationId;
+}
+
 /**
- * A kiosk can only carry an ad while this organization currently owns it. Ownership is
- * `Kiosk.currentOrgId`; the join table deliberately has no tenant column, so this check is
- * the boundary that keeps one tenant's ad off another tenant's hardware.
+ * A kiosk can carry an ad while it is part of this Company's fleet — including directly
+ * owned machines, machines assigned to child Distributors, and machines assigned to Partners
+ * (whether placed directly or via Distributors).
+ *
+ * Preserves existing kiosk ownership, distributor/partner assignments and access permissions;
+ * only RETIRED machines are excluded.
  */
 async function resolveOwnedKiosks(organizationId: string, kioskIds: string[]): Promise<string[]> {
   const unique = [...new Set(kioskIds)];
   if (unique.length === 0) return [];
 
+  // Same resolver as the kiosk inventory the picker reads, so a machine that is offered
+  // there is always accepted here -- including Partners linked by connection or agreement
+  // rather than by `parentOrgId`.
+  const allowedOrgIds = new Set(await networkOrgIds(organizationId, 'COMPANY'));
+
   const kiosks = await prisma.kiosk.findMany({
     where: { id: { in: unique } },
-    select: { id: true, currentOrgId: true, status: true },
+    select: {
+      id: true,
+      currentOrgId: true,
+      status: true,
+      assignments: {
+        where: { assignedTo: null },
+        select: { organizationId: true },
+        take: 1,
+      },
+    },
   });
 
-  const owned = new Set(
-    kiosks.filter((kiosk) => kiosk.currentOrgId === organizationId).map((kiosk) => kiosk.id),
+  const eligibleKiosks = new Set(
+    kiosks
+      .filter((kiosk) => {
+        if (!kiosk.currentOrgId) return true; // Unassigned Company stock
+        if (allowedOrgIds.has(kiosk.currentOrgId)) return true;
+        return kiosk.assignments.some((a) => allowedOrgIds.has(a.organizationId));
+      })
+      .map((kiosk) => kiosk.id),
   );
-  const rejected = unique.filter((id) => !owned.has(id));
+
+  const rejected = unique.filter((id) => !eligibleKiosks.has(id));
   if (rejected.length > 0) {
-    throw new ApiError(400, `Kiosks are not owned by this organization: ${rejected.join(', ')}`);
+    throw new ApiError(400, `Kiosks are not owned or assigned within this organization network: ${rejected.join(', ')}`);
   }
 
   const retired = kiosks.filter((kiosk) => kiosk.status === 'RETIRED');
@@ -456,89 +500,25 @@ export const uploadChunkMultipart = asyncHandler(async (req: Request, res: Respo
   );
 });
 
+/**
+ * Member-facing playback by ad id.
+ *
+ * Resolves the row inside the caller's company, then delegates the transfer to
+ * `serveAdVideo` -- the same implementation the kiosk sync feed uses, so both surfaces
+ * answer Range requests and MIME the same way.
+ */
 export const streamAdVideo = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = AdIdParamSchema.parse(req.params);
-    const { organizationId } = actor(req);
+    const companyOrgId = await resolveAdCompanyOrgId(req);
 
     const ad = await prisma.ad.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId: companyOrgId },
       select: { videoFilename: true, mimeType: true, originalFilename: true },
     });
     if (!ad) throw new ApiError(404, 'Ad not found');
 
-    if (!(ads.ALLOWED_VIDEO_TYPES as readonly string[]).includes(ad.mimeType)) {
-      throw new ApiError(415, 'Stored video type is not supported');
-    }
-
-    const { filePath, size } = await ads.statVideo(ad.videoFilename);
-
-    const safeName = ad.originalFilename.replace(/[^\w.\-]+/g, '_') || 'ad.mp4';
-    // `?download=1` turns the same stream into a save-file response. Range handling stays
-    // identical, so a resumable download works exactly like playback.
-    const asAttachment = ['1', 'true', 'yes'].includes(
-      String(req.query.download ?? '').trim().toLowerCase(),
-    );
-    res.setHeader('Content-Type', ad.mimeType);
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader(
-      'Content-Disposition',
-      `${asAttachment ? 'attachment' : 'inline'}; filename="${safeName}"`,
-    );
-    res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
-
-    const range = req.headers.range;
-    if (!range) {
-      res.status(200);
-      res.setHeader('Content-Length', String(size));
-      const stream = createReadStream(filePath);
-      stream.on('error', (error) => {
-        if (res.headersSent) res.destroy();
-        else next(error);
-      });
-      stream.pipe(res);
-      return;
-    }
-
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
-    if (!match || (match[1] === '' && match[2] === '')) {
-      res.setHeader('Content-Range', `bytes */${size}`);
-      throw new ApiError(416, 'Invalid range header');
-    }
-
-    let start: number;
-    let end: number;
-
-    if (match[1] === '') {
-      // Suffix range: the last N bytes.
-      const suffix = Number(match[2]);
-      if (!Number.isInteger(suffix) || suffix <= 0) {
-        res.setHeader('Content-Range', `bytes */${size}`);
-        throw new ApiError(416, 'Invalid range header');
-      }
-      start = Math.max(size - suffix, 0);
-      end = size - 1;
-    } else {
-      start = Number(match[1]);
-      end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
-    }
-
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start > end || start >= size) {
-      res.setHeader('Content-Range', `bytes */${size}`);
-      throw new ApiError(416, 'Requested range not satisfiable');
-    }
-
-    res.status(206);
-    res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
-    res.setHeader('Content-Length', String(end - start + 1));
-
-    const stream = createReadStream(filePath, { start, end });
-    stream.on('error', (error) => {
-      if (res.headersSent) res.destroy();
-      else next(error);
-    });
-    stream.pipe(res);
+    await serveAdVideo(req, res, next, ad);
   },
 );
 
@@ -548,15 +528,15 @@ export const streamAdVideo = asyncHandler(
  * The stored name goes through the storage module's single choke point, so this route
  * cannot be used to reach another path, and the lookup is organization-scoped: an ad in
  * another company answers 404 exactly like a missing one. Range handling, headers and MIME
- * enforcement stay in `streamAdVideo`; this only resolves the id it needs.
+ * enforcement stay in `serveAdVideo`; this only resolves the id it needs.
  */
 export const streamAdVideoByFilename = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const filename = ads.assertStoredFilename(String(req.params.filename ?? ''));
-    const { organizationId } = actor(req);
+    const companyOrgId = await resolveAdCompanyOrgId(req);
 
     const ad = await prisma.ad.findFirst({
-      where: { videoFilename: filename, organizationId },
+      where: { videoFilename: filename, organizationId: companyOrgId },
       select: { id: true },
     });
     if (!ad) throw new ApiError(404, 'Ad not found');
