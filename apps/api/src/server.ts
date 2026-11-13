@@ -20,10 +20,14 @@ if (env.EOD_PRICE_JOBS_ENABLED === 'true') {
 }
 
 if (process.env.REVENUE_JOBS_ENABLED === 'true') {
-  const { startRevenueJobs } = await import('./workers/Revenue/revenue.worker.js');
-  const jobs = await startRevenueJobs();
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, async () => { await jobs.close(); await pricingJobs?.close(); process.exit(0); });
+  try {
+    const { startRevenueJobs } = await import('./workers/Revenue/revenue.worker.js');
+    const jobs = await startRevenueJobs();
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      process.once(signal, async () => { await jobs.close(); await pricingJobs?.close(); process.exit(0); });
+    }
+  } catch (error) {
+    console.error('[Revenue] scheduler unavailable; scheduled revenue updates are paused', error);
   }
 }
 
