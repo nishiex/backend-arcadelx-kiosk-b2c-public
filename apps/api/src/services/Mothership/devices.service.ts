@@ -350,15 +350,21 @@ const PRICE_EPSILON = 0.001;
 const samePrice = (a: number, b: number): boolean => Math.abs(a - b) < PRICE_EPSILON;
 
 /**
- * An override exists only when Mothership reports one. Catalog drift used to be counted
- * here, which made reset verification fail on kiosks with nothing to reset: an upstream
- * device reset cannot make the device price equal the catalog price.
+ * Anything a reset has to clear: Mothership's override fields, or a device price that is
+ * simply not the catalog price.
+ *
+ * The second half is not paranoia. A device write can land -- effective 12 against a
+ * catalog 10 -- while `has_override` and both override columns still read empty; counting
+ * only the reported fields made the reset answer "no overrides to reset" and leave the
+ * kiosk charging 12. Catalog drift is counted for the same reason: the operator asked for
+ * catalog pricing, and the reset is the only call that can produce it.
  */
 function hasPriceOverride(game: GamePriceView): boolean {
   return (
     game.hasOverride ||
     game.overridePrice !== null ||
-    game.overrideReplayPrice !== null
+    game.overrideReplayPrice !== null ||
+    game.differsFromCatalog
   );
 }
 
