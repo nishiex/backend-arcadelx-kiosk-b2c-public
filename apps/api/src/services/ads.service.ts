@@ -97,13 +97,35 @@ function tempDir(): string {
   return path.join(adsUploadDir(), '.tmp');
 }
 
+/**
+ * Map a filesystem failure onto the status it really is.
+ *
+ * A directory the container user cannot write is a deployment error, not a bug in the
+ * request: answering 500 hides that and sends the operator looking in the wrong place. The
+ * path and the OS code are both included because they name the fix.
+ */
+function storageFailure(error: unknown, target: string): never {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  if (code && ['EACCES', 'EPERM', 'EROFS', 'ENOSPC', 'ENOTDIR'].includes(code)) {
+    throw new ApiError(
+      503,
+      `Ad storage is not writable at ${target} (${code}); point ADS_UPLOAD_DIR at a writable directory`,
+    );
+  }
+  throw error;
+}
+
 let ensuredRoot: string | null = null;
 
 /** Create the storage directories on demand. No filesystem work happens at import. */
 export async function ensureStorageReady(): Promise<void> {
   const root = adsUploadDir();
   if (ensuredRoot === root) return;
-  await fsp.mkdir(tempDir(), { recursive: true });
+  try {
+    await fsp.mkdir(tempDir(), { recursive: true });
+  } catch (error) {
+    storageFailure(error, tempDir());
+  }
   ensuredRoot = root;
 }
 
@@ -269,7 +291,11 @@ export async function initUpload(input: UploadInitInput): Promise<{
     createdAt: new Date().toISOString(),
   };
 
-  await fsp.writeFile(partPath(uploadId), Buffer.alloc(0), { flag: 'wx' });
+  try {
+    await fsp.writeFile(partPath(uploadId), Buffer.alloc(0), { flag: 'wx' });
+  } catch (error) {
+    storageFailure(error, adsUploadDir());
+  }
   try {
     await writeSession(session);
   } catch (error) {
@@ -326,7 +352,9 @@ export async function writeChunk(input: ChunkInput): Promise<{
     throw new ApiError(400, `Expected ${expected} bytes for chunk ${chunkIndex}, received ${chunk.length}`);
   }
 
-  const handle = await fsp.open(partPath(session.uploadId), 'r+');
+  const handle = await fsp.open(partPath(session.uploadId), 'r+').catch((error: unknown) =>
+    storageFailure(error, adsUploadDir()),
+  );
   try {
     const { bytesWritten } = await handle.write(chunk, 0, chunk.length, offset);
     if (bytesWritten !== chunk.length) {
@@ -383,7 +411,11 @@ export async function completeUpload(input: CompleteInput): Promise<{
   }
 
   const videoFilename = generateStoredFilename(session.extension);
-  await fsp.rename(part, path.join(adsUploadDir(), videoFilename));
+  try {
+    await fsp.rename(part, path.join(adsUploadDir(), videoFilename));
+  } catch (error) {
+    storageFailure(error, adsUploadDir());
+  }
   await fsp.rm(sessionPath(session.uploadId), { force: true });
 
   return {

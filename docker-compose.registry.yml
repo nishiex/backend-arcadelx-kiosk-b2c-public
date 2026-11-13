@@ -20,10 +20,14 @@ services:
       PORT: 4000
       HOST: 0.0.0.0
       INVOICES_DIR: /app/apps/api/invoices
+      # Ad videos need a writable, persistent directory; without this the service falls
+      # back to a path inside the image that the `node` user cannot create.
+      ADS_UPLOAD_DIR: /app/apps/api/uploads/ads
       LOCAL_DATABASE_WIPE_ENABLED: "false"
       EOD_PRICE_JOBS_ENABLED: "false"
     volumes:
       - ./apps/api/invoices:/app/apps/api/invoices
+      - api_uploads:/app/apps/api/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -42,3 +46,6 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  api_uploads:
