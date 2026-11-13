@@ -5,6 +5,9 @@ import { createRevenueQueue, statementJobId, type RevenueJobData } from '../../q
 import { processRevenueStatement } from '../../services/Revenue/revenueStatement.service';
 import { syncRevenueData } from '../../services/Revenue/revenueTransaction.services';
 import { syncDevices } from '../../services/Revenue/deviceSync.service';
+import { calculatePendingTransactionSplits } from '../../services/Revenue/transactionSplit.service';
+import { runDailyRevenueAggregation } from '../../services/Revenue/ipDailyRevenue.service';
+import { triggerMonthlyIpSettlements } from '../../services/Revenue/ipSettlement.service';
 
 export function previousRevenueMonth(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric' }).formatToParts(now);
@@ -19,18 +22,37 @@ export function revenueJobPeriod(job: { timestamp: number; opts: { prevMillis?: 
 export async function startRevenueJobs() {
   if (!process.env.MOTHERSHIP_TRANSACTION_API_URL) throw new Error('MOTHERSHIP_TRANSACTION_API_URL is required for revenue jobs');
   const queue = createRevenueQueue();
+  const { ipSettlementWorker } = await import('./ipSettlement.worker');
   const worker = new Worker<RevenueJobData>('revenue-statements', async job => {
     // Register/refresh devices first: the transaction sync attributes a payment by
     // looking a kiosk up by externalDeviceId, so a device that is not recorded yet
     // would leave its payments unattributed.
     if (job.name === 'sync-transactions') {
       const devices = await syncDevices();
-      return { devices, transactions: await syncRevenueData() };
+      const transactions = await syncRevenueData();
+      // Stage B: per-transaction splits feed the IP dashboards and settlements.
+      const splits = await calculatePendingTransactionSplits();
+      const latestLog = await prisma.revenueSyncRunLog.findFirst({ orderBy: { runAt: 'desc' }, select: { id: true } });
+      if (latestLog) {
+        await prisma.revenueSyncRunLog.update({
+          where: { id: latestLog.id },
+          data: { unsplitCount: splits.unresolvedCount + splits.failedCount },
+        });
+      }
+      // Stage C: snapshot the previous completed IST day for IP parties.
+      const dailyRevenue = await runDailyRevenueAggregation();
+      return { devices, transactions, splits, dailyRevenue };
     }
     if (job.name === 'monthly-statements') {
       const { month, year } = revenueJobPeriod(job);
       const orgs = await prisma.organization.findMany({ where: { type: { in: ['DISTRIBUTOR', 'PARTNER'] }, isActive: true }, select: { id: true } });
       for (const org of orgs) await queue.add('statement', { targetOrgId: org.id, month, year }, { jobId: statementJobId(org.id, month, year) });
+      // IP settlements gate on the completed daily pipeline for the whole month.
+      try {
+        await triggerMonthlyIpSettlements(month, year);
+      } catch (error) {
+        console.error('[Revenue] IP settlement trigger failed:', error);
+      }
       return;
     }
     const { targetOrgId, month, year } = job.data;
@@ -44,5 +66,5 @@ export async function startRevenueJobs() {
     await queue.upsertJobScheduler('nightly-sync', { pattern: '0 0 * * *', tz: 'Asia/Kolkata' }, { name: 'sync-transactions', data: {} });
     await queue.upsertJobScheduler('monthly-revenue', { pattern: '0 2 1 * *', tz: 'Asia/Kolkata' }, { name: 'monthly-statements', data: {} });
   } catch (error) { await worker.close(); await queue.close(); throw error; }
-  return { close: async () => { await worker.close(); await queue.close(); } };
+  return { close: async () => { await worker.close(); await queue.close(); await ipSettlementWorker.close(); } };
 }

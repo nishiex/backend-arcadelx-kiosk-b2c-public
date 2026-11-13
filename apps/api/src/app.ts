@@ -22,6 +22,10 @@ import adsRoutes from './routes/Ads/ads.routes';
 import auditRoutes from './routes/Audit/audit.routes';
 import workflowRoutes from './routes/Workflow/workflow.routes';
 import analyticsRoutes from './routes/Analytics/analytics.routes';
+import ipRoutes from './IP/routes/registerRoute';
+import ipGameRoutes from './IP/routes/IpGamesRoutes';
+import ipRevenueRoutes from './IP/routes/ipRevenue.routes';
+import ipSettlementRoutes from './IP/routes/ipSettlement.routes';
 import { writeAuditLog } from './services/audit-log.service';
 const app = express();
 
@@ -60,6 +64,11 @@ app.use('/api/analytics', analyticsRoutes);
 
 app.use("/api/orders",orderRoutes)
 app.use('/api/revenue', revenueRoutes);
+// IP parties: onboarding and read-only royalty views; Company alone writes agreements and games.
+app.use('/api/ip', ipRoutes);
+app.use('/api/ip', ipGameRoutes);
+app.use('/api/ip/revenue', ipRevenueRoutes);
+app.use('/api/ip/settlements', ipSettlementRoutes);
 // Payment-gateway administration (proxied to Mothership). Session-authenticated and
 // limited to COMPANY OWNER/ADMIN inside the router.
 app.use('/api/admin/gateways', adminGatewayRoutes);

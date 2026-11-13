@@ -368,7 +368,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     .json(
       new ApiResponse(
         200,
-        { user: { id: user.id, email: user.email } },
+        { user: { id: user.id, email: user.email, mustChangePassword: user.mustChangePassword } },
         "Login successful",
       ),
     );
@@ -453,6 +453,7 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
       id: true,
       email: true,
       name: true,
+      mustChangePassword: true,
       membership: {
         select: {
           organizationId: true,
@@ -538,6 +539,7 @@ export const changePassword = asyncHandler(
         },
         data: {
           passwordHash: newPasswordHash,
+          mustChangePassword: false,
         },
       });
 
@@ -790,7 +792,7 @@ export const completeForgotPassword = asyncHandler(
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
-        data: { passwordHash: newPasswordHash },
+        data: { passwordHash: newPasswordHash, mustChangePassword: false },
       });
 
       await tx.passwordReset.update({

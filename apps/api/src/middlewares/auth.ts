@@ -71,7 +71,20 @@ export const loadMembership = asyncHandler(async (req: Request, res: Response, n
     });
 
     if (!membership || membership.status !== "ACTIVE" ||!membership.role) throw new ApiError(403, "You do not have active access to an organization");
-     
+
+    // Accounts issued a temporary password (IP parties) must replace it first. /change-password
+    // and /me are mounted with requireAuth only, so they stay reachable.
+    const account = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { mustChangePassword: true },
+    });
+    if (account?.mustChangePassword) {
+      throw new ApiError(
+        403,
+        "Password change required. You must change your temporary password before accessing the system.",
+        { mustChangePassword: true },
+      );
+    }
 
     req.membership = {
       organizationId: membership.organizationId,

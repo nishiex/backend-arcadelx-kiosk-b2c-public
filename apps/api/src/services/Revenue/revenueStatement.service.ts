@@ -38,7 +38,7 @@ export async function processRevenueStatement(
         where: { id: targetOrgId },
         select: { id: true, name: true, type: true },
       });
-      if (!org || org.type === "COMPANY") return null;
+      if (!org || org.type === "COMPANY" || org.type === "IP_PARTY") return null;
       const settings = await tx.systemSettings.findUnique({
         where: { id: "default" },
       });
