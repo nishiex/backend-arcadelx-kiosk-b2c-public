@@ -123,7 +123,7 @@ export default function AdsScreen() {
     retry: 1,
   })
 
-  const kiosks = useOwnedKiosks()
+  const kiosks = useOwnedKiosks({ includeNetworkInventory: true })
   // A retired machine cannot receive an ad: the API rejects it, so it is not offered here.
   const assignableKiosks = useMemo(
     () => (kiosks.data ?? []).filter((kiosk) => kiosk.status !== "RETIRED"),
@@ -225,7 +225,7 @@ export default function AdsScreen() {
 
       <Panel
         title="Ad library"
-        subtitle="Videos belong to your Company and can be assigned to any kiosk it currently owns."
+        subtitle="Videos belong to your Company and can be assigned to any kiosk in its network: its own machines, plus the ones held by its Distributors and Partners."
       >
         {ads.isPending ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -392,7 +392,12 @@ function AdCard({
       </dl>
 
       <div className="mt-3 min-h-12">
-        <p className="text-xs text-muted-foreground">Playing on</p>
+        <p
+          className="text-xs text-muted-foreground"
+          title="Assigning an ad does not interrupt playback: the kiosk downloads it at its next sync and keeps its current playlist until then."
+        >
+          Assigned to
+        </p>
         {ad.kioskIds.length === 0 ? (
           <p className="mt-1 text-xs">Not assigned to any kiosk</p>
         ) : (
@@ -511,6 +516,8 @@ function KioskPicker({
         <div className="max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-border p-2">
           {kiosks.map((kiosk) => {
             const checked = selected.includes(kiosk.id)
+            const holderOrg =
+              kiosk.assignedOrg ?? (kiosk.currentOrg?.type !== "COMPANY" ? kiosk.currentOrg : null)
             return (
               <label
                 key={kiosk.id}
@@ -533,6 +540,11 @@ function KioskPicker({
                 <span className="truncate text-xs text-muted-foreground">
                   {kiosk.model ?? "Unknown model"}
                 </span>
+                {holderOrg && (
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    {holderOrg.name} ({holderOrg.type.toLowerCase()})
+                  </span>
+                )}
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                   {kiosk.location ?? kiosk.status.toLowerCase()}
                 </span>

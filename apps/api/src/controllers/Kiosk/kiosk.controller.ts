@@ -6,6 +6,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { BatchCreateKiosksSchema } from "@shared-types/validationSchemas/Kiosk/kiosk.validation";
 import { recordOpeningAssignmentsByCode } from "../../services/kiosk-ownership";
+import { networkOrgIds } from "../../services/network-scope";
 
 // Display-only organization references; do not expose contact or invite details.
 const kioskDisplaySelect = {
@@ -101,58 +102,44 @@ export const getKiosks = asyncHandler(
     const currentOrgId = req.membership!.organizationId;
     const orgType = req.membership!.type;
 
-    const requestedOrgId = typeof req.query.organizationId === "string"? req.query.organizationId: currentOrgId;
+    const hasExplicitOrg = typeof req.query.organizationId === "string" && req.query.organizationId.trim() !== "";
+    const requestedOrgId = hasExplicitOrg ? req.query.organizationId as string : currentOrgId;
 
-    let allowedOrgIds: string[] = [];
+    // Own organization plus the network below it, resolved in one place. Reading
+    // `parentOrgId` alone here is what hid Partner and Distributor machines: an org linked
+    // only by an ACTIVE connection or agreement has no parent row, so its kiosks never
+    // reached this list even though the console lists the org itself.
+    const allowedOrgIds = await networkOrgIds(currentOrgId, orgType);
 
-    if (orgType === "COMPANY") {
-      // Find direct Distributors.
-      const distributors = await prisma.organization.findMany({
-        where: {
-          parentOrgId: currentOrgId,
-          type: "DISTRIBUTOR",
-        },
-        select: { id: true },
-      });
-
-      const distributorIds = distributors.map((d) => d.id);
-
-      // Find direct Partners and Partners under Distributors.
-      const partners = await prisma.organization.findMany({
-        where: {
-          type: "PARTNER",
-          parentOrgId: {
-            in: [currentOrgId, ...distributorIds],
-          },
-        },
-        select: { id: true },
-      });
-
-      allowedOrgIds = [currentOrgId, ...distributorIds, ...partners.map((p) => p.id),];
-    } else if (orgType === "DISTRIBUTOR") {
-      // Find direct Partners.
-      const partners = await prisma.organization.findMany({
-        where: {
-          parentOrgId: currentOrgId,
-          type: "PARTNER",
-        },
-        select: { id: true },
-      });
-
-      allowedOrgIds = [ currentOrgId, ...partners.map((p) => p.id),];
-    } else if (orgType === "PARTNER") {
-      // Partners can only view their own inventory.
-      allowedOrgIds = [currentOrgId];
+    // Validate requested organization access if explicitly scoped.
+    if (hasExplicitOrg && !allowedOrgIds.includes(requestedOrgId)) {
+      throw new ApiError(403, "Unauthorized to view this organization's kiosks");
     }
 
-    // Validate requested organization access.
-    if (!allowedOrgIds.includes(requestedOrgId)) throw new ApiError(403,"Unauthorized to view this organization's kiosks");
-    
-    // Fetch kiosks currently owned by the selected organization.
+    // When an organization is explicitly requested, scope to it. Otherwise, return all
+    // eligible fleet kiosks for this network scope (directly owned, distributor-assigned,
+    // partner-assigned, or unassigned company stock).
+    const where: Prisma.KioskWhereInput = hasExplicitOrg
+      ? { currentOrgId: requestedOrgId }
+      : orgType === "COMPANY"
+        ? {
+            OR: [
+              { currentOrgId: { in: allowedOrgIds } },
+              { currentOrgId: null },
+              { assignments: { some: { organizationId: { in: allowedOrgIds }, assignedTo: null } } },
+            ],
+          }
+        : orgType === "DISTRIBUTOR"
+          ? {
+              OR: [
+                { currentOrgId: { in: allowedOrgIds } },
+                { assignments: { some: { organizationId: { in: allowedOrgIds }, assignedTo: null } } },
+              ],
+            }
+          : { currentOrgId: currentOrgId };
+
     const kiosks = await prisma.kiosk.findMany({
-      where: {
-        currentOrgId: requestedOrgId,
-      },
+      where,
       select: kioskDisplaySelect,
       orderBy: {
         createdAt: "desc",

@@ -9,7 +9,7 @@ import { useMe } from "@/hooks/useMe"
  *
  * `includeNetworkInventory` opts a view into the full network scope the API already returns:
  * a Distributor's own stock plus the machines it placed with children, and for a Company master
- * admin the whole fleet down to Partners. Only the Machines screen asks for it, so summary
+ * admin the whole fleet down to Partners. Machines and the Ad library ask for it, so summary
  * widgets keep their existing "my organization's stock" reading.
  */
 export function useOwnedKiosks({
