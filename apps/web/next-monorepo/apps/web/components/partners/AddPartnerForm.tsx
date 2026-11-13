@@ -2,11 +2,10 @@
 
 import React from "react"
 import Link from "next/link"
-import * as Dialog from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { FullScreenDialog } from "@/components/common/FullScreenDialog"
 import { cn } from "@workspace/ui/lib/utils"
 import { useMe } from "@/hooks/useMe"
 import { createPartner, retryOrganizationCredentials, type CreatePartnerInput } from "@/lib/backend-api"
@@ -148,24 +147,21 @@ function PartnerForm({ modal }: { modal: boolean }) {
 
   if (!modal) return content
   return (
-    <Dialog.Root open={open} onOpenChange={value => {
-      if (busy.current || create.isPending || retry.isPending) return
-      if (value) { reset(); create.reset(); retry.reset() }
-      setOpen(value)
-    }}>
-      <Dialog.Trigger asChild>
+    <FullScreenDialog
+      open={open}
+      onOpenChange={value => {
+        if (busy.current || create.isPending || retry.isPending) return
+        if (value) { reset(); create.reset(); retry.reset() }
+        setOpen(value)
+      }}
+      trigger={
         <button type="button" className="inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Register Partner</button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-xl sm:p-6">
-          <Dialog.Title className="pr-10 text-xl font-semibold">Register Partner</Dialog.Title>
-          <Dialog.Description className="mb-5 mt-2 text-sm text-muted-foreground">Create a partner account from your dashboard.</Dialog.Description>
-          <Dialog.Close disabled={create.isPending || retry.isPending} aria-label="Close partner registration" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted disabled:opacity-50"><X size={18} /></Dialog.Close>
-          {content}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      }
+      title="Register Partner"
+      description="Create a partner account from your dashboard."
+    >
+      {content}
+    </FullScreenDialog>
   )
 }
 
