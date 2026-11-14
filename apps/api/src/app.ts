@@ -18,7 +18,6 @@ import revenueRoutes from './routes/Revenue/revenue.routes';
 import adminGatewayRoutes from './routes/Admin/gateway.routes';
 import deviceRoutes from './routes/Admin/device.routes';
 import reportsRoutes from './routes/Reports/reports.routes';
-import adsRoutes from './routes/Ads/ads.routes';
 import auditRoutes from './routes/Audit/audit.routes';
 import workflowRoutes from './routes/Workflow/workflow.routes';
 import analyticsRoutes from './routes/Analytics/analytics.routes';
@@ -51,12 +50,6 @@ app.use("/api/members",memberRoutes)
 app.use('/api/network', networkRoutes);
 app.use('/api/agreements', agreementRoutes);
 app.use('/api/kiosks', kioskRoutes);
-// Company video ads: library, resumable upload and range-aware playback (COMPANY only).
-app.use('/api/ads', adsRoutes);
-// Same surface for clients written against the `/api/v1` contract (mobile spec): the same
-// router, so no handler is duplicated. `POST /upload-chunk` is intentionally absent --
-// uploads stay chunked through `/uploads` + `PUT .../chunks/:index`.
-app.use('/api/v1/ads', adsRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/analytics', analyticsRoutes);
 // Crucial: These routes bypass standard JWT auth because they are server-to-server

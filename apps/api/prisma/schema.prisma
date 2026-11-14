@@ -140,7 +140,6 @@ model Organization {
   emailDeliveries     EmailDelivery[]
   revenueStatements   RevenueStatement[]
   devicePriceRequests DevicePriceRequest[] @relation("DevicePriceRequestOrganization")
-  ads                 Ad[]
 
   ipProfile             IpProfile?
   ipAgreements          IpAgreement[]        @relation("IpPartyAgreements")
@@ -310,7 +309,6 @@ model Kiosk {
   transactions   Transaction[]
   reservedOrder  Order?               @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
   returnRequests KioskReturnRequest[]
-  adKiosks       AdKiosk[]
 }
 
 // A kiosk owner asking to hand a machine back, and the supplier's decision on it.
@@ -611,52 +609,6 @@ model RevenueStatement {
 
   // DB-level duplicate-prevention safety net
   @@unique([organizationId, Month, Year])
-}
-
-// ── Ads Module ──────────────────────────────────────────────────────────────────
-// Company-level video ads that can be pushed to one or more kiosks.
-
-enum AdStatus {
-  ACTIVE
-  INACTIVE
-}
-
-model Ad {
-  id               String   @id @default(uuid())
-  organizationId   String
-  title            String   @db.VarChar(200)
-  description      String?  @db.Text
-  videoFilename    String   @unique @db.VarChar(500)   // server-minted filename on disk
-  originalFilename String   @db.VarChar(500)   // upload name shown to the user
-  mimeType         String   @db.VarChar(100)   // validated at upload; replayed on playback
-  videoSizeBytes   Int                          // exact byte-length; Int covers the 500 MB cap
-  durationSeconds  Float?                       // optional client hint, never trusted for billing
-  status           AdStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id])
-  adKiosks     AdKiosk[]
-
-  @@index([organizationId, status])
-  @@index([organizationId, createdAt])
-}
-
-// Many-to-many join: which kiosks currently carry which ad.
-model AdKiosk {
-  adId    String
-  kioskId String
-
-  assignedAt DateTime @default(now())
-
-  ad    Ad    @relation(fields: [adId], references: [id], onDelete: Cascade)
-  kiosk Kiosk @relation(fields: [kioskId], references: [id], onDelete: Cascade)
-
-  @@id([adId, kioskId])
-  // Postgres does not index foreign keys; this one is scanned by kiosk deletes, the
-  // ownership-transfer flow and the per-kiosk playback feed.
-  @@index([kioskId])
 }
 
 // IP MODELS 
