@@ -14,6 +14,7 @@ import {
   IndianRupee,
   Activity,
   CreditCard,
+  Megaphone,
   Settings,
   Menu,
   X,
@@ -69,6 +70,7 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
   { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
+  { kind: "link", item: { name: "Ads", href: "/ads", icon: Megaphone, show: (p) => p.canViewAds } },
   // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
   { kind: "link", item: { name: "IP Parties", href: "/ip", icon: Handshake, show: (p) => p.isMasterAdmin } },
   // The Distributors section: the row itself is the distributor list, and it expands
