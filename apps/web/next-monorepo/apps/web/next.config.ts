@@ -11,6 +11,12 @@ if (!['http:', 'https:'].includes(backendUrl.protocol) || backendUrl.username ||
 }
 const BACKEND_API_URL = backendUrl.origin
 
+const mothershipUrl = new URL(process.env.MOTHERSHIP_API_URL || "https://main.arcadelx.games")
+if (!['http:', 'https:'].includes(mothershipUrl.protocol) || mothershipUrl.username || mothershipUrl.password || mothershipUrl.pathname !== '/' || mothershipUrl.search || mothershipUrl.hash) {
+  throw new Error("MOTHERSHIP_API_URL must be an HTTP(S) origin without credentials, a path, query, or fragment.")
+}
+const MOTHERSHIP_API_URL = mothershipUrl.origin
+
 const nextConfig: NextConfig = {
   output: "standalone",
   transpilePackages: ["@workspace/ui"],
@@ -21,6 +27,10 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination: `${BACKEND_API_URL}/api/:path*`,
+      },
+      {
+        source: "/mothership-api/:path*",
+        destination: `${MOTHERSHIP_API_URL}/:path*`,
       },
     ]
   },

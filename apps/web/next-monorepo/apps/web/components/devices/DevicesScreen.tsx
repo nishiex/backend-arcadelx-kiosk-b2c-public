@@ -190,7 +190,10 @@ export default function DevicesScreen() {
       </div>
 
       {devices.isError ? (
-        <ErrorState message="Couldn't load the device fleet." onRetry={() => devices.refetch()} />
+        <ErrorState
+          message={devices.error instanceof Error ? devices.error.message : "Couldn't load the device fleet."}
+          onRetry={() => devices.refetch()}
+        />
       ) : (
         <Panel>
           {activeTab === "fleet" ? (
