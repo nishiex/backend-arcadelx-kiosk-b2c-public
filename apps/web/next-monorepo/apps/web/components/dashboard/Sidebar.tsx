@@ -20,7 +20,6 @@ import {
   ChevronDown,
   Share2,
   ScrollText,
-  Clapperboard,
   Handshake,
   Waypoints,
   type LucideIcon,
@@ -70,9 +69,6 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
   { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
-  // Company video ads. Reads are open to every active Company member; OWNER/ADMIN
-  // additionally get upload, edit and delete inside the screen.
-  { kind: "link", item: { name: "Ads", href: "/ads", icon: Clapperboard, show: (p) => p.canViewAds } },
   // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
   { kind: "link", item: { name: "IP Parties", href: "/ip", icon: Handshake, show: (p) => p.isMasterAdmin } },
   // The Distributors section: the row itself is the distributor list, and it expands

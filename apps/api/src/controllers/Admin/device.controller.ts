@@ -12,9 +12,7 @@ import {
   SetDeviceGamePriceSchema,
   SetDeviceGamePriceResultSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
-import {
-  attachLibraryAds,
-  getDevicePrices,
+import {  getDevicePrices,
   listDevices,
   resetDevicePrices,
   resetAllDevicePrices,
@@ -63,20 +61,7 @@ export const getDevices = asyncHandler(async (_req: Request, res: Response) => {
       if (company) companyOrgId = company.id;
     }
   }
-
-  const reportedFiles = [
-    ...new Set(visible.flatMap((device) => device.ads.map((ad) => ad.file.trim()))),
-  ].filter(Boolean);
-  const library = reportedFiles.length
-    ? await prisma.ad.findMany({
-        where: {
-          organizationId: companyOrgId,
-          originalFilename: { in: reportedFiles, mode: 'insensitive' },
-        },
-        select: { id: true, originalFilename: true, videoFilename: true, status: true },
-      })
-    : [];
-  const devices = attachLibraryAds(visible, library);
+  const devices = visible;
   res
     .status(200)
     .json(
