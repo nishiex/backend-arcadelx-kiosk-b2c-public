@@ -240,6 +240,15 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
 
 const requestParamsSchema = z.object({ requestId: z.string().uuid() });
 const reviewBodySchema = z.object({ reason: z.string().trim().min(1).max(1000) });
+const approvePriceRequestBodySchema = z.object({
+  mode: z.enum(['APPLY_NOW', 'SCHEDULED', 'ALL_KIOSKS']).default('SCHEDULED'),
+  scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Scheduled date must use YYYY-MM-DD').optional(),
+  scheduled_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Scheduled time must use HH:mm').optional(),
+}).superRefine((value, context) => {
+  if (value.mode === 'SCHEDULED' && (!value.scheduled_date || !value.scheduled_time)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Scheduled approvals require a date and time' });
+  }
+});
 
 function assertCompanyAdmin(req: Request) {
   if (req.membership?.type !== 'COMPANY' || !['OWNER', 'ADMIN'].includes(req.membership.role)) {
@@ -329,6 +338,8 @@ export const getDevicePriceRequests = asyncHandler(async (req: Request, res: Res
 export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: Response) => {
   const params = requestParamsSchema.safeParse(req.params);
   if (!params.success) throw new ApiError(400, 'Invalid price request id', params.error.issues);
+  const body = approvePriceRequestBodySchema.safeParse(req.body ?? {});
+  if (!body.success) throw new ApiError(400, 'Invalid price approval options', body.error.issues);
   const request = await prisma.devicePriceRequest.findUnique({ where: { id: params.data.requestId } });
   if (!request) throw new ApiError(404, 'Price request not found');
   await assertCanReviewPriceRequest(req, request.requesterOrgId);
@@ -375,12 +386,43 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
     if (ownedKiosk.status === 'RETIRED') {
       throw new ApiError(409, 'Retired kiosks cannot receive game price changes');
     }
-    await scheduleEodDevicePrice({ deviceId: request.deviceId, gameId: request.gameId, displayName: request.displayName, price: Number(request.price), replayPrice: Number(request.replayPrice), createdById: request.requestedById });
+    const price = Number(request.price);
+    const replayPrice = Number(request.replayPrice);
+    if (body.data.mode === 'APPLY_NOW') {
+      await setDeviceGamePrice(request.deviceId, request.gameId, {
+        price,
+        replay_price: replayPrice,
+        scope: 'DEVICE',
+        apply_now: true,
+      });
+    } else if (body.data.mode === 'ALL_KIOSKS') {
+      await setDeviceGamePrice(request.deviceId, request.gameId, {
+        price,
+        replay_price: replayPrice,
+        scope: 'GAME_CATALOG',
+      });
+    } else {
+      await scheduleEodDevicePrice({
+        deviceId: request.deviceId,
+        gameId: request.gameId,
+        displayName: request.displayName,
+        price,
+        replayPrice,
+        createdById: request.requestedById,
+        scheduledDate: body.data.scheduled_date!,
+        scheduledTime: body.data.scheduled_time!,
+      });
+    }
     const approved = await prisma.devicePriceRequest.update({
       where: { id: request.id },
-      data: { status: 'APPROVED', processingAt: null, reviewedById: req.user!.id, reviewedAt: new Date(), reviewNote: null },
+      data: { status: 'APPROVED', processingAt: null, reviewedById: req.user!.id, reviewedAt: new Date(), reviewNote: body.data.mode },
     });
-    res.json(new ApiResponse(200, { request: serializePriceRequest(approved) }, 'Price request approved and applied'));
+    const message = body.data.mode === 'APPLY_NOW'
+      ? 'Price request approved and applied now'
+      : body.data.mode === 'ALL_KIOSKS'
+        ? 'Price request approved and applied to all kiosks'
+        : 'Price request approved and scheduled';
+    res.json(new ApiResponse(200, { request: serializePriceRequest(approved) }, message));
   } catch (error) {
     await prisma.devicePriceRequest.updateMany({
       where: { id: request.id, status: 'PROCESSING' },

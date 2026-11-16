@@ -275,8 +275,17 @@ export async function fetchDevicePriceRequests(): Promise<{ requests: DevicePric
   return handleRes<{ requests: DevicePriceRequest[] }>(res)
 }
 
-export async function approveDevicePriceRequest(requestId: string): Promise<{ request: DevicePriceRequest }> {
-  const res = await apiFetch(`/api/devices/price-requests/${encodeURIComponent(requestId)}/approve`, { method: "PATCH" })
+export type PriceApprovalMode = "APPLY_NOW" | "SCHEDULED" | "ALL_KIOSKS"
+
+export async function approveDevicePriceRequest(
+  requestId: string,
+  input: { mode: PriceApprovalMode; scheduled_date?: string; scheduled_time?: string },
+): Promise<{ request: DevicePriceRequest }> {
+  const res = await apiFetch(`/api/devices/price-requests/${encodeURIComponent(requestId)}/approve`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
   return handleRes<{ request: DevicePriceRequest }>(res)
 }
 

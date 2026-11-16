@@ -12,6 +12,7 @@ import {
   approveDevicePriceRequest,
   rejectDevicePriceRequest,
   requestDeviceGamePrice,
+  type PriceApprovalMode,
   type DevicePriceRequest,
   resetAllDevicePrices,
   resetDevicePrices,
@@ -240,10 +241,16 @@ function PriceRequestQueue({
   /** Company reviewers act on requests; a Distributor's view of the queue is read-only. */
   canReview: boolean
 }) {
+  const [approvalRequest, setApprovalRequest] = React.useState<DevicePriceRequest | null>(null)
+  const [approvalMode, setApprovalMode] = React.useState<PriceApprovalMode>("SCHEDULED")
+  const [approvalDate, setApprovalDate] = React.useState(defaultScheduledDate())
+  const [approvalTime, setApprovalTime] = React.useState("00:00")
   const approve = useMutation({
-    mutationFn: approveDevicePriceRequest,
+    mutationFn: ({ requestId, mode, scheduled_date, scheduled_time }: { requestId: string; mode: PriceApprovalMode; scheduled_date?: string; scheduled_time?: string }) =>
+      approveDevicePriceRequest(requestId, { mode, scheduled_date, scheduled_time }),
     onSuccess: async () => {
-      toast.success("Price request approved and applied")
+      toast.success(approvalMode === "APPLY_NOW" ? "Price request approved and applied now" : approvalMode === "ALL_KIOSKS" ? "Price request applied to all kiosks" : "Price request approved and scheduled")
+      setApprovalRequest(null)
       await onChanged()
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't approve request"),
@@ -293,7 +300,12 @@ function PriceRequestQueue({
                   type="button"
                   className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
                   disabled={approve.isPending || reject.isPending}
-                  onClick={() => approve.mutate(request.id)}
+                  onClick={() => {
+                    setApprovalRequest(request)
+                    setApprovalMode("SCHEDULED")
+                    setApprovalDate(defaultScheduledDate())
+                    setApprovalTime("00:00")
+                  }}
                 >Approve</button>
                 <button
                   type="button"
@@ -310,6 +322,35 @@ function PriceRequestQueue({
           ))}
         </div>
       </div>
+      {approvalRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Choose price application options">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl">
+            <h3 className="text-lg font-semibold">Choose when to apply this price</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{approvalRequest.displayName} · {approvalRequest.deviceId}</p>
+            <div className="mt-4 space-y-3">
+              <label className="block space-y-1.5 text-sm font-medium">
+                <span>Application option</span>
+                <select value={approvalMode} onChange={event => setApprovalMode(event.target.value as PriceApprovalMode)} className={inputClass}>
+                  <option value="SCHEDULED">Schedule for a date and time</option>
+                  <option value="APPLY_NOW">Apply now to this kiosk</option>
+                  <option value="ALL_KIOSKS">Apply now to all kiosks</option>
+                </select>
+              </label>
+              {approvalMode === "SCHEDULED" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm font-medium"><span>Date</span><input type="date" min={localDateKey(new Date())} value={approvalDate} onChange={event => setApprovalDate(event.target.value)} className={inputClass} /></label>
+                  <label className="space-y-1.5 text-sm font-medium"><span>Time</span><input type="time" value={approvalTime} onChange={event => setApprovalTime(event.target.value)} className={inputClass} /></label>
+                </div>
+              )}
+              {approvalMode === "ALL_KIOSKS" && <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">This changes the game catalog price for every kiosk offering this game.</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={buttonClass} disabled={approve.isPending} onClick={() => setApprovalRequest(null)}>Cancel</button>
+              <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" disabled={approve.isPending || (approvalMode === "SCHEDULED" && (!approvalDate || !approvalTime))} onClick={() => approve.mutate({ requestId: approvalRequest.id, mode: approvalMode, scheduled_date: approvalMode === "SCHEDULED" ? approvalDate : undefined, scheduled_time: approvalMode === "SCHEDULED" ? approvalTime : undefined })}>{approve.isPending ? "Applying…" : "Confirm approval"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }
