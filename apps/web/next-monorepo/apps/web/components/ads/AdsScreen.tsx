@@ -18,6 +18,8 @@ import {
   updateMothershipAd,
   uploadMothershipAd,
   type MothershipAd,
+  type MothershipCreateAdResult,
+  type MothershipUpdateAdResult,
 } from "@/lib/mothership-ads-api"
 
 const inputClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
@@ -79,7 +81,7 @@ function AdvertisementCard({ ad, kiosksReporting, selectedCount, canManageAds, i
   onDelete: () => void
   onAssign: () => void
 }) {
-  const assignedLabel = ad.assignment_mode === "selected" ? `${ad.assigned_devices.length} assigned` : "All kiosks"
+  const assignedLabel = ad.assignment_mode === "selected" || ad.assigned_devices.length > 0 ? `${ad.assigned_devices.length} assigned` : "All kiosks"
   return (
     <article className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
       <video className="aspect-video w-full bg-black object-contain" controls preload="metadata" src={mothershipAdFileUrl(ad.filename)} />
@@ -153,16 +155,25 @@ export default function AdsScreen() {
         if (problem) throw new Error(problem)
       }
       const uploadId = file ? await uploadMothershipAd(file, undefined, setProgress) : undefined
+      let result: MothershipCreateAdResult | MothershipUpdateAdResult
+      let adId: number
       if (editing === null) {
         if (!file || !uploadId) throw new Error("Choose a video file.")
-        return createMothershipAd({ upload_id: uploadId, original_name: file.name, title: title.trim(), start_date: startDate, days_to_live: daysToLive })
+        result = await createMothershipAd({ upload_id: uploadId, original_name: file.name, title: title.trim(), start_date: startDate, days_to_live: daysToLive })
+        adId = result.id
+      } else {
+        result = await updateMothershipAd(editing, { title: title.trim(), start_date: startDate, days_to_live: daysToLive, ...(uploadId ? { upload_id: uploadId, original_name: file?.name } : {}) })
+        adId = editing
       }
-      return updateMothershipAd(editing, { title: title.trim(), start_date: startDate, days_to_live: daysToLive, ...(uploadId ? { upload_id: uploadId, original_name: file?.name } : {}) })
+      if (selectedDeviceIds.length) await assignMothershipAd(adId, selectedDeviceIds)
+      return result
     },
     onSuccess: (result) => {
       toast.success(result.message)
+      setSelectedDeviceIds([])
       resetForm()
       void queryClient.invalidateQueries({ queryKey: ["mothership-ads"] })
+      void queryClient.invalidateQueries({ queryKey: ["mothership-devices"] })
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -234,10 +245,11 @@ export default function AdsScreen() {
           {save.isError && <p role="alert" className="mt-4 text-sm text-destructive">{save.error instanceof Error ? save.error.message : "Couldn’t save the advertisement."}</p>}
           {progress !== null && <div className="mt-4"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Uploading video</span><span>{progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-[width]" style={{ width: `${progress}%` }} /></div></div>}
           <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" className={buttonClass} disabled={save.isPending} onClick={resetForm}>Clear</button><button className={primaryButtonClass} disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />} {editing === null ? "Create advertisement" : "Save changes"}</button></div>
+          <div className="mt-6 border-t border-border pt-6">
+            <KioskSelectionPicker devices={devices.data ?? []} isLoading={devices.isPending} error={devices.isError ? devices.error : null} onRefresh={() => void devices.refetch()} selectedDeviceIds={selectedDeviceIds} onSelectionChange={setSelectedDeviceIds} />
+          </div>
         </Panel>
       )}
-
-      <KioskSelectionPicker devices={devices.data ?? []} isLoading={devices.isPending} error={devices.isError ? devices.error : null} onRefresh={() => void devices.refetch()} selectedDeviceIds={selectedDeviceIds} onSelectionChange={setSelectedDeviceIds} />
 
       <Panel title="3. Advertisement library" subtitle={selectedDeviceIds.length ? `${selectedDeviceIds.length} kiosk${selectedDeviceIds.length === 1 ? "" : "s"} ready to assign.` : `${ads.data?.kiosks_reporting ?? 0} kiosks reporting`} action={<div className="flex flex-wrap items-center gap-2"><input aria-label="Search advertisements" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40 sm:w-52" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search advertisements" /><button className={buttonClass} onClick={() => void ads.refetch()}><RefreshCw size={16} /> Refresh</button></div>}>
         {ads.isPending ? <Skeleton className="h-64" /> : ads.isError ? <ErrorState message={ads.error.message} onRetry={() => void ads.refetch()} /> : !filteredAds.length ? <EmptyState icon={<Clapperboard size={28} />} message={search ? "No advertisements match your search." : "No advertisements have been uploaded yet."} /> : <div className="grid gap-4 lg:grid-cols-2">{filteredAds.map((ad) => <AdvertisementCard key={ad.id} ad={ad} kiosksReporting={ads.data?.kiosks_reporting ?? 0} selectedCount={selectedDeviceIds.length} canManageAds={canManageAds} isAssigning={assign.isPending} isDeleting={remove.isPending} onEdit={() => beginEdit(ad)} onDelete={() => { if (window.confirm(`Delete ${ad.title}? This removes it from the server and kiosks on their next check-in.`)) remove.mutate(ad.id) }} onAssign={() => assign.mutate({ adId: ad.id, deviceIds: selectedDeviceIds })} />)}</div>}
