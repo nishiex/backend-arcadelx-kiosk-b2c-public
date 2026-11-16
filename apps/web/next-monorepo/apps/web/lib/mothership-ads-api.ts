@@ -250,12 +250,24 @@ export async function fetchMothershipDevices(signal?: AbortSignal): Promise<Moth
   return body.devices.map(parseDevice)
 }
 
+function createUploadId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID()
+
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16)
+    globalThis.crypto.getRandomValues(bytes)
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
 export async function uploadMothershipAd(
   file: File,
   signal?: AbortSignal,
   onProgress?: UploadProgress,
 ): Promise<string> {
-  const uploadId = `up${crypto.randomUUID().replaceAll("-", "").slice(0, 30)}`
+  const uploadId = `up${createUploadId().replaceAll("-", "").slice(0, 30)}`
   const totalChunks = Math.max(1, Math.ceil(file.size / UPLOAD_CHUNK_BYTES))
 
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
