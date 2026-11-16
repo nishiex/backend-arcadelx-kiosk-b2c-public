@@ -21,7 +21,6 @@ import {
   ChevronDown,
   Share2,
   ScrollText,
-  Handshake,
   Waypoints,
   type LucideIcon,
 } from "lucide-react"
@@ -72,7 +71,6 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
   { kind: "link", item: { name: "Ads", href: "/ads", icon: Megaphone, show: (p) => p.canViewAds } },
   // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
-  { kind: "link", item: { name: "IP Parties", href: "/ip", icon: Handshake, show: (p) => p.isMasterAdmin } },
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;
   // it is intentionally not a second tab on the Requests page.
