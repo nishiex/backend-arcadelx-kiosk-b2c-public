@@ -342,10 +342,14 @@ export const getAgreements = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, { agreements, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } }));
 });
 
-/** Return the agreement history for one Partner in the caller's network. */
+/**
+ * Return the agreement history for one child organization in the caller's
+ * network. Company callers may inspect direct Distributors and Partners;
+ * Distributor callers may inspect their Partners.
+ */
 export const getAgreementsForChild = asyncHandler(async (req, res) => {
   const childOrgId = req.params.childOrgId;
-  if (typeof childOrgId !== 'string') throw new ApiError(400, 'Invalid Partner organization ID');
+  if (typeof childOrgId !== 'string') throw new ApiError(400, 'Invalid child organization ID');
 
   const currentOrgId = req.membership!.organizationId;
   const currentOrgType = req.membership!.type;
@@ -359,11 +363,14 @@ export const getAgreementsForChild = asyncHandler(async (req, res) => {
   }
 
   const child = await prisma.organization.findFirst({
-    where: { id: childOrgId, type: 'PARTNER' },
+    where: {
+      id: childOrgId,
+      type: currentOrgType === 'COMPANY' ? { in: ['DISTRIBUTOR', 'PARTNER'] } : 'PARTNER',
+    },
     select: { id: true, parentOrgId: true },
   });
   if (!child || !child.parentOrgId || !parentIds.includes(child.parentOrgId)) {
-    throw new ApiError(403, 'You are not authorized to view this Partner agreement');
+    throw new ApiError(403, 'You are not authorized to view this child organization agreement');
   }
 
   const agreements = await prisma.agreement.findMany({
@@ -374,5 +381,5 @@ export const getAgreementsForChild = asyncHandler(async (req, res) => {
       childOrg: { select: { id: true, name: true, type: true } },
     },
   });
-  res.json(new ApiResponse(200, { agreements }, 'Partner agreements fetched successfully'));
+  res.json(new ApiResponse(200, { agreements }, 'Child organization agreements fetched successfully'));
 });

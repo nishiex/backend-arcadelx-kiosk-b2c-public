@@ -113,12 +113,9 @@ export default function KiosksScreen() {
   const [q, setQ] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(10)
-  // Machines only start charging once a kiosk is paired to hardware, so the default
-  // view is the fleet that is actually live. Unpaired rows stay one selection away.
-  // Pairing filter has three states: unpaired machines are the queue an operator works
-  // through after minting or before pairing hardware, and they used to be reachable only
-  // by choosing "All machines" and reading the badges.
-  const [pairing, setPairing] = React.useState<"paired" | "unpaired" | "all">("paired")
+  // Show the complete inventory when the page opens. Pairing remains an optional filter so
+  // operators can narrow the list to live hardware or the unpaired queue when needed.
+  const [pairing, setPairing] = React.useState<"paired" | "unpaired" | "all">("all")
   // Narrows the network view to one child org (or the viewer's own stock). Options are derived
   // from the rows already loaded, so this needs no extra request.
   const [assignedTo, setAssignedTo] = React.useState("all")

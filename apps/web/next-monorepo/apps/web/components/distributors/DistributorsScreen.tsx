@@ -54,7 +54,7 @@ function AgreementPill({ status }: { status: string | null }) {
 export default function DistributorsScreen() {
   const { canManageDistributors, canManageAgreements, can, isCompany, orgType, me } = useMe()
   const canAdd = canManageDistributors && can("DISTRIBUTORS", "CREATE")
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["distributors", me?.membership?.organizationId],
     queryFn: fetchDistributors,
     // A Partner's own Distributor is its only counterparty, and the agreement terms sit
@@ -193,7 +193,11 @@ export default function DistributorsScreen() {
             ))}
           </div>
         ) : isError ? (
-          <ErrorState className="py-12" message="Couldn't load distributors." onRetry={() => refetch()} />
+          <ErrorState
+            className="py-12"
+            message={error instanceof Error ? error.message : "Couldn't load distributors."}
+            onRetry={() => refetch()}
+          />
         ) : !distributors.length ? (
           <EmptyState
             className="py-14"

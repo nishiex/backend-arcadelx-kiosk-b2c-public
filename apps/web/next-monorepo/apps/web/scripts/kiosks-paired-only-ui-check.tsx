@@ -1,4 +1,4 @@
-// /kiosks: paired machines by default, and minting a machine must not look like a no-op.
+// /kiosks: all machines by default, with pairing filters, and minting a machine must not look like a no-op.
 // Mocked HTTP only, no live reads or writes.
 // Run from the repo root with:
 //   npx tsx --tsconfig apps/web/next-monorepo/apps/web/tsconfig.json apps/web/next-monorepo/apps/web/scripts/kiosks-paired-only-ui-check.tsx
@@ -134,24 +134,24 @@ try {
   await render()
   await until(() => bodyText().includes("ADLX-PAIRED-1"))
 
-  assert.ok(!bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine is hidden by default")
+  assert.ok(bodyText().includes("ADLX-UNPAIRED-1"), "all machines are visible by default")
   assert.ok(!bodyText().includes("Model"), "the machines table no longer shows a model column")
   assert.ok(bodyText().includes("ADLX-PAIRED-2"), "every paired machine is listed")
   const filter = pairingFilter()
   assert.ok(filter, "the pairing filter is offered as a dropdown")
-  assert.equal(filter!.value, "paired", "the dropdown starts on Paired only")
+  assert.equal(filter!.value, "all", "the dropdown starts on All machines")
   assert.ok(bodyText().includes("(2/3)"), "the dropdown states how many machines are paired")
 
-  await choosePairing("all")
-  await until(() => bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine to appear")
-  assert.ok(bodyText().includes("ADLX-UNPAIRED-1"), "choosing All machines reveals the unpaired machine")
+  await choosePairing("paired")
+  await until(() => !bodyText().includes("ADLX-UNPAIRED-1"), "the paired filter to hide the unpaired machine")
+  assert.ok(!bodyText().includes("ADLX-UNPAIRED-1"), "choosing Paired hides the unpaired machine")
   assert.ok(bodyText().includes("Pairing"), "the table names the pairing column")
   assert.ok(bodyText().includes("Unpaired"), "the unpaired machine is labelled Unpaired")
   assert.ok(bodyText().includes("Paired"), "a paired machine is labelled Paired")
 
   // Mint a machine: it is unpaired by definition, so the list must widen instead of freezing.
-  await choosePairing("paired")
-  await until(() => !bodyText().includes("ADLX-UNPAIRED-1"), "the unpaired machine to hide again")
+  await choosePairing("all")
+  await until(() => bodyText().includes("ADLX-UNPAIRED-1"), "the all-machines filter to restore the unpaired machine")
 
   const addButton = button("Add Machine")
   assert.ok(addButton, "the mint action is offered")
@@ -162,9 +162,9 @@ try {
   await until(() => bodyText().includes("ADLX-MINTED-1"), "the minted machine to appear")
 
   assert.ok(bodyText().includes("ADLX-MINTED-1"), "a freshly minted machine is shown without extra clicks")
-  assert.equal(pairingFilter()!.value, "all", "minting widens the filter so the new machine is visible")
+  assert.equal(pairingFilter()!.value, "unpaired", "minting switches to the unpaired queue so the new machine is visible")
 
-  console.log("PASS kiosks UI: paired by default, unpaired one click away, minting reveals the new machine")
+  console.log("PASS kiosks UI: all machines by default, pairing filters work, minting reveals the new machine")
 } finally {
   await React.act(async () => root.unmount())
   queryClient.clear()

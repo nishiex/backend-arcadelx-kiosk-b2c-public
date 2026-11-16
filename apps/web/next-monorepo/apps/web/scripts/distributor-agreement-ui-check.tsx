@@ -80,6 +80,10 @@ globalThis.fetch = async (input, init) => {
   if (url.pathname === '/api/auth/me') data = { user: me() }
   else if (url.pathname === '/api/network/distributors') data = { distributors: [unconnected, connected, declined] }
   else if (url.pathname === '/api/network') data = { requests: connections, meta: { total: connections.length, page: 1, limit: 50, totalPages: 1 } }
+  else if (url.pathname.startsWith('/api/agreements/child/')) {
+    const childOrgId = decodeURIComponent(url.pathname.split('/').pop()!)
+    data = { agreements: agreements.filter(agreement => agreement.childOrgId === childOrgId) }
+  }
   else if (url.pathname === '/api/agreements') data = { agreements, meta: { total: agreements.length, page: 1, limit: 20, totalPages: 1 } }
   else if (url.pathname === '/api/network/initiate') {
     const target = [unconnected, connected, declined].find(row => row.owner?.email === (body as { targetOwnerEmail: string }).targetOwnerEmail)!
