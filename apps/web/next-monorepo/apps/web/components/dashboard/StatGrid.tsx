@@ -8,12 +8,14 @@ import {
   Users,
   Network,
   MapPin,
+  Megaphone,
 } from "lucide-react"
 import {
   fetchInventorySummary,
   fetchPendingMembers,
   fetchNetworkRequests,
 } from "@/lib/backend-api"
+import { fetchMothershipAds } from "@/lib/mothership-ads-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import StatCard from "./StatCard"
@@ -24,7 +26,7 @@ import { Skeleton, ErrorState } from "./ui"
 const nf = new Intl.NumberFormat("en-IN")
 
 export default function StatGrid() {
-  const { canManageMembers, canManageNetwork, orgType } = useMe()
+  const { canManageMembers, canManageNetwork, canViewAds, orgType } = useMe()
 
   const inventory = useQuery({
     queryKey: ["inventorySummary"],
@@ -39,6 +41,12 @@ export default function StatGrid() {
     queryKey: ["networkRequests", 1, 1],
     queryFn: () => fetchNetworkRequests(1, 1),
     enabled: canManageNetwork,
+  })
+  const ads = useQuery({
+    queryKey: ["mothership-ads"],
+    queryFn: ({ signal }) => fetchMothershipAds(signal),
+    enabled: canViewAds,
+    refetchInterval: 15_000,
   })
 
   const summary = inventory.data?.summary ?? {}
@@ -87,6 +95,15 @@ export default function StatGrid() {
       icon: <Network size={18} />,
       iconClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
       hint: "Incoming connections",
+    })
+  }
+  if (canViewAds) {
+    cards.push({
+      label: "Ads",
+      value: ads.data?.ads.length ?? 0,
+      icon: <Megaphone size={18} />,
+      iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      hint: "In your library",
     })
   }
 
