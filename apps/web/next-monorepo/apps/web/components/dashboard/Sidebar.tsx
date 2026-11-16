@@ -81,7 +81,7 @@ const NAV: NavEntry[] = [
 ]
 
 const NETWORK_CHILDREN: NavItem[] = [
-  { name: "Networks", href: "/requests", icon: Share2, show: (p) => p.canReviewRequests },
+  { name: "Networks", href: "/requests", icon: Share2, show: (p) => p.canReviewNetworkRequests },
   // Active Owners/Admins of every organization type, including Partners, must
   // be able to review incoming financial agreements.
   { name: "Agreements", href: "/agreements", icon: ScrollText, show: (p) => p.canReviewRequests },
@@ -153,8 +153,9 @@ function NavNetworkSection({
 }) {
   const items = NETWORK_CHILDREN.filter((i) => (i.show ? i.show(perms) : true))
   const activeItem = items.find((i) => isActive(i, paths.pathname, paths.tab))
-  // Partners need the same entry point to read their Distributor's agreement.
-  const showParentLink = perms.canManageDistributors || perms.orgType === "PARTNER"
+  // Only Company users with distributor-management access may open the distributor
+  // management page. Partners reach their agreement through the Network section.
+  const showParentLink = perms.canManageDistributors
   const parentActive =
     showParentLink &&
     (paths.pathname === "/distributors" || paths.pathname.startsWith("/distributors/"))

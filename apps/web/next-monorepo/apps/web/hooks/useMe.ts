@@ -38,6 +38,8 @@ export type Permissions = {
   canViewPartners: boolean
   canRegisterPartners: boolean
   canReviewRequests: boolean
+  /** Only the Company OWNER (Master Admin) may view network connection requests/history. */
+  canReviewNetworkRequests: boolean
   canViewRevenue: boolean
   /** Payment gateway administration is COMPANY + OWNER/ADMIN only. */
   canManageGateways: boolean
@@ -112,6 +114,7 @@ export function useMe(): Permissions {
       ((isCompany && isMasterAdmin) || (isDistributor && (isOwnerOrAdmin || role === "MANAGER"))),
     canRegisterPartners: !isError && me?.membership?.status === "ACTIVE" && ((isCompany && isMasterAdmin) || (isDistributor && isOwnerOrAdmin)),
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
+    canReviewNetworkRequests: me?.membership?.status === "ACTIVE" && isMasterAdmin,
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
       (isOwnerOrAdmin || role === "MANAGER") &&
       (isCompany || isDistributor || orgType === "PARTNER"),

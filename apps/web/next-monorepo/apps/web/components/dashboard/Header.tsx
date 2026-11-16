@@ -33,7 +33,7 @@ type Notice = {
  * them are empty. Each entry links to the screen where the decision is made.
  */
 export default function Header() {
-  const { me, role, canManageMembers, isCompany, isLoading: loadingMe } = useMe()
+  const { me, role, canManageMembers, canReviewNetworkRequests, isCompany, isLoading: loadingMe } = useMe()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -66,7 +66,7 @@ export default function Header() {
   const incomingConnections = useQuery({
     queryKey: ["review-requests", "network", 1, "header"],
     queryFn: () => fetchReviewRequests("network", 1),
-    enabled: canReview,
+    enabled: canReviewNetworkRequests,
     refetchInterval: 10_000,
   })
   const pendingAgreements = useQuery({

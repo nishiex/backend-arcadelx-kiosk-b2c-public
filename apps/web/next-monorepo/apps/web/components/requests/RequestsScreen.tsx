@@ -11,12 +11,11 @@ import ReviewRequestList from "./ReviewRequestList"
  * The list itself lives in `ReviewRequestList`, which the Company's
  * Distributors → View More dialog also renders.
  *
- * All organization types use this page when they open Network from the sidebar. Company
- * users also reach the same review list from Distributors → View More, but keeping the
- * full list here makes the Network navigation useful and shows the request cards directly.
+ * Network request history is a Company Master Admin view. Agreement review remains
+ * available through its dedicated page and organization-specific dialogs.
  */
 export default function RequestsScreen() {
-  const { me, canReviewRequests, isLoading } = useMe()
+  const { me, canReviewNetworkRequests, isLoading } = useMe()
   const organizationId = me?.membership?.organizationId
   const [page, setPage] = React.useState(1)
   const [pageOrganizationId, setPageOrganizationId] = React.useState(organizationId)
@@ -28,15 +27,15 @@ export default function RequestsScreen() {
   }
 
   if (isLoading) return <Skeleton className="h-64" />
-  if (!canReviewRequests)
-    return <EmptyState message="Only organization Owners and Admins can review requests." />
+  if (!canReviewNetworkRequests)
+    return <EmptyState message="Only the Company Master Admin can review network requests." />
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Requests</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review incoming network connection requests and track your request history.
+          Review incoming network connection requests and track your outgoing request history.
         </p>
       </header>
       <ReviewRequestList kind="network" page={page} onPageChange={setPage} />

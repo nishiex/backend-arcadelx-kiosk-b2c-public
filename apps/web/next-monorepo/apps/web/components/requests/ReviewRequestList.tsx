@@ -69,17 +69,18 @@ export default function ReviewRequestList({
   /** When set, only rows involving this organization are listed. */
   counterpartyId?: string
 }) {
-  const { me, role, orgType, canReviewRequests } = useMe()
+  const { me, role, orgType, canReviewRequests, canReviewNetworkRequests } = useMe()
   const organizationId = me?.membership?.organizationId
   const isMasterAdmin = me?.membership?.status === "ACTIVE" &&
     me.membership.organization.type === "COMPANY" && me.membership.role === "OWNER"
   // Only the Company OWNER reviews a counterparty's kiosk inventory. Distributors and
   // Partners decide on the request itself; the other side's fleet is not their business.
   const canViewNetworkInventory = isMasterAdmin
+  const canView = kind === "network" ? canReviewNetworkRequests : canReviewRequests
   const query = useQuery({
     queryKey: ["review-requests", organizationId, kind, page],
     queryFn: () => fetchReviewRequests(kind, page),
-    enabled: canReviewRequests,
+    enabled: canView,
     refetchInterval: 10_000,
   })
   const pages = Math.max(1, query.data?.meta.totalPages ?? 1)
@@ -88,8 +89,8 @@ export default function ReviewRequestList({
     if (query.data && page > pages) onPageChange(pages)
   }, [query.data, page, pages, onPageChange])
 
-  if (!canReviewRequests) {
-    return <EmptyState message="Only organization Owners and Admins can review requests." />
+  if (!canView) {
+    return <EmptyState message={kind === "network" ? "Only the Company Master Admin can review network requests." : "Only organization Owners and Admins can review agreements."} />
   }
 
   // The API pages the whole organization's history, so a distributor-scoped view

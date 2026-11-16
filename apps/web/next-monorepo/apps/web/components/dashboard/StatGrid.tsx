@@ -26,7 +26,7 @@ import { Skeleton, ErrorState } from "./ui"
 const nf = new Intl.NumberFormat("en-IN")
 
 export default function StatGrid() {
-  const { canManageMembers, canManageNetwork, canViewAds, orgType } = useMe()
+  const { canManageMembers, canReviewNetworkRequests, canViewAds, orgType } = useMe()
 
   const inventory = useQuery({
     queryKey: ["inventorySummary"],
@@ -40,7 +40,7 @@ export default function StatGrid() {
   const network = useQuery({
     queryKey: ["networkRequests", 1, 1],
     queryFn: () => fetchNetworkRequests(1, 1),
-    enabled: canManageNetwork,
+    enabled: canReviewNetworkRequests,
   })
   const ads = useQuery({
     queryKey: ["mothership-ads"],
@@ -88,7 +88,7 @@ export default function StatGrid() {
       hint: "Awaiting approval",
     })
   }
-  if (canManageNetwork) {
+  if (canReviewNetworkRequests) {
     cards.push({
       label: "Network Requests",
       value: network.data?.meta?.total ?? 0,

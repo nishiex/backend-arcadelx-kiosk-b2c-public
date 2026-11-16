@@ -5,12 +5,14 @@ import { requireAuth, loadMembership, requireRole, requireOrgType } from '../../
 const router = Router();
 
 router.use(requireAuth, loadMembership);
-router.get('/', requireRole('OWNER', 'ADMIN'), getConnections);
+// Network request history is a Company Master Admin view. Other organizations
+// continue to use their scoped agreement/order surfaces for decisions.
+router.get('/', requireOrgType('COMPANY'), requireRole('OWNER'), getConnections);
 
 //ONLY COMPANY AND DISTRIBUTOR CAN SEND CONNECTION REQUESTS
 router.post('/initiate', requireOrgType("COMPANY","DISTRIBUTOR"),requireRole('OWNER', 'ADMIN'), initiateConnection);
 
-router.get("/requests",requireRole("OWNER","ADMIN"),getPendingNetworkRequests)
+router.get("/requests", requireOrgType('COMPANY'), requireRole("OWNER"), getPendingNetworkRequests)
 
 // Company-only listing of distributor organizations for the dashboard.
 // Partners read this to see the Distributor they belong to; the controller scopes them.
