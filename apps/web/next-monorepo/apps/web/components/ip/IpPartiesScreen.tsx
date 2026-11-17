@@ -111,7 +111,8 @@ export default function IpPartiesScreen() {
   const averageRoyalty = (() => {
     const shares = parties
       .map((party) => party.ipAgreements[0]?.ipSharePct)
-      .filter((value): value is number => typeof value === "number")
+      .map((value) => (value === undefined || value === null ? null : Number(value)))
+      .filter((value): value is number => value !== null && Number.isFinite(value))
     if (shares.length === 0) return null
     return shares.reduce((sum, value) => sum + value, 0) / shares.length
   })()
