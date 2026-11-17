@@ -294,8 +294,7 @@ export function GamesPricing({ machines }: { machines: Awaited<ReturnType<typeof
                       ₹{game.price} / replay ₹{game.replayPrice}
                     </p>
                     <p className="truncate text-[10px] text-muted-foreground tabular-nums">
-                      Cat ₹{game.catalogPrice ?? "—"} · v{game.version ?? "—"}
-                      {!game.playable ? " · n/a" : ""}
+                      {!game.playable ? "Not playable" : ""}
                     </p>
                   </div>
                 </li>

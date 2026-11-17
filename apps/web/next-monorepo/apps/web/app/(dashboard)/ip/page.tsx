@@ -4,6 +4,6 @@ export const metadata = {
   title: "IP Parties · ArcadeLX",
 }
 
-export default function IpPartiesPage() {
+export default async function IpPartiesPage() {
   return <IpPartiesScreen />
 }

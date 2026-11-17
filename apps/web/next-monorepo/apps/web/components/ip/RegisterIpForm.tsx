@@ -113,7 +113,9 @@ export default function RegisterIpForm() {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["ip-parties"] })
       toast.success(
-        `${data.organization.name} registered. A temporary password was emailed to ${data.owner.email}.`,
+        data.credentialsEmailSent
+          ? `${data.organization.name} registered. A temporary password was emailed to ${data.owner.email}.`
+          : `${data.organization.name} registered, but the credentials email is still pending. Retry delivery before the owner signs in.`,
       )
       router.push("/ip")
     },

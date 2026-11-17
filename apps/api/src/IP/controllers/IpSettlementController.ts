@@ -303,11 +303,17 @@ export const triggerMonthlySettlementsEndpoint = asyncHandler(async (req: Reques
   }
 
   const { month, year, force } = req.body;
-  if (!month || !year) {
+  if (!Number.isInteger(Number(month)) || Number(month) < 1 || Number(month) > 12 || !Number.isInteger(Number(year)) || Number(year) < 2020 || Number(year) > 2100) {
     throw new ApiError(400, 'Month (1-12) and Year are required');
   }
 
-  const result = await triggerMonthlyIpSettlements(Number(month), Number(year), { force: Boolean(force) });
+  let result;
+  try {
+    result = await triggerMonthlyIpSettlements(Number(month), Number(year), { force: Boolean(force) });
+  } catch (error) {
+    console.error('[IP settlements] trigger queue unavailable', error);
+    throw new ApiError(503, 'Settlement queue is unavailable. Start Redis and the revenue worker, then try again.');
+  }
 
   res.status(200).json(new ApiResponse(200, result, 'Monthly settlement trigger processed'));
 });

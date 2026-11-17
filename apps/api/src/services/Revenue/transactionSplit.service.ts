@@ -29,6 +29,16 @@ export const normalizeGameIdentifier = (raw: string): string => {
   return raw.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
 };
 
+/**
+ * Normalizes the upstream attribution key exactly the way IP registration stores it:
+ * trim, lowercase, spaces/underscores to hyphens. The payment feed only trims its value
+ * (revenueTransaction.services.ts), so comparing raw strings made `Neela-Productions`
+ * miss the stored `neela-productions` and drop the royalty as UNRESOLVED. Stored keys are
+ * already normalized and unique, so normalizing both sides cannot merge two parties.
+ */
+export const normalizeSourceKey = (raw: string): string =>
+  raw.trim().toLowerCase().replace(/[\s_]+/g, '-');
+
 export interface SplitCalculationResult {
   totalProcessed: number;
   resolvedCount: number;
@@ -320,9 +330,10 @@ export const computeTransactionSplit = (
 
   // 4. IP Revenue Attribution & Royalty
   const rawSource = tx.source ? tx.source.trim() : null;
+  const normalizedSource = rawSource ? normalizeSourceKey(rawSource) : null;
 
   // Non-IP transaction: null source or in-house company game ('nilee-games')
-  if (!rawSource || rawSource === 'nilee-games') {
+  if (!normalizedSource || normalizedSource === 'nilee-games') {
     return {
       transactionId: tx.id,
       businessDate,
@@ -350,7 +361,7 @@ export const computeTransactionSplit = (
   }
 
   // Source provided: check IP registration in IpProfile
-  const ipProfile = context.ipProfileBySourceKey.get(rawSource);
+  const ipProfile = context.ipProfileBySourceKey.get(normalizedSource);
   if (!ipProfile) {
     return buildUnresolved(
       `Unknown source '${rawSource}' - not registered in IpProfile`,
@@ -496,8 +507,9 @@ export const calculatePendingTransactionSplits = async (
         sourceKey: true,
       },
     });
+    // Keyed by the normalized form so feed casing/spacing cannot miss the party.
     const ipProfileBySourceKey = new Map<string, any>(
-      ipProfiles.map((p: any) => [p.sourceKey, p])
+      ipProfiles.map((p: any) => [normalizeSourceKey(p.sourceKey), p])
     );
 
     // Preload Active Registered IP Games

@@ -1088,6 +1088,10 @@ export async function triggerMonthlyIpSettlements(
     `[IP Settlement Scheduler] Successfully queued ${jobIds.length}/${ipParties.length} IP settlement jobs for ${resolveMonthName(month)} ${year}.`
   );
 
+  if (jobIds.length === 0 && ipParties.length > 0) {
+    throw new Error('No IP settlement jobs could be queued');
+  }
+
   return {
     success: true,
     status: 'QUEUED',

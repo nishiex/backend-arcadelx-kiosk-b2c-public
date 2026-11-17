@@ -45,6 +45,8 @@ export type Permissions = {
   canManageGateways: boolean
   /** Company members may read the Mothership Ads library. */
   canViewAds: boolean
+  /** Company members and IP Party members may access IP views. */
+  canViewIp: boolean
   /** Uploading, editing, and deleting Ads is limited to Company OWNER/ADMIN. */
   canManageAds: boolean
   /** Devices are visible for the current org; Company fleet visibility is master-admin only. */
@@ -75,6 +77,7 @@ export function useMe(): Permissions {
   const orgType = me?.membership?.organization.type ?? null
   const role = me?.membership?.role ?? null
   const orgName = me?.membership?.organization.name ?? null
+  const isIpParty = orgType === "IP_PARTY"
 
   const isCompany = orgType === "COMPANY"
   const isMasterAdmin = isCompany && role === "OWNER"
@@ -120,6 +123,7 @@ export function useMe(): Permissions {
       (isCompany || isDistributor || orgType === "PARTNER"),
     canManageGateways: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canViewAds: !isError && me?.membership?.status === "ACTIVE" && isCompany,
+    canViewIp: !isError && me?.membership?.status === "ACTIVE" && (isCompany || isIpParty),
     canManageAds: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     /**
      * The Mothership device fleet is operational data the whole network already sees, so it

@@ -199,7 +199,10 @@ export const createIpGame = asyncHandler(async (req: Request, res: Response) => 
     if (err?.code === 'P2002' || err?.message?.includes('Unique constraint failed')) {
       throw new ApiError(409,`Game with identifier '${normalizedIdentifier}' is already registered`);
     }
-
+    // Any other failure (connection, unexpected constraint, bug) must surface as itself.
+    // Swallowing it left `createdGame` undefined and turned the real cause into a
+    // TypeError/500 on the response below.
+    throw err;
   }
 
   res.status(201).json(new ApiResponse(201,

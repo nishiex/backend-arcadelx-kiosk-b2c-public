@@ -1,5 +1,41 @@
 # Backend working guide
 
+## IP royalty module: credentials, attribution, error handling (2026-11-17)
+
+Four defects fixed in the IP Party vertical. No schema change, no migration.
+
+1. **Onboarding credentials could be lost permanently.** `registerIpParty` sent the temporary
+   password inline after commit and only logged a failure, so a party registered while Mailjet
+   was unavailable (or with the local dummy keys) left no recoverable record and its owner could
+   never sign in. The delivery is now written inside the registration transaction with
+   `queueCredentials`, attempted once after commit through `attemptDelivery`, and retryable via the
+   existing `POST /api/auth/organizations/:organizationId/credentials/retry` — the creating Company
+   owns the delivery, which is the scope that route checks. The response reports
+   `credentialsEmailSent` instead of always claiming the email was sent.
+2. **Attribution compared unlike strings.** The payment feed only trims `source`
+   (`revenueTransaction.services.ts`), while `IpProfile.sourceKey` is stored lowercased with
+   spaces/underscores turned into hyphens. `Neela-Productions` therefore missed the stored
+   `neela-productions`, the split became UNRESOLVED, and that revenue was excluded from daily
+   snapshots and settlements with no error. `normalizeSourceKey` now normalizes both sides — the
+   map of profiles and the feed value at lookup — and the reserved `nilee-games` check normalizes
+   too. Stored keys are unique fixpoints, so normalizing cannot merge two parties.
+3. **A registration race returned 500.** Uniqueness pre-checks run before the transaction, so the
+   unique indexes are the real guard; a concurrent duplicate now maps P2002 to 409.
+4. **`createIpGame` swallowed every non-unique database failure**, leaving `createdGame` undefined
+   and turning the real cause into a TypeError/500 on the response. Other errors are rethrown.
+
+`GET /api/ip/parties` also returns `credentialsEmailSent` per party, from one bounded
+`EmailDelivery` lookup keyed by organization id (no per-row query, no new column).
+
+Verification: `npm run typecheck` in `apps/api` passes. No database was available (localhost:5433
+closed, Docker daemon down), so none of this ran against real rows; the credentials path still
+needs a live check with working Mailjet keys.
+
+Still open in this module: `GET /api/ip/games/:ipOrgId/available-identifiers` still filters
+`Transaction.source` by exact match, so rows that now attribute correctly may not appear in that
+picker; `IpSettlement.status` has no transition to `PAID` anywhere in `src`; the Company view has
+no settlement PDF download.
+
 ## Machine-code numbering fixes (2026-10-07)
 
 Two defects surfaced once the device feed started registering kiosks under their own

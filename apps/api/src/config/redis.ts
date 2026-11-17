@@ -7,6 +7,12 @@ export function revenueRedisOptions() {
     username: decodeURIComponent(url.username) || undefined,
     password: decodeURIComponent(url.password) || undefined,
     db: Number(url.pathname.slice(1) || 0),
-    ...(url.protocol === 'rediss:' ? { tls: {} } : {}), maxRetriesPerRequest: null,
+    ...(url.protocol === 'rediss:' ? { tls: {} } : {}),
+    // Do not let an HTTP request wait indefinitely when Redis is unavailable.
+    // Workers may retry reconnecting, but queue commands must fail promptly so the
+    // API can return an actionable error instead of a browser timeout.
+    connectTimeout: 5000,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: null,
   };
 }

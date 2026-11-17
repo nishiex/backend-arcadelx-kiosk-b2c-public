@@ -22,6 +22,7 @@ import {
   Share2,
   ScrollText,
   Waypoints,
+  Gamepad2,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
@@ -70,6 +71,7 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
   { kind: "link", item: { name: "Ads", href: "/ads", icon: Megaphone, show: (p) => p.canViewAds } },
+  { kind: "link", item: { name: "IP & Royalties", href: "/ip", icon: Gamepad2, show: (p) => p.canViewIp } },
   // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
   // The Distributors section: the row itself is the distributor list, and it expands
   // into separate Network, Agreements and Partners entries. Agreements stays here;

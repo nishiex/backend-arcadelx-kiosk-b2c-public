@@ -2,11 +2,15 @@
 
 import React from "react"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
-import { Building2, Plus, Search, ShieldCheck, Users } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { Building2, MailPlus, Plus, Search, ShieldCheck, Users } from "lucide-react"
 import { fetchIpParties } from "@/lib/ip-api"
+import { retryOrganizationCredentials } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
+import IpPartyDashboard from "@/components/ip/IpPartyDashboard"
+import CompanyIpTools from "@/components/ip/CompanyIpTools"
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
@@ -34,7 +38,7 @@ function SharePill({ ipSharePct }: { ipSharePct: number | undefined }) {
 }
 
 export default function IpPartiesScreen() {
-  const { isMasterAdmin, isLoading: meLoading } = useMe()
+  const { isMasterAdmin, isLoading: meLoading, me } = useMe()
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["ip-parties"],
     queryFn: fetchIpParties,
@@ -42,7 +46,22 @@ export default function IpPartiesScreen() {
     refetchInterval: 60000,
   })
 
+  const queryClient = useQueryClient()
+  // Onboarding can finish with the credentials email still undelivered (provider down,
+  // dummy keys locally). That leaves the owner unable to sign in, so the company needs a
+  // way to re-send without calling the API by hand.
+  const resendCredentials = useMutation({
+    mutationFn: (organizationId: string) => retryOrganizationCredentials(organizationId),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["ip-parties"] })
+      if (result.credentialsEmailSent) toast.success("Credentials email sent")
+      else toast.info("Delivery is still pending. Fix the mail configuration, then try again.")
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
   const [search, setSearch] = React.useState("")
+  const [selectedPartyId, setSelectedPartyId] = React.useState<string | null>(null)
 
   if (meLoading) {
     return (
@@ -52,6 +71,8 @@ export default function IpPartiesScreen() {
       </div>
     )
   }
+
+  if (me?.membership?.organization.type === "IP_PARTY") return <IpPartyDashboard />
 
   // The tab is hidden for everyone else; this covers a direct URL visit.
   if (!isMasterAdmin) {
@@ -171,15 +192,17 @@ export default function IpPartiesScreen() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Party</th>
                   <th className="px-3 py-2 font-medium">Source key</th>
                   <th className="px-3 py-2 font-medium">Tax / legal</th>
                   <th className="px-3 py-2 font-medium">Owner</th>
+                  <th className="px-3 py-2 font-medium">Credentials</th>
                   <th className="px-3 py-2 font-medium">Royalty</th>
                   <th className="px-3 py-2 font-medium">Since</th>
+                  <th className="px-3 py-2 font-medium">Manage</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,6 +233,29 @@ export default function IpPartiesScreen() {
                         <p className="text-xs text-muted-foreground">{party.owner?.email ?? "—"}</p>
                       </td>
                       <td className="px-3 py-3">
+                        <span
+                          className={
+                            party.credentialsEmailSent
+                              ? "mb-1.5 block text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                              : "mb-1.5 block text-xs font-medium text-amber-700 dark:text-amber-300"
+                          }
+                        >
+                          {party.credentialsEmailSent ? "Sent" : "Not delivered"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => resendCredentials.mutate(party.id)}
+                          disabled={resendCredentials.isPending && resendCredentials.variables === party.id}
+                          title="Re-send the temporary-password email to this party's owner"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-60"
+                        >
+                          <MailPlus size={13} />
+                          {resendCredentials.isPending && resendCredentials.variables === party.id
+                            ? "Sending…"
+                            : "Resend"}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
                         <SharePill ipSharePct={agreement?.ipSharePct} />
                         {agreement ? (
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -220,6 +266,11 @@ export default function IpPartiesScreen() {
                       <td className="px-3 py-3 text-muted-foreground">
                         {agreement ? dateFmt.format(new Date(agreement.effectiveFrom)) : "—"}
                       </td>
+                      <td className="px-3 py-3">
+                        <button type="button" className="rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium hover:bg-muted" onClick={() => setSelectedPartyId(selectedPartyId === party.id ? null : party.id)}>
+                          {selectedPartyId === party.id ? "Close" : "Manage"}
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -228,6 +279,11 @@ export default function IpPartiesScreen() {
           </div>
         )}
       </Panel>
+
+      {selectedPartyId ? (() => {
+        const selected = parties.find((party) => party.id === selectedPartyId)
+        return selected ? <CompanyIpTools party={{ id: selected.id, name: selected.name, ipSharePct: selected.ipAgreements[0]?.ipSharePct }} /> : null
+      })() : null}
 
       {parties.length > 0 ? (
         <p className="text-xs text-muted-foreground">

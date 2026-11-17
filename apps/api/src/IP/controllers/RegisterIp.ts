@@ -6,7 +6,11 @@ import { prisma } from '../../utils/db';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
-import { sendOrganizationCredentialsEmail } from '../../services/email/auth.email';
+import {
+  attemptDelivery,
+  credentialDeliveryKey,
+  queueCredentials,
+} from '../../services/email/delivery.service';
 import '../../middlewares/auth';
 
 const db = prisma as any;
@@ -76,6 +80,10 @@ export const registerIpParty = asyncHandler(async (req: Request, res: Response) 
     throw new ApiError(403, 'Only the Company organization is authorized to register IP Parties');
   }
 
+  if (!currentOrgId) {
+    throw new ApiError(403, 'No active organization found in session');
+  }
+
   const validatedData = RegisterIpSchema.parse(req.body);
   const normalizedKey = normalizeSourceKey(validatedData.sourceKey);
 
@@ -132,7 +140,7 @@ export const registerIpParty = asyncHandler(async (req: Request, res: Response) 
 
   // 5. ATOMIC DATABASE TRANSACTION
   // Creates Organization, Owner User, Membership, IpProfile, and active IpAgreement together
-  const { user, org, profile, agreement } = await prisma.$transaction(async (tx) => {
+  const registration = await prisma.$transaction(async (tx) => {
     // A. Create Owner User with mustChangePassword = true
     const newUser = await (tx as any).user.create({
       data: {
@@ -193,26 +201,44 @@ export const registerIpParty = asyncHandler(async (req: Request, res: Response) 
       },
     });
 
+    // F. Queue the credential delivery in the SAME transaction. Previously this email was
+    // sent inline after commit and its failure was only logged, so a party whose email could
+    // not be delivered had no recoverable record and its owner could never sign in. The
+    // creating Company owns the delivery, which is the scope the credentials retry route uses.
+    await queueCredentials(tx, currentOrgId, newOrg.id, {
+      email: newUser.email,
+      name: newUser.name,
+      organizationName: newOrg.name,
+      organizationType: 'IP Party',
+      temporaryPassword,
+    });
+
     return {
       user: newUser,
       org: newOrg,
       profile: newProfile,
       agreement: newAgreement,
     };
+  }).catch((err: any) => {
+    // Two requests can clear the pre-checks above concurrently; the unique indexes are the
+    // real guard. Report the loser as a conflict instead of letting P2002 surface as a 500.
+    if (err?.code === 'P2002') {
+      throw new ApiError(409, 'An IP party with this owner email, contact number, or source key already exists');
+    }
+    throw err;
   });
 
-  // 6. Send Credential Email strictly AFTER database transaction commits
-  try {
-    await sendOrganizationCredentialsEmail({
-      email: user.email,
-      name: user.name,
-      organizationName: org.name,
-      organizationType: 'IP Party',
-      temporaryPassword,
-    });
-  } catch (emailErr) {
-    console.error(`[IP Registration] Warning: Credential email failed to deliver to ${user.email}:`, emailErr);
-    // Email delivery failure does not roll back the committed records
+  const { user, org, profile, agreement } = registration;
+
+  // 6. Attempt the queued delivery strictly AFTER the transaction commits. A failed attempt
+  // leaves the encrypted EmailDelivery row retryable instead of discarding the password; it
+  // never turns a committed registration into an HTTP failure.
+  const deliveryKey = credentialDeliveryKey(org.id);
+  const credentialsEmailSent = await attemptDelivery(deliveryKey);
+  if (!credentialsEmailSent) {
+    console.error(
+      `[IP Registration] Credential email for ${user.email} was not delivered; delivery '${deliveryKey}' remains queued for an explicit retry.`
+    );
   }
 
   res.status(201).json(
@@ -246,8 +272,11 @@ export const registerIpParty = asyncHandler(async (req: Request, res: Response) 
           effectiveFrom: agreement.effectiveFrom,
           status: agreement.status,
         },
+        credentialsEmailSent,
       },
-      'IP Party registered successfully. Credentials sent to owner.'
+      credentialsEmailSent
+        ? 'IP Party registered successfully. Credentials sent to owner.'
+        : 'IP Party registered successfully. Credentials email is pending delivery; retry it before the owner signs in.'
     )
   );
 });
@@ -406,5 +435,21 @@ export const getIpParties = asyncHandler(async (req: Request, res: Response) => 
     orderBy: { createdAt: 'desc' },
   });
 
-  res.status(200).json(new ApiResponse(200, { parties }, 'IP Parties fetched successfully'));
+  // Attach credential delivery state so the Company can see whose owner still has no
+  // password and re-send deliberately. One bounded lookup keyed by organization id —
+  // no per-row query, and no extra state stored on the organization itself.
+  const deliveries = await db.emailDelivery.findMany({
+    where: { key: { in: parties.map((party: any) => credentialDeliveryKey(party.id)) } },
+    select: { key: true, sentAt: true },
+  });
+  const deliveredKeys = new Set(
+    deliveries.filter((delivery: any) => delivery.sentAt).map((delivery: any) => delivery.key)
+  );
+
+  const partiesWithDelivery = parties.map((party: any) => ({
+    ...party,
+    credentialsEmailSent: deliveredKeys.has(credentialDeliveryKey(party.id)),
+  }));
+
+  res.status(200).json(new ApiResponse(200, { parties: partiesWithDelivery }, 'IP Parties fetched successfully'));
 });
