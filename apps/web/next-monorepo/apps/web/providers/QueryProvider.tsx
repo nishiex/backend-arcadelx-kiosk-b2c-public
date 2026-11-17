@@ -10,6 +10,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       defaultOptions: {
         queries: {
           staleTime: 1000 * 60, // 1 minute
+          gcTime: 1000 * 60 * 5, // retain inactive API data for quick navigation back
           retry: 1,
         },
       },

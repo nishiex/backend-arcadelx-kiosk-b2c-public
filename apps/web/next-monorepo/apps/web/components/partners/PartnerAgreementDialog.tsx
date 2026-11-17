@@ -33,8 +33,8 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
   const [open, setOpen] = React.useState(false)
   const [parentShare, setParentShare] = React.useState("60")
   const [childShare, setChildShare] = React.useState("40")
-  const [deposit, setDeposit] = React.useState("0")
-  const [nonRefundable, setNonRefundable] = React.useState("0")
+  const [deposit, setDeposit] = React.useState("")
+  const [nonRefundable, setNonRefundable] = React.useState("")
   const [editing, setEditing] = React.useState(false)
   const queryClient = useQueryClient()
   const agreements = useQuery({
@@ -58,8 +58,8 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
         parentSharePct: Number(parentShare), childSharePct: Number(childShare),
         depositAmountPerMachine: Number(deposit), nonRefundableAmountPerMachine: Number(nonRefundable),
       }
-      if (parentShare === "" || childShare === "" || deposit === "" || nonRefundable === "" || Number(parentShare) + Number(childShare) !== 100) {
-        throw new Error("Enter valid agreement shares totaling 100 and non-negative kiosk amounts.")
+      if (parentShare === "" || childShare === "" || deposit === "" || nonRefundable === "" || Number(deposit) <= 0 || Number(nonRefundable) <= 0 || Number(parentShare) + Number(childShare) !== 100) {
+        throw new Error("Enter valid agreement shares totaling 100 and positive kiosk amounts.")
       }
       return createAgreement({ childOrgId: partner.id, ...terms })
     },

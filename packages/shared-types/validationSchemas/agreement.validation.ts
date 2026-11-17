@@ -8,11 +8,11 @@ export const CreateAgreementSchema = z
     childOrgId: z.string().uuid(),
     parentSharePct: z.number().min(0).max(100).optional(),
     childSharePct: z.number().min(0).max(100).optional(),
-    depositAmountPerMachine: z.number().int().min(0).max(2147483647).optional(),
+    depositAmountPerMachine: z.number().int().min(1, "Total collected must be greater than zero").max(2147483647).optional(),
     nonRefundableAmountPerMachine: z
       .number()
       .int()
-      .min(0)
+      .min(1, "Non-refundable fee must be greater than zero")
       .max(2147483647)
       .optional(),
   })
@@ -49,11 +49,11 @@ export const UpdateAgreementSchema = z
   .object({
     parentSharePct: z.number().min(0).max(100).optional(),
     childSharePct: z.number().min(0).max(100).optional(),
-    depositAmountPerMachine: z.number().int().min(0).max(2147483647).optional(),
+    depositAmountPerMachine: z.number().int().min(1, "Total collected must be greater than zero").max(2147483647).optional(),
     nonRefundableAmountPerMachine: z
       .number()
       .int()
-      .min(0)
+      .min(1, "Non-refundable fee must be greater than zero")
       .max(2147483647)
       .optional(),
   })

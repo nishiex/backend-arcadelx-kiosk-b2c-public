@@ -4,6 +4,7 @@ dotenv.config({path:"../../.env"})
 
 const { default: app } = await import("./app.js");
 const { env } = await import("./config/env.js");
+const { prisma } = await import("./utils/db.js");
 
 const PORT = Number(env.PORT);
 
@@ -40,3 +41,11 @@ if (pricingJobs && process.env.REVENUE_JOBS_ENABLED !== 'true') {
 app.listen(PORT, env.HOST,()=>{
     console.log(`Server Running on ${PORT}`);
 })
+
+// Warm the hosted database connection during startup so the first web request
+// does not pay the connection-handshake latency. This is read-only and does not
+// change request logic or response contracts.
+void prisma.$queryRaw`SELECT 1`.then(
+  () => console.log('[Database] connection warmed'),
+  error => console.error('[Database] warmup failed; requests will retry on demand', error instanceof Error ? error.message : String(error)),
+);

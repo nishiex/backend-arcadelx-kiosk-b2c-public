@@ -151,8 +151,8 @@ export default function OrderDetailsDialog({
                       className="mb-4 grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2"
                       onSubmit={event => {
                         event.preventDefault()
-                        if (!Number.isInteger(Number(depositPerMachine)) || Number(depositPerMachine) < 0 || !Number.isInteger(Number(nonRefundablePerMachine)) || Number(nonRefundablePerMachine) < 0) {
-                          toast.error("Enter valid non-negative whole-number prices")
+                        if (!Number.isInteger(Number(depositPerMachine)) || Number(depositPerMachine) <= 0 || !Number.isInteger(Number(nonRefundablePerMachine)) || Number(nonRefundablePerMachine) <= 0) {
+                          toast.error("Total collected and non-refundable fee must be greater than zero")
                           return
                         }
                         updatePricing.mutate()

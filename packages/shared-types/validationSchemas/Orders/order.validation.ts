@@ -39,8 +39,8 @@ export const CreateOrderSchema = z.discriminatedUnion("type", [
  * cover both deductions.
  */
 export const UpdateOrderPricingSchema = z.object({
-  depositPerMachine: z.number().int().min(0).max(10_000_000),
-  nonRefundablePerMachine: z.number().int().min(0).max(10_000_000),
+  depositPerMachine: z.number().int().min(1, "Total collected must be greater than zero").max(10_000_000),
+  nonRefundablePerMachine: z.number().int().min(1, "Non-refundable fee must be greater than zero").max(10_000_000),
 }).strict();
 
 export const OrderQuerySchema = z.object({
