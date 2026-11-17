@@ -201,7 +201,7 @@ export default function IpPartiesScreen() {
                   <th className="px-3 py-2 font-medium">Tax / legal</th>
                   <th className="px-3 py-2 font-medium">Owner</th>
                   <th className="px-3 py-2 font-medium">Credentials</th>
-                  <th className="px-3 py-2 font-medium">Royalty</th>
+                  <th className="px-3 py-2 font-medium"> Royalties</th>
                   <th className="px-3 py-2 font-medium">Since</th>
                   <th className="px-3 py-2 font-medium">Manage</th>
                 </tr>
