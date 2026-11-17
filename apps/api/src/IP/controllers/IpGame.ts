@@ -22,6 +22,8 @@ export const slugToDisplayName = (slug: string): string => {
   return slug.split('-').filter(Boolean).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
+const normalizeSourceKey = (raw: string): string => raw.trim().toLowerCase().replace(/[\s_]+/g, '-');
+
 export const CreateIpGameSchema = z.object({
   displayName: z.string({ message: 'Display name is required' }).trim().min(2, 'Display name must be at least 2 characters').max(100, 'Display name cannot exceed 100 characters'),
   gameIdentifier: z.string({ message: 'Game ID is required' }).trim().min(2, 'Game ID must be at least 2 characters').max(100, 'Game ID cannot exceed 100 characters'),
@@ -67,12 +69,12 @@ export const getAvailableObservedGameIds = asyncHandler(async (req: Request, res
   // 3. Query observed game IDs from transactions for this sourceKey
   let observedGameRecords: { gameId: string; transactionCount: number; lastObservedAt: Date }[] = [];
     const rows = await (db.transaction as any).findMany({
-      where: { source: sourceKey },
-      select: { gameId: true, occurredAt: true },
+      where: { source: { not: null } },
+      select: { source: true, gameId: true, occurredAt: true },
     });
 
     const map = new Map<string, { count: number; lastObserved: Date }>();
-    for (const r of rows) {
+    for (const r of rows.filter((row: any) => normalizeSourceKey(row.source ?? '') === normalizeSourceKey(sourceKey))) {
       if (!r.gameId) continue;
       const existing = map.get(r.gameId);
       if (!existing) {

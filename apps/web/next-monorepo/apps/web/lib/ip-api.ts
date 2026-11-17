@@ -128,6 +128,7 @@ export type IpSettlement = {
   emailDeliveredAt: string | null
   linesCount?: number
   createdAt: string
+  lines?: Array<{ gameIdentifier: string; gameDisplayName: string; kioskCount: number; grossRevenue: string; ipRoyaltyShare: string }>
 }
 
 export async function fetchIpParties(): Promise<IpParty[]> {
