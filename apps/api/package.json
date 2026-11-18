@@ -12,6 +12,7 @@
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate deploy",
+    "db:clear-ip": "node scripts/clear-ip-royalties.cjs",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "prisma skills sync || exit 0",
     "build:vercel": "prisma generate && node scripts/build-vercel.mjs",

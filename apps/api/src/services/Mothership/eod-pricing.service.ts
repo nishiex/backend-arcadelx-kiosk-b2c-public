@@ -90,7 +90,7 @@ export async function scheduleEodDevicePrice(input: { deviceId: string; gameId: 
   const selectedTime = validatePricingTime(input.scheduledTime ?? getEodPricingTime());
   // Requests created without an explicit date (for example after approval) are
   // scheduled for the next available default EOD run, never applied immediately.
-  const selectedDate = input.scheduledDate ?? businessDate(new Date(nextEod()));
+  const selectedDate = input.scheduledDate ?? businessDate(new Date(nextEod(new Date(), selectedTime)));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) throw new Error('Scheduled date must use YYYY-MM-DD');
   if (selectedDate < businessDate()) throw new Error('Scheduled date cannot be in the past');
   if (selectedDate === businessDate() && isEodDue(new Date(), selectedTime)) {
@@ -181,12 +181,12 @@ export async function pricingStatus(deviceId: string, gameId: string) {
 }
 
 /**
- * After an immediate, verified device write, close out any scheduled row that is due.
+ * After an immediate, verified device write, remove any pending scheduled rows.
  *
- * A row scheduled for today or earlier would otherwise be applied by the next EOD run and
- * silently revert the price an operator just set live. The row is moved to APPLIED with the
- * values that are actually on the device now, so the schedule table keeps one truthful
- * record instead of a stale intent.
+ * Any pending row, including a future-dated row, would otherwise be applied by a later EOD
+ * run and silently revert the price an operator just set live. These rows are stale intents,
+ * not completed applications, so remove them rather than reporting a misleading APPLIED
+ * history entry.
  */
 export async function markScheduledUpdatesSuperseded(
   deviceId: string,
@@ -194,19 +194,10 @@ export async function markScheduledUpdatesSuperseded(
   price: number,
   replayPrice: number,
 ): Promise<number> {
-  const today = new Date(`${businessDate()}T00:00:00.000Z`);
-  const superseded = await prisma.eodDevicePriceUpdate.updateMany({
-    where: { deviceId, gameId, status: { in: ['PENDING', 'FAILED'] }, businessDate: { lte: today } },
-    data: {
-      price,
-      replayPrice,
-      status: 'APPLIED',
-      processingAt: null,
-      appliedAt: new Date(),
-      lastError: null,
-      verifiedPrice: price,
-      verifiedReplayPrice: replayPrice,
-    },
+  void price;
+  void replayPrice;
+  const superseded = await prisma.eodDevicePriceUpdate.deleteMany({
+    where: { deviceId, gameId, status: { in: ['PENDING', 'FAILED'] } },
   });
   return superseded.count;
 }

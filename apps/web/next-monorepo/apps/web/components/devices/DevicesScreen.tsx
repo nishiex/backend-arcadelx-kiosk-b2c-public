@@ -118,6 +118,9 @@ export default function DevicesScreen() {
     queryFn: () => fetchDevicePrices(selectedDevice!),
     enabled: !!selectedDevice,
     staleTime: 15_000,
+    // EOD jobs run independently of the dashboard; keep Scheduled/Failed/Applied
+    // status current without requiring the operator to reopen the device.
+    refetchInterval: 15_000,
     retry: 1,
   })
   const requests = useQuery({

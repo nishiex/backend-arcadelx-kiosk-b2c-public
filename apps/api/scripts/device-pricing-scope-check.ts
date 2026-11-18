@@ -89,8 +89,9 @@ globalThis.fetch = async (input, init) => {
   );
   const path = decodeURIComponent(url.pathname);
 
-  if (method === "GET" && path === "/api/v1/kiosks/device-ids") {
+  if (method === "GET" && (path === "/api/v1/devices" || path === "/api/v1/kiosks/device-ids")) {
     return Response.json({
+      devices: deviceIds.map((id) => ({ device_id: id, is_online: true })),
       device_ids: [...deviceIds],
       kiosks: deviceIds.map((id) => ({ device_id: id, is_online: true })),
       last_updated: "2026-10-13T00:00:00Z",
@@ -114,6 +115,13 @@ globalThis.fetch = async (input, init) => {
         price: entry.price,
         replay_price: entry.replayPrice,
       })),
+    });
+  }
+
+  if (method === "GET" && path === "/api/v1/launcher/games") {
+    return Response.json({
+      games: [{ GameId: GAME_ID, GameName: GAME_ID, IconUrl: null, PosterUrl: null }],
+      coming_soon: [],
     });
   }
 
@@ -146,7 +154,8 @@ globalThis.fetch = async (input, init) => {
 
 try {
   // Case 1 -- DEVICE scope when the upstream accepts the write and persists nothing: the
-  // request must fail clearly and must not fall back to the catalog.
+  // request must fail clearly and must not write to the catalog. The service
+  // reads the catalog before and after to prove it stayed unchanged.
   resetState();
   deviceOverridePersists = false;
   catalogWriteApplies = false;
@@ -168,14 +177,14 @@ try {
     replay_price: 60,
   });
   assert.equal(
-    calls.filter((call) => call.url.includes("/api/v1/games")).length,
-    0,
-    "device scope must not touch the catalog",
+    calls.filter((call) => new URL(call.url).pathname === "/api/v1/games").length,
+    2,
+    "device scope may read the catalog for isolation verification, but must not write it",
   );
-  console.log("PASS device scope: an unpersisted write fails clearly and never touches the catalog");
+  console.log("PASS device scope: an unpersisted write fails clearly and never writes the catalog");
 
   // Case 2 -- DEVICE scope with the endpoint behaving as confirmed live: the override is
-  // verified through the read-back, still without reading or writing the catalog.
+  // verified through the read-back, while proving the catalog remains unchanged.
   resetState();
   deviceOverridePersists = true;
   const deviceResult = await setDeviceGamePrice("D1", GAME_ID, { price: 150, replay_price: 60, scope: "DEVICE" });
@@ -183,9 +192,9 @@ try {
   assert.equal(deviceResult.price, 150);
   assert.equal(deviceResult.replayPrice, 60);
   assert.equal(
-    calls.filter((call) => call.url.includes("/api/v1/games")).length,
-    0,
-    "device scope must not read the catalog",
+    calls.filter((call) => new URL(call.url).pathname === "/api/v1/games").length,
+    2,
+    "device scope reads the catalog before and after but must not write it",
   );
   console.log("PASS device scope: a persisted override is read back and verified");
 

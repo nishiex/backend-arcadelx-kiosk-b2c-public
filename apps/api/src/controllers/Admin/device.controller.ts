@@ -196,7 +196,9 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   if (body.data.scope === 'DEVICE') {
     if (body.data.apply_now) {
       const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));
-      const supersededSchedules = await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice);
+      const supersededSchedules = result.status === 'APPLIED'
+        ? await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice)
+        : 0;
       // The flush is explicit but not guaranteed: if Mothership still reports the change as
       // pending, say so instead of claiming it went live.
       const applied = result.status !== 'PENDING';
