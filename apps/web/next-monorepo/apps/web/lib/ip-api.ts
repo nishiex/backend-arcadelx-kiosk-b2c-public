@@ -214,3 +214,57 @@ export async function triggerIpMonthlySettlements(input: { month: number; year: 
   const res = await apiFetch("/api/ip/settlements/trigger", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) })
   return handleRes(res)
 }
+
+export type IpGameKioskItem = {
+  connectionId: string
+  assignedAt: string
+  id: string
+  machineCode: string
+  model: string | null
+  status: string
+  location: string | null
+  externalDeviceId?: string | null
+  currentOrg?: { id: string; name: string; type: string } | null
+}
+
+export type IpGameKiosksResponse = {
+  game: {
+    id: string
+    gameIdentifier: string
+    displayName: string
+    organization: { id: string; name: string; type: string }
+  }
+  kiosks: IpGameKioskItem[]
+  total: number
+}
+
+export async function fetchKiosksForIpGame(ipGameId: string): Promise<IpGameKiosksResponse> {
+  const res = await apiFetch(`/api/ip/games/${encodeURIComponent(ipGameId)}/kiosks`, { credentials: "include", cache: "no-store" })
+  return handleRes<IpGameKiosksResponse>(res)
+}
+
+export async function assignKiosksToIpGame(ipGameId: string, kioskIds: string[]) {
+  const res = await apiFetch(`/api/ip/games/${encodeURIComponent(ipGameId)}/kiosks`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kioskIds }),
+  })
+  return handleRes<{ game: unknown; requested: number; newlyAssigned: number; alreadyAssigned: number }>(res)
+}
+
+export async function removeKiosksFromIpGame(ipGameId: string, kioskIds: string[]) {
+  const res = await apiFetch(`/api/ip/games/${encodeURIComponent(ipGameId)}/kiosks`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kioskIds }),
+  })
+  return handleRes<{ game: unknown; removed: number }>(res)
+}
+
+export async function fetchIpGamesForKiosk(kioskId: string) {
+  const res = await apiFetch(`/api/ip/kiosks/${encodeURIComponent(kioskId)}/games`, { credentials: "include", cache: "no-store" })
+  return handleRes<{ kiosk: unknown; games: Array<{ connectionId: string; assignedAt: string; id: string; gameIdentifier: string; displayName: string; coverImageUrl: string | null; status: string; organization: { id: string; name: string } }>; total: number }>(res)
+}
+

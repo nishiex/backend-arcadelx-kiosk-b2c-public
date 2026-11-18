@@ -1,13 +1,16 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { CalendarDays, Download, Gamepad2, RefreshCw } from "lucide-react"
+import { CalendarDays, Download, Gamepad2, RefreshCw, Monitor } from "lucide-react"
 import { fetchMyIpDailyRevenue, fetchMyIpGames, fetchMyIpSettlements, downloadMyIpSettlement } from "@/lib/ip-api"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
+import IpPartyGameKiosksModal from "./IpPartyGameKiosksModal"
 
 const money = (value: unknown) => `₹${Number(value ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function IpPartyDashboard() {
+  const [selectedGameForKiosks, setSelectedGameForKiosks] = useState<{ id: string; displayName: string; gameIdentifier: string } | null>(null)
   const games = useQuery({ queryKey: ["ip-my-games"], queryFn: fetchMyIpGames })
   const revenue = useQuery({ queryKey: ["ip-daily-revenue"], queryFn: () => fetchMyIpDailyRevenue() })
   const settlements = useQuery({ queryKey: ["ip-settlements"], queryFn: () => fetchMyIpSettlements() })
@@ -39,7 +42,7 @@ export default function IpPartyDashboard() {
 
       <Panel className="p-5">
         <div className="mb-4 flex items-center gap-2"><Gamepad2 size={18} /><h2 className="font-semibold">My games</h2></div>
-        {gameRows.length === 0 ? <EmptyState message="No games registered yet" /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{gameRows.map(game => <div key={game.id} className="rounded-xl border border-border p-4"><p className="font-medium">{game.displayName}</p><p className="mt-1 text-xs text-muted-foreground">{game.gameIdentifier}</p><p className="mt-3 text-xs text-muted-foreground">Status: {game.status}</p></div>)}</div>}
+        {gameRows.length === 0 ? <EmptyState message="No games registered yet" /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{gameRows.map(game => <div key={game.id} className="flex flex-col justify-between rounded-xl border border-border p-4"><div><p className="font-medium">{game.displayName}</p><p className="mt-1 text-xs text-muted-foreground">{game.gameIdentifier}</p><p className="mt-2 text-xs text-muted-foreground">Status: {game.status}</p></div><div className="mt-4 pt-2 border-t border-border flex justify-end"><button type="button" onClick={() => setSelectedGameForKiosks({ id: game.id, displayName: game.displayName, gameIdentifier: game.gameIdentifier })} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Monitor size={13} /> View Kiosks</button></div></div>)}</div>}
       </Panel>
 
       <Panel className="p-5">
@@ -48,6 +51,12 @@ export default function IpPartyDashboard() {
       </Panel>
 
       <Panel className="p-5"><div className="mb-4 flex items-center gap-2"><RefreshCw size={18} /><h2 className="font-semibold">Monthly settlements</h2></div>{settlementRows.length === 0 ? <EmptyState message="No settlements generated yet" /> : <div className="space-y-2">{settlementRows.map(settlement => <div key={settlement.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"><div><p className="font-medium">{settlement.month}/{settlement.year}</p><p className="text-xs text-muted-foreground">{settlement.status} · {settlement.linesCount ?? 0} games</p></div><div className="text-right"><p className="font-semibold">{money(settlement.finalPayout)}</p>{settlement.hasPdf && <button className="mt-1 inline-flex items-center gap-1 text-xs text-primary" onClick={async () => { const blob = await downloadMyIpSettlement(settlement.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `settlement-${settlement.year}-${settlement.month}.pdf`; a.click(); URL.revokeObjectURL(url) }}><Download size={13} /> Download PDF</button>}</div></div>)}</div>}</Panel>
+      {selectedGameForKiosks && (
+        <IpPartyGameKiosksModal
+          game={selectedGameForKiosks}
+          onClose={() => setSelectedGameForKiosks(null)}
+        />
+      )}
     </div>
   )
 }
