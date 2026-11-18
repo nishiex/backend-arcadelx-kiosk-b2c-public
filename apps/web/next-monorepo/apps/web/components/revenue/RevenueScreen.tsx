@@ -196,9 +196,18 @@ export default function RevenueScreen() {
     mutationFn: syncMothershipPayments,
     onSuccess: (result) => {
       setPaymentsPage(1)
-      void queryClient.invalidateQueries({ queryKey: ["revenue-machines", ...scope] })
-      void queryClient.invalidateQueries({ queryKey: ["revenue-series", ...scope] })
-      void queryClient.invalidateQueries({ queryKey: ["mothership-payments", ...scope] })
+      // Mark these keys stale, then refetch only what is on screen. invalidateQueries
+      // refetches with `cancelRefetch: true`, which aborts a request that is already in
+      // flight (the 60s sync regularly overlaps one) and surfaces as an AbortError;
+      // `cancelRefetch: false` reuses the live request instead.
+      for (const queryKey of [
+        ["revenue-machines", ...scope],
+        ["revenue-series", ...scope],
+        ["mothership-payments", ...scope],
+      ]) {
+        void queryClient.invalidateQueries({ queryKey, refetchType: "none" })
+        void queryClient.refetchQueries({ queryKey, type: "active" }, { cancelRefetch: false })
+      }
       const linked = result.devices?.newKiosksCreated ?? 0
       if (result.transactions.newRecordsInserted > 0 || linked > 0) {
         toast.success(`${result.transactions.newRecordsInserted} new payment${result.transactions.newRecordsInserted === 1 ? "" : "s"} imported${linked ? `; ${linked} device${linked === 1 ? "" : "s"} linked` : ""}`)
@@ -215,9 +224,17 @@ export default function RevenueScreen() {
   const runAutomaticPaymentSync = React.useCallback(() => {
     if (!syncPendingRef.current) syncPaymentsMutate()
   }, [syncPaymentsMutate])
+  const initialSyncDone = React.useRef(false)
   React.useEffect(() => {
-    if (!canEdit) return
-    runAutomaticPaymentSync()
+    if (!canEdit) {
+      initialSyncDone.current = false
+      return
+    }
+    // Development StrictMode runs this effect twice; one sync per mount is enough.
+    if (!initialSyncDone.current) {
+      initialSyncDone.current = true
+      runAutomaticPaymentSync()
+    }
     const interval = window.setInterval(runAutomaticPaymentSync, PAYMENT_SYNC_INTERVAL_MS)
     return () => window.clearInterval(interval)
   }, [canEdit, runAutomaticPaymentSync])
