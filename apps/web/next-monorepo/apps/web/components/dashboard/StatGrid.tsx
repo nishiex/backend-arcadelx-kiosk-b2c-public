@@ -6,14 +6,14 @@ import {
   Box,
   CheckCircle2,
   Users,
-  Network,
+  ClipboardList,
   MapPin,
   Megaphone,
 } from "lucide-react"
 import {
   fetchInventorySummary,
   fetchPendingMembers,
-  fetchNetworkRequests,
+  fetchOrders,
 } from "@/lib/backend-api"
 import { fetchMothershipAds } from "@/lib/mothership-ads-api"
 import { useMe } from "@/hooks/useMe"
@@ -26,7 +26,7 @@ import { Skeleton, ErrorState } from "./ui"
 const nf = new Intl.NumberFormat("en-IN")
 
 export default function StatGrid() {
-  const { canManageMembers, canReviewNetworkRequests, canViewAds, orgType } = useMe()
+  const { canManageMembers, canViewAds, orgType } = useMe()
 
   const inventory = useQuery({
     queryKey: ["inventorySummary"],
@@ -37,10 +37,9 @@ export default function StatGrid() {
     queryFn: () => fetchPendingMembers(1, 1),
     enabled: canManageMembers,
   })
-  const network = useQuery({
-    queryKey: ["networkRequests", 1, 1],
-    queryFn: () => fetchNetworkRequests(1, 1),
-    enabled: canReviewNetworkRequests,
+  const orders = useQuery({
+    queryKey: ["dashboardOrders", "UNDER_REVIEW"],
+    queryFn: ({ signal }) => fetchOrders("UNDER_REVIEW", signal),
   })
   const ads = useQuery({
     queryKey: ["mothership-ads"],
@@ -88,13 +87,13 @@ export default function StatGrid() {
       hint: "Awaiting approval",
     })
   }
-  if (canReviewNetworkRequests) {
+  {
     cards.push({
-      label: "Network Requests",
-      value: network.data?.meta?.total ?? 0,
-      icon: <Network size={18} />,
+      label: "Orders & Requests",
+      value: orders.data?.length ?? 0,
+      icon: <ClipboardList size={18} />,
       iconClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-      hint: "Incoming connections",
+      hint: "Awaiting review",
     })
   }
   if (canViewAds) {
