@@ -309,6 +309,7 @@ model Kiosk {
   transactions   Transaction[]
   reservedOrder  Order?               @relation("ReservedKiosks", fields: [reservedOrderId], references: [id], onDelete: Restrict)
   returnRequests KioskReturnRequest[]
+  ipGames        IpGameKiosk[]
 }
 
 // A kiosk owner asking to hand a machine back, and the supplier's decision on it.
@@ -682,8 +683,26 @@ model IpGame {
   transactionSplits TransactionSplit[]
   settlementLines   IpSettlementLine[]
   dailyRevenues     IpDailyGameRevenue[]
+  kiosks            IpGameKiosk[]
 
   @@index([organizationId, status])
+}
+
+// Tracks which physical kiosks are licensed to run a given IP game.
+// Company OWNER/ADMIN manage this list; both Company and IP_PARTY can read it.
+model IpGameKiosk {
+  id         String @id @default(uuid())
+  ipGameId   String
+  kioskId    String
+
+  assignedAt DateTime @default(now())
+
+  ipGame IpGame @relation(fields: [ipGameId], references: [id], onDelete: Cascade)
+  kiosk  Kiosk  @relation(fields: [kioskId], references: [id], onDelete: Cascade)
+
+  @@unique([ipGameId, kioskId])
+  @@index([ipGameId])
+  @@index([kioskId])
 }
 
 enum SplitStatus {
