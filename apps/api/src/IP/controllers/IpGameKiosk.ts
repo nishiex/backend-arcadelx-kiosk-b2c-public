@@ -29,6 +29,14 @@ const KioskIdsSchema = z.object({
     .array(z.string().uuid('Each kioskId must be a valid UUID'))
     .min(1, 'At least one kioskId is required')
     .max(200, 'Cannot assign more than 200 kiosks in a single request'),
+}).superRefine(({ kioskIds }, ctx) => {
+  if (new Set(kioskIds).size !== kioskIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['kioskIds'],
+      message: 'kioskIds must not contain duplicates',
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -84,7 +92,10 @@ export const assignKiosksToIpGame = asyncHandler(async (req: Request, res: Respo
 
   // Verify every requested kiosk actually exists in our fleet.
   const foundKiosks = await db.kiosk.findMany({
-    where: { id: { in: kioskIds } },
+    where: {
+      id: { in: kioskIds },
+      currentOrgId: req.membership!.organizationId,
+    },
     select: { id: true, machineCode: true, status: true, currentOrgId: true },
   });
 

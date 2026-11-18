@@ -27,7 +27,7 @@ export default function IpPartyGameKiosksModal({
           <div className="flex items-center gap-2">
             <Monitor className="h-5 w-5 text-primary" />
             <div>
-              <h2 className="text-lg font-semibold">{game.displayName} · Active Kiosks</h2>
+              <h2 className="text-lg font-semibold">{game.displayName} · Connected Kiosks</h2>
               <p className="text-xs text-muted-foreground">{game.gameIdentifier}</p>
             </div>
           </div>
@@ -43,7 +43,7 @@ export default function IpPartyGameKiosksModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           <div className="text-sm font-medium">
-            Total active kiosks running this game: <strong>{kiosks.length}</strong>
+            Total kiosks connected to this game: <strong>{kiosks.length}</strong>
           </div>
 
           {kiosksQuery.isLoading ? (
@@ -70,8 +70,8 @@ export default function IpPartyGameKiosksModal({
                       </span>
                     )}
                   </div>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                    Active
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {kiosk.status}
                   </span>
                 </div>
               ))}
