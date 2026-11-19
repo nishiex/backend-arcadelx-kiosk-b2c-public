@@ -175,6 +175,13 @@ export const SetDeviceGamePriceResultSchema = z.object({
   status: z.enum(['APPLIED', 'PENDING']).optional(),
   /** Human-readable moment the queued change goes live, as Mothership phrases it. */
   scheduledFor: z.string().optional(),
+  /**
+   * GAME_CATALOG only: kiosks whose own price for this game was rewritten to the
+   * catalog value, so "apply to all kiosks" reaches devices carrying an override.
+   */
+  devicesUpdated: z.number().int().nonnegative().optional(),
+  /** GAME_CATALOG only: kiosks that still did not read the catalog value back. */
+  devicesNotUpdated: z.array(z.string()).optional(),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;

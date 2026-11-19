@@ -225,14 +225,23 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
     }, 'Device game price scheduled for EOD application'));
   }
   const result = SetDeviceGamePriceResultSchema.parse(await setDeviceGamePrice(params.data.deviceId, params.data.gameId, body.data));
+  // A GAME_CATALOG write overwrites the catalog price that all kiosks inherit. Any pending
+  // EOD row for this device+game would re-apply the old scheduled price on top of the catalog
+  // write when the job fires, silently reverting "Apply to all kiosks". Cancel them here, the
+  // same way `apply_now` does for device-scoped writes.
+  const supersededSchedules = result.scope === 'GAME_CATALOG'
+    ? await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice)
+    : 0;
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        result,
+        { ...result, supersededSchedules },
         result.scope === 'GAME_CATALOG'
-          ? 'Game catalog price applied to all kiosks and verified'
+          ? result.devicesNotUpdated?.length
+            ? `Game catalog price applied; ${result.devicesNotUpdated.length} kiosk(s) still show their previous price`
+            : 'Game catalog price applied to all kiosks and verified'
           : result.status === 'PENDING'
             ? `Device price queued at Mothership for ${result.scheduledFor ?? 'the next scheduled run'}`
             : 'Device game price updated and verified',

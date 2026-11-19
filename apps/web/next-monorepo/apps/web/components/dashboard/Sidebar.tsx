@@ -432,7 +432,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
+      <aside className="scrollbar-hide sticky top-0 hidden h-dvh w-64 shrink-0 flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
         <Brand accountLabel={accountLabel} />
         <NavLinks perms={perms} />
         <div className="mt-4 px-1 text-xs text-muted-foreground">v1.0.0</div>

@@ -232,6 +232,10 @@ export type SetDeviceGamePriceResult = {
   scheduledDate?: string
   scheduledTime?: string
   updateId?: string
+  /** GAME_CATALOG only: kiosks with their own price rewritten to the catalog value. */
+  devicesUpdated?: number
+  /** GAME_CATALOG only: kiosks that still did not read the catalog value back. */
+  devicesNotUpdated?: string[]
 }
 
 export type DevicePriceRequest = {

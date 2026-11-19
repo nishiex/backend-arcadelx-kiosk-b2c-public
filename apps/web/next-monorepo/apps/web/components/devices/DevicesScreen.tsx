@@ -1185,9 +1185,23 @@ function DeviceGamePriceEditor({
         scope: "GAME_CATALOG",
       }),
     onSuccess: async result => {
-      toast.success(
-        `${result.displayName} applied to all kiosks through the catalog: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
-      )
+      const reconciled = result.devicesUpdated ?? 0
+      const unconfirmed = result.devicesNotUpdated?.length ?? 0
+      const reach = [
+        reconciled > 0
+          ? `${reconciled} kiosk${reconciled === 1 ? "" : "s"} with their own price updated`
+          : "",
+        unconfirmed > 0
+          ? `${unconfirmed} kiosk${unconfirmed === 1 ? "" : "s"} still showing the old price`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+      const message = `${result.displayName} applied to all kiosks through the catalog: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}${reach ? ` (${reach})` : ""}`
+      // A kiosk that did not read the catalog value back is a partial result, not a
+      // success: say so instead of implying the whole fleet is on the new price.
+      if (unconfirmed > 0) toast.warning(message)
+      else toast.success(message)
       await onSaved()
     },
     onError: (error: unknown) =>
@@ -1294,10 +1308,17 @@ function DeviceGamePriceEditor({
           <p className="text-sm">
             Apply {game.displayName} to all kiosks? This sets the game&apos;s catalog price to{" "}
             {inr.format(Number(price))} first play / {inr.format(Number(replayPrice))} replay,
-            and every kiosk offering it picks that up. This will apply to all dispatched kiosks
+            and every kiosk offering it picks that up. Kiosks that carry their own price for
+            this game are set to the same value. This will apply to all dispatched kiosks
             across the fleet, wherever they are operating. It cannot be limited to{" "}
             <span className="font-mono text-xs">{deviceId}</span>.
           </p>
+          {scheduledUpdate && scheduledUpdate.status === "PENDING" && (
+            <p className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              <strong>Note:</strong> A scheduled price update ({inr.format(scheduledUpdate.price)} on {scheduledUpdate.businessDate}) is pending on this device.
+              Applying to all kiosks will cancel that schedule so it doesn&apos;t revert the fleet-wide price later.
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button
               type="button"

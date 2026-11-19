@@ -654,6 +654,78 @@ async function setGameCatalogPrice(
     });
   }
 
+  // An explicit device override outranks the catalog on a kiosk, so a catalog-only write
+  // leaves every device that carries its own price for this game (for example after a
+  // scheduled device write was applied) charging the old value. From the dashboard that
+  // reads as "Apply to all kiosks" doing nothing on the kiosk in front of the operator,
+  // even though the catalog write succeeded. Rewrite those devices to the verified
+  // catalog value so the fleet actually converges; kiosks without an override are left
+  // alone and pick the catalog price up through Mothership itself.
+  const { devices: fleet } = await listDevices();
+  const overridden: Array<{ deviceId: string; gameId: string }> = [];
+  for (const device of fleet) {
+    const rows = await getDevicePrices(device.deviceId, catalogAfter);
+    const row =
+      findGameOnDevice(rows, confirmed.game_id) ??
+      rows.find((game) => game.displayName === confirmed.display_name);
+    if (!row) continue;
+    const hasExplicitOverride =
+      row.hasOverride || row.overridePrice !== null || row.overrideReplayPrice !== null;
+    if (!hasExplicitOverride) continue;
+    if (
+      samePrice(row.effectivePrice, input.price) &&
+      samePrice(row.effectiveReplayPrice, replayPrice)
+    ) {
+      continue;
+    }
+    overridden.push({ deviceId: device.deviceId, gameId: row.gameId });
+  }
+
+  if (overridden.length > 0) {
+    // Device writes are staged by Mothership; flush once so the read-back below checks
+    // the live kiosk price rather than the queue.
+    await Promise.all(
+      overridden.map((target) =>
+        callMothership(
+          `/api/v1/devices/${encodeURIComponent(target.deviceId)}/games/${encodeURIComponent(target.gameId)}/price`,
+          { method: 'POST', body: { price: input.price, replay_price: replayPrice } },
+        ),
+      ),
+    );
+    await callMothership('/api/v1/schedule/run-now', { method: 'POST' });
+  }
+
+  const devicesNotUpdated: string[] = [];
+  for (const target of overridden) {
+    const rows = await getDevicePrices(target.deviceId, catalogAfter);
+    const row = findGameOnDevice(rows, target.gameId);
+    if (
+      !row ||
+      !samePrice(row.effectivePrice, input.price) ||
+      !samePrice(row.effectiveReplayPrice, replayPrice)
+    ) {
+      devicesNotUpdated.push(target.deviceId);
+    }
+  }
+
+  // The device writes must not disturb the catalog value this call just verified.
+  const catalogFinal = await getGameCatalog();
+  const finalEntry = catalogFinal.find((entry) => entry.game_id === confirmed.game_id);
+  if (
+    !finalEntry ||
+    !samePrice(finalEntry.price, input.price) ||
+    !samePrice(finalEntry.replay_price, replayPrice)
+  ) {
+    throw new ApiError(502, 'Mothership changed the catalog price while device overrides were reconciled', {
+      deviceId,
+      gameId: confirmed.game_id,
+      requested: { price: input.price, replayPrice },
+      observed: finalEntry
+        ? { price: finalEntry.price, replayPrice: finalEntry.replay_price }
+        : null,
+    });
+  }
+
   return {
     deviceId,
     gameId: confirmed.game_id,
@@ -661,6 +733,8 @@ async function setGameCatalogPrice(
     price: confirmed.price,
     replayPrice: confirmed.replay_price,
     scope: 'GAME_CATALOG',
+    devicesUpdated: overridden.length - devicesNotUpdated.length,
+    devicesNotUpdated,
   };
 }
 

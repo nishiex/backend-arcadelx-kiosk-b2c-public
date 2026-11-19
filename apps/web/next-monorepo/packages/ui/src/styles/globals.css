@@ -137,6 +137,12 @@
      text cursor so text entry and selection remain clear. */
   html {
     cursor: default;
+    /* The page still scrolls; only the scrollbar chrome is hidden. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
   }
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,

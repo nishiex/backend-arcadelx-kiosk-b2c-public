@@ -147,6 +147,9 @@ globalThis.fetch = async (input, init) => {
       }
       return Response.json({ message: "Metadata saved" });
     }
+    if (path === "/api/v1/schedule/run-now") {
+      return Response.json({ status: "success" });
+    }
   }
 
   throw new Error(`Unexpected mocked request: ${method} ${path}`);
@@ -241,6 +244,28 @@ try {
     100,
   );
   console.log("PASS catalog scope: success is withheld until the catalog read-back matches");
+
+  // Case 5 -- GAME_CATALOG after a device override is already live (the scheduled path):
+  // the catalog write alone is masked on that kiosk, so the service must rewrite the
+  // overridden device and verify it read the catalog value back, while leaving kiosks
+  // without an override untouched.
+  resetState();
+  deviceOverridePersists = true;
+  catalogWriteApplies = true;
+  await setDeviceGamePrice("D1", GAME_ID, { price: 150, replay_price: 60, scope: "DEVICE", apply_now: true });
+  calls.length = 0;
+  const reconciled = await setDeviceGamePrice("D1", GAME_ID, { price: 120, replay_price: 55, scope: "GAME_CATALOG" });
+  assert.equal(reconciled.scope, "GAME_CATALOG");
+  assert.equal(reconciled.devicesUpdated, 1, "the overridden kiosk is rewritten to the catalog value");
+  assert.deepEqual(reconciled.devicesNotUpdated, [], "the rewritten kiosk is verified");
+  assert.equal(deviceState("D1").get(GAME_ID)?.overridePrice, 120);
+  assert.equal(deviceState("D1").get(GAME_ID)?.overrideReplayPrice, 55);
+  assert.equal(deviceState("D2").get(GAME_ID)?.overridePrice, null, "kiosks without an override are not written");
+  const reconciledWrites = calls.filter((call) => call.method === "POST" && call.url.includes("/devices/"));
+  assert.equal(reconciledWrites.length, 1, "only the overridden kiosk receives a device write");
+  assert.match(reconciledWrites[0]?.url ?? "", /\/devices\/D1\/games\//);
+  assert.deepEqual(JSON.parse(reconciledWrites[0]?.body ?? "{}"), { price: 120, replay_price: 55 });
+  console.log("PASS catalog scope: an overridden kiosk is converged to the catalog price and verified");
 } finally {
   globalThis.fetch = originalFetch;
   if (originalDeviceUrl === undefined) {
