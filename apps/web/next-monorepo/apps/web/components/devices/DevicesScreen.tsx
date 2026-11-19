@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useMe } from "@/hooks/useMe"
 import {
   fetchDevicePrices,
+  cancelScheduledDeviceGamePrice,
   fetchDevices,
   fetchDevicePriceRequests,
   approveDevicePriceRequest,
@@ -1219,8 +1220,18 @@ function DeviceGamePriceEditor({
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't apply the device price"),
   })
 
-  const pending = requestMutation.isPending || deviceMutation.isPending || catalogMutation.isPending || applyNowMutation.isPending
-  const activeError = requestMutation.error ?? catalogMutation.error ?? deviceMutation.error ?? applyNowMutation.error
+  const cancelScheduledMutation = useMutation({
+    mutationFn: () => cancelScheduledDeviceGamePrice(deviceId, game.gameId),
+    onSuccess: async result => {
+      if (result.cancelled > 0) toast.success("Scheduled price update cancelled")
+      else toast.info("No actionable scheduled update was found")
+      await onSaved()
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Couldn't cancel the scheduled update"),
+  })
+
+  const pending = requestMutation.isPending || deviceMutation.isPending || catalogMutation.isPending || applyNowMutation.isPending || cancelScheduledMutation.isPending
+  const activeError = requestMutation.error ?? catalogMutation.error ?? deviceMutation.error ?? applyNowMutation.error ?? cancelScheduledMutation.error
 
   return (
     <div
@@ -1365,6 +1376,16 @@ function DeviceGamePriceEditor({
           <button type="button" className={buttonClass} onClick={() => deviceMutation.mutate()} disabled={pending || !priceValid}>
             {deviceMutation.isPending ? "Scheduling…" : "Scheduled"}
           </button>
+          {scheduledUpdate?.status === "PENDING" && (
+            <button
+              type="button"
+              className="rounded-lg border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              onClick={() => cancelScheduledMutation.mutate()}
+              disabled={pending}
+            >
+              {cancelScheduledMutation.isPending ? "Cancelling…" : "Cancel scheduled"}
+            </button>
+          )}
           <button type="button" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" onClick={() => applyNowMutation.mutate()} disabled={pending || !priceValid}>
             {applyNowMutation.isPending ? "Applying…" : "Apply now"}
           </button>

@@ -202,6 +202,27 @@ export async function markScheduledUpdatesSuperseded(
   return superseded.count;
 }
 
+/**
+ * A catalog update changes the inherited price for every kiosk offering a game.
+ * Cancel all still-actionable EOD intents for that game, not only the device from
+ * which the operator opened the pricing dialog. Otherwise another kiosk's older
+ * scheduled row could run later and reintroduce the stale price as an override.
+ */
+export async function markGameScheduledUpdatesSuperseded(gameId: string): Promise<number> {
+  const superseded = await prisma.eodDevicePriceUpdate.deleteMany({
+    where: { gameId, status: { in: ['PENDING', 'FAILED'] } },
+  });
+  return superseded.count;
+}
+
+/** Cancel an actionable schedule for one device/game from the pricing dialog. */
+export async function cancelScheduledDevicePrice(deviceId: string, gameId: string): Promise<number> {
+  const cancelled = await prisma.eodDevicePriceUpdate.deleteMany({
+    where: { deviceId, gameId, status: { in: ['PENDING', 'FAILED'] } },
+  });
+  return cancelled.count;
+}
+
 /** Apply every EOD price update that is due. Safe to call from a timer or HTTP cron. */
 export async function applyPendingEodUpdates() {
   const recovered = await recoverStaleEodUpdates();

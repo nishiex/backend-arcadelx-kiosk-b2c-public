@@ -8,6 +8,7 @@ import {
 import {
   getDevices,
   getPricesForDevice,
+  cancelScheduledDeviceGamePrice,
   resetPricesForDevice,
   resetPricesForAllDevices,
   updateDeviceGamePrice,
@@ -54,6 +55,13 @@ router.get(
   requireOrgType('COMPANY', 'DISTRIBUTOR', 'PARTNER'),
   requireRole('OWNER', 'ADMIN', 'MANAGER'),
   getPricesForDevice,
+);
+
+router.delete(
+  '/:deviceId/games/:gameId/scheduled',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  cancelScheduledDeviceGamePrice,
 );
 
 // Reset price overrides for this device only. It does not change catalog prices or other

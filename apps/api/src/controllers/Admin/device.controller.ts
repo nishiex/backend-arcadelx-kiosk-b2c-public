@@ -19,7 +19,7 @@ import {  getDevicePrices,
   setDeviceGamePrice,
 } from '../../services/Mothership/devices.service';
 import { networkOrgIds } from '../../services/network-scope';
-import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, eodRunForDate, getEodPricingTime, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
+import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, cancelScheduledDevicePrice, eodRunForDate, getEodPricingTime, markGameScheduledUpdatesSuperseded, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
 
 /**
  * Device fleet and per-device game pricing.
@@ -87,6 +87,15 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   res
     .status(200)
     .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+});
+
+export const cancelScheduledDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {
+  const params = DeviceGameParamsSchema.safeParse(req.params);
+  if (!params.success) throw new ApiError(400, 'Invalid device or game id', params.error.issues);
+  assertCompanyAdmin(req);
+  await assertDeviceVisible(req, params.data.deviceId);
+  const cancelled = await cancelScheduledDevicePrice(params.data.deviceId, params.data.gameId);
+  res.status(200).json(new ApiResponse(200, { deviceId: params.data.deviceId, gameId: params.data.gameId, cancelled }, cancelled ? 'Scheduled device price update cancelled' : 'No actionable scheduled update found'));
 });
 
 export const resetPricesForDevice = asyncHandler(async (req: Request, res: Response) => {
@@ -230,7 +239,7 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
   // write when the job fires, silently reverting "Apply to all kiosks". Cancel them here, the
   // same way `apply_now` does for device-scoped writes.
   const supersededSchedules = result.scope === 'GAME_CATALOG'
-    ? await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice)
+    ? await markGameScheduledUpdatesSuperseded(result.gameId)
     : 0;
   res
     .status(200)

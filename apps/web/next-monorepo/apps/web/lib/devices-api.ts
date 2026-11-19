@@ -325,6 +325,14 @@ export async function setDeviceGamePrice(
   return handleRes<SetDeviceGamePriceResult>(res)
 }
 
+export async function cancelScheduledDeviceGamePrice(deviceId: string, gameId: string): Promise<{ cancelled: number }> {
+  const res = await apiFetch(
+    `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/scheduled`,
+    { method: "DELETE" },
+  )
+  return handleRes<{ cancelled: number }>(res)
+}
+
 /** Reset only this device's overrides; the API confirms all prices returned to catalog values. */
 export async function resetDevicePrices(deviceId: string): Promise<ResetDevicePricesResult> {
   const res = await apiFetch(
