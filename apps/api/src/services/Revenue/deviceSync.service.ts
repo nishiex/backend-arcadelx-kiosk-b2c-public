@@ -41,7 +41,7 @@ export type DeviceSyncResult = {
 };
 
 /** Default model for a device discovered by sync, when the feed does not say. */
-const DISCOVERED_MODEL = "Unassigned";
+const DISCOVERED_MODEL = "ArcadeLX";
 
 function normaliseLocation(location: string | null | undefined) {
   const trimmed = location?.trim();

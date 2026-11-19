@@ -18,7 +18,7 @@ const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-s
 // Mirrors DISCOVERED_MODEL in apps/api/src/services/Revenue/deviceSync.service.ts:
 // kiosks picked up by the Mothership sync carry this literal model when the feed
 // does not report one, which is the common case for a freshly discovered fleet.
-const DEFAULT_MODEL = "Unassigned"
+const DEFAULT_MODEL = "ArcadeLX"
 
 function CreateAllocationDialog({ organizationId, disabled, companyMode, onCreated }: { organizationId: string; disabled: boolean; companyMode: boolean; onCreated: (order: CreatedOrder) => void }) {
   const [open, setOpen] = React.useState(false)
