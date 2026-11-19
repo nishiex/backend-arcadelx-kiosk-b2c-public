@@ -15,12 +15,17 @@ import DecisionDialog from "@/components/requests/DecisionDialog"
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_STYLES, orderDate, orderPerspective } from "./order-display"
 
 const control = "rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+// Mirrors DISCOVERED_MODEL in apps/api/src/services/Revenue/deviceSync.service.ts:
+// kiosks picked up by the Mothership sync carry this literal model when the feed
+// does not report one, which is the common case for a freshly discovered fleet.
+const DEFAULT_MODEL = "Unassigned"
 
 function CreateAllocationDialog({ organizationId, disabled, companyMode, onCreated }: { organizationId: string; disabled: boolean; companyMode: boolean; onCreated: (order: CreatedOrder) => void }) {
   const [open, setOpen] = React.useState(false)
   const [partnerId, setPartnerId] = React.useState("")
   const [quantity, setQuantity] = React.useState("1")
   const [model, setModel] = React.useState("")
+  const [modelTouched, setModelTouched] = React.useState(false)
   const partners = useQuery({ queryKey: ["allocation-partners", organizationId], queryFn: fetchPartners, enabled: open })
   const distributors = useQuery({ queryKey: ["allocation-distributors", organizationId], queryFn: fetchDistributors, enabled: open && companyMode })
   const kiosks = useQuery({ queryKey: ["allocation-kiosks", organizationId], queryFn: fetchKiosks, enabled: open })
@@ -36,15 +41,19 @@ function CreateAllocationDialog({ organizationId, disabled, companyMode, onCreat
   const hasRecipientError = partners.isError || (companyMode && distributors.isError)
   const recipientError = partners.error ?? (companyMode ? distributors.error : null)
   const models = [...new Set(available.map(kiosk => kiosk.model).filter((value): value is string => !!value))]
-  const availableCount = available.filter(kiosk => !model || kiosk.model === model).length
+  // Default to "Unassigned" until the user picks something, so an order never
+  // silently means "any model" when nothing was chosen. Derived rather than held in
+  // state: the inventory list arrives after the dialog opens.
+  const effectiveModel = modelTouched ? model : (models.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : "")
+  const availableCount = available.filter(kiosk => !effectiveModel || kiosk.model === effectiveModel).length
   const validQuantity = Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 50
   const mutation = useMutation({
-    mutationFn: () => createOrder({ type: "ALLOCATION", targetOrgId: partnerId, quantity: Number(quantity), model: model || undefined }),
+    mutationFn: () => createOrder({ type: "ALLOCATION", targetOrgId: partnerId, quantity: Number(quantity), model: effectiveModel || undefined }),
     onSuccess: order => { toast.success(companyMode ? "Allocation order created" : "Partner allocation order created"); setOpen(false); onCreated(order) },
     onError: (error: Error) => toast.error(error.message),
   })
   const blocked = disabled || !partnerId || !validQuantity || availableCount < Number(quantity) || mutation.isPending || (companyMode && distributors.isLoading)
-  return <Dialog.Root open={open} onOpenChange={value => { if (mutation.isPending) return; if (value) { setPartnerId(""); setQuantity("1"); setModel(""); mutation.reset() }; setOpen(value) }}>
+  return <Dialog.Root open={open} onOpenChange={value => { if (mutation.isPending) return; if (value) { setPartnerId(""); setQuantity("1"); setModel(""); setModelTouched(false); mutation.reset() }; setOpen(value) }}>
     <Dialog.Trigger asChild><button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"><Plus size={16} />{companyMode ? "Create Order" : "Create Partner Order"}</button></Dialog.Trigger>
     <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" /><Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl">
       <Dialog.Title className="pr-7 text-lg font-semibold">{companyMode ? "Create allocation order" : "Create Partner allocation"}</Dialog.Title>
@@ -54,7 +63,7 @@ function CreateAllocationDialog({ organizationId, disabled, companyMode, onCreat
         <label className="block space-y-2 text-sm font-medium">{companyMode ? "Recipient organization" : "Partner"}<select aria-label={companyMode ? "Recipient organization" : "Partner"} value={partnerId} onChange={event => setPartnerId(event.target.value)} disabled={mutation.isPending || partners.isLoading || distributors.isLoading} className={control + " w-full"}><option value="">{hasRecipientError ? (companyMode ? "Recipients could not be loaded" : "Partners could not be loaded") : recipients.length ? `Select a ${companyMode ? "recipient" : "Partner"}` : companyMode ? "No Distributors or Partners under your organization" : "No Partners under your organization"}</option>{recipients.map(recipient => <option key={recipient.id} value={recipient.id} disabled={!recipient.eligible}>{recipient.name} ({recipient.kind}){recipient.eligible ? "" : " — active agreement required"}</option>)}</select></label>
         {hasRecipientError && <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><span>{recipientError instanceof Error ? recipientError.message : companyMode ? "Couldn't load Distributors and Partners." : "Couldn't load Partners."}</span><button type="button" className="shrink-0 rounded-md border border-destructive/30 px-2 py-1 font-medium hover:bg-destructive/10" onClick={() => { void partners.refetch(); if (companyMode) void distributors.refetch() }}>Retry</button></div>}
         <label className="block space-y-2 text-sm font-medium">Number of kiosks<input aria-label="Number of kiosks" type="number" min={1} max={50} value={quantity} onChange={event => setQuantity(event.target.value)} disabled={mutation.isPending} className={control + " w-full"} /></label>
-        <label className="block space-y-2 text-sm font-medium">Model (optional)<select aria-label="Kiosk model" value={model} onChange={event => setModel(event.target.value)} disabled={mutation.isPending || kiosks.isLoading} className={control + " w-full"}><option value="">Any available model</option>{models.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="block space-y-2 text-sm font-medium">Model<select aria-label="Kiosk model" value={effectiveModel} onChange={event => { setModel(event.target.value); setModelTouched(true) }} disabled={mutation.isPending || kiosks.isLoading} className={control + " w-full"}><option value="">Any available model</option>{models.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
         <p className="text-xs text-muted-foreground">Available in your inventory: {availableCount} kiosk{availableCount === 1 ? "" : "s"}.</p>
         {mutation.isError && <p role="alert" className="text-sm text-destructive">{mutation.error.message}</p>}
         <div className="flex justify-end gap-3"><Dialog.Close asChild><button type="button" disabled={mutation.isPending} className={control}>Cancel</button></Dialog.Close><button type="submit" disabled={blocked} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{mutation.isPending && <Loader2 size={16} className="animate-spin" />}{mutation.isPending ? "Creating…" : "Create order"}</button></div>
