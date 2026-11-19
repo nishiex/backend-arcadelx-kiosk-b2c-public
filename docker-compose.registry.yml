@@ -23,7 +23,6 @@ services:
       # Ad videos need a writable, persistent directory; without this the service falls
       # back to a path inside the image that the `node` user cannot create.
       ADS_UPLOAD_DIR: /app/apps/api/uploads/ads
-      LOCAL_DATABASE_WIPE_ENABLED: "false"
       EOD_PRICE_JOBS_ENABLED: "false"
     volumes:
       - ./apps/api/invoices:/app/apps/api/invoices

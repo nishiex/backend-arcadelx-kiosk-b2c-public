@@ -29,7 +29,6 @@ services:
       HOST: 0.0.0.0
       # Must match the bind mount below and the image default.
       INVOICES_DIR: /app/apps/api/invoices
-      LOCAL_DATABASE_WIPE_ENABLED: "false"
       EOD_PRICE_JOBS_ENABLED: "false"
     volumes:
       - ./apps/api/invoices:/app/apps/api/invoices
