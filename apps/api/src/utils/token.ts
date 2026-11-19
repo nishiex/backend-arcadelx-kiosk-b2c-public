@@ -4,6 +4,12 @@ import crypto from 'crypto';
 import { env } from '../config/env';
 import type { Response } from 'express';
 
+// Non-credential routing hint (value "1", carries no authority). The web app
+// reads it server-side to send logged-out visitors straight to /login instead of
+// rendering a dashboard that bounces them. It outlives the 15m access cookie, so
+// a still-valid 7d refresh session never looks logged out.
+const SESSION_HINT_COOKIE = 'has_session';
+
 const cookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
@@ -57,9 +63,11 @@ export const setTokenCookies = (res: any, accessToken: string, refreshToken: str
   res.cookie('access_token', accessToken, { ...cookieOptions, maxAge: ACCESS_COOKIE_EXPIRY }); 
   // Refresh token cookie
   res.cookie('refresh_token', refreshToken, { ...cookieOptions, path: '/api/auth/refresh', maxAge: REFRESH_COOKIE_EXPIRY }); 
+  res.cookie(SESSION_HINT_COOKIE, '1', { ...cookieOptions, path: '/', maxAge: REFRESH_COOKIE_EXPIRY }); 
 };
 
 export const clearTokenCookies = (res: Response) => {
   res.clearCookie('access_token', { ...cookieOptions, path: '/' });
   res.clearCookie('refresh_token', { ...cookieOptions, path: '/api/auth/refresh' });
+  res.clearCookie(SESSION_HINT_COOKIE, { ...cookieOptions, path: '/' });
 };
