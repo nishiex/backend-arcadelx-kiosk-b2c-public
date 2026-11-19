@@ -26,9 +26,39 @@ import ipGameRoutes from './IP/routes/IpGamesRoutes';
 import ipRevenueRoutes from './IP/routes/ipRevenue.routes';
 import ipSettlementRoutes from './IP/routes/ipSettlement.routes';
 import { writeAuditLog } from './services/audit-log.service';
+import { env } from "./config/env";
+
+// Cross-origin access matters when the browser calls this API directly (another
+// port, a LAN address, a separate frontend host) instead of going through the
+// Next.js /api proxy. Cookie auth requires `credentials: true`, and that forbids
+// the wildcard origin, so the allowlist is explicit: CORS_ORIGINS plus, in
+// development, any localhost or private-network origin.
+const configuredOrigins = new Set(
+  (env.CORS_ORIGINS ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+);
+const localOrPrivateOrigin =
+  /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d{1,5})?$/;
+
+function isAllowedOrigin(origin: string) {
+  if (configuredOrigins.has(origin)) return true;
+  return env.NODE_ENV !== "production" && localOrPrivateOrigin.test(origin);
+}
+
 const app = express();
 
-app.use(cors())
+app.use(cors({
+  origin(origin, callback) {
+    // Same-origin, curl and server-to-server calls send no Origin header.
+    if (!origin) return callback(null, false);
+    return callback(null, isAllowedOrigin(origin));
+  },
+  credentials: true,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Internal-Api-Key"],
+  // Cross-origin downloads read the filename from this header.
+  exposedHeaders: ["Content-Disposition"],
+  maxAge: 600,
+}));
 app.use(helmet());
 
 app.use(express.json());
