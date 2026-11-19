@@ -1,4 +1,4 @@
-import jwt, { type SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import type { StringValue } from 'ms';
 import crypto from 'crypto';
 import { env } from '../config/env';

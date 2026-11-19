@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { prisma } from "../utils/db";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";

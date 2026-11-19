@@ -263,8 +263,3 @@ export async function removeKiosksFromIpGame(ipGameId: string, kioskIds: string[
   return handleRes<{ game: unknown; removed: number }>(res)
 }
 
-export async function fetchIpGamesForKiosk(kioskId: string) {
-  const res = await apiFetch(`/api/ip/kiosks/${encodeURIComponent(kioskId)}/games`, { credentials: "include", cache: "no-store" })
-  return handleRes<{ kiosk: unknown; games: Array<{ connectionId: string; assignedAt: string; id: string; gameIdentifier: string; displayName: string; coverImageUrl: string | null; status: string; organization: { id: string; name: string } }>; total: number }>(res)
-}
-

@@ -176,26 +176,6 @@ export type Kiosk = {
   assignedAt?: string | null;
 };
 
-export type UnpairedKiosk = {
-  id: string;
-  machineCode: string;
-  model: string | null;
-};
-
-export async function fetchUnpairedKiosks(): Promise<UnpairedKiosk[]> {
-  const res = await apiFetch('/api/devices/unpaired-kiosks', { cache: 'no-store' });
-  return (await handleRes<{ unpairedKiosks: UnpairedKiosk[] }>(res)).unpairedKiosks;
-}
-
-export async function pairKioskDevice(machineCode: string, externalDeviceId: string) {
-  const res = await apiFetch(`/api/devices/kiosks/${encodeURIComponent(machineCode)}/pair`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ externalDeviceId }),
-  });
-  return handleRes<{ kiosk: { machineCode: string; externalDeviceId: string; model: string | null } }>(res);
-}
-
 export const handleRes = async <T,>(res: Response): Promise<T> => {
   const text = await res.text();
   let json: ApiResponse<T> | { message?: string } | null = null;
@@ -1004,13 +984,6 @@ export type Agreement = {
   effectiveTo: string | null;
   createdAt: string;
 };
-
-export type AgreementsResponse = { agreements: Agreement[]; meta: PaginationMeta };
-
-export async function fetchAgreements(page = 1, signal?: AbortSignal): Promise<AgreementsResponse> {
-  const res = await apiFetch(`/api/agreements?page=${page}&limit=20`, { signal, cache: 'no-store' });
-  return handleRes<AgreementsResponse>(res);
-}
 
 /**
  * Every agreement for one child organization, newest first. The endpoint lists the

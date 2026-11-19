@@ -3,7 +3,7 @@ import path from 'path';
 import { prisma } from '../../utils/db';
 import { ApiError } from '../../utils/ApiError';
 import { Prisma } from '../../generated/prisma/client';
-import { sendEmail, checkEmailDelivery, type SendEmailParams } from '../email/email.service';
+import { sendEmail, checkEmailDelivery } from '../email/email.service';
 import {
   generateIpSettlementPdf,
   resolveMonthName,
