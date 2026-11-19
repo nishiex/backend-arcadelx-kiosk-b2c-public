@@ -12,7 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@radix-ui/react-dialog": "^1.1.23",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@tanstack/react-query": "^5.103.2",
     "@workspace/ui": "*",
     "gsap": "^3.15.0",
@@ -24,13 +27,15 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.88.0",
     "recharts": "^3.10.1",
-    "sonner": "^2.0.8"
+    "sonner": "^2.0.8",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "@workspace/eslint-config": "*",
     "@workspace/typescript-config": "*",
     "eslint": "^9",

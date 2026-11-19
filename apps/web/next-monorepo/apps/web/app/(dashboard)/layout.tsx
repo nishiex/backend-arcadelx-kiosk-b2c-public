@@ -1,8 +1,7 @@
 import React from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import Sidebar from '@/components/dashboard/Sidebar'
-import Header from '@/components/dashboard/Header'
+import AppShell from '@/components/dashboard/AppShell'
 import AuthGuard from '@/components/dashboard/AuthGuard'
 
 // Cookie scope decides this check: access_token is scoped to "/" and expires after
@@ -19,18 +18,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!hasSession) redirect('/login')
 
-  // The shell renders outside AuthGuard on purpose: Sidebar and Header are
-  // null-safe while /api/auth/me is in flight, so a cold load paints the app
-  // immediately and only the content area waits.
+  // AppShell picks the chrome by organization type (operator console vs IP studio).
+  // It renders outside AuthGuard so the frame paints immediately; only the content
+  // area waits for /api/auth/me.
   return (
-    <div className="flex min-h-dvh flex-col bg-background md:flex-row">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header />
-        <main className="min-w-0 p-4 sm:p-6">
-          <AuthGuard>{children}</AuthGuard>
-        </main>
-      </div>
-    </div>
+    <AppShell>
+      <AuthGuard>{children}</AuthGuard>
+    </AppShell>
   )
 }

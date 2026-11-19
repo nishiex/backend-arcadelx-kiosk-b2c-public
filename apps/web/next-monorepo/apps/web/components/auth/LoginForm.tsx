@@ -147,7 +147,14 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p data-reveal className="mt-6 text-center text-sm text-muted-foreground">
+      <p data-reveal className="mt-6 text-center text-xs text-muted-foreground">
+        Own the games?{" "}
+        <Link href="/studio/login" className="font-medium text-primary hover:underline">
+          Studio sign in
+        </Link>
+      </p>
+
+      <p data-reveal className="mt-3 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link href="/join" className="font-medium text-primary hover:underline">
           Sign up
