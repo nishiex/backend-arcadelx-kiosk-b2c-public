@@ -12,11 +12,13 @@ import {
 } from "@/lib/backend-api"
 import { KIOSK_MODELS } from "@/lib/kiosk-models"
 
-export default function CreateOrderDialog({ organizationId, disabled, onCreated }: {
+export default function CreateOrderDialog({ organizationId, disabled, showAvailabilityCounts, onCreated }: {
   organizationId: string
   disabled: boolean
+  showAvailabilityCounts?: boolean
   onCreated: (order: CreatedOrder) => void
 }) {
+  showAvailabilityCounts = showAvailabilityCounts ?? false
   const [open, setOpen] = React.useState(false)
   const [quantity, setQuantity] = React.useState("1")
   const [requestedModel, setRequestedModel] = React.useState("")
@@ -103,7 +105,7 @@ export default function CreateOrderDialog({ organizationId, disabled, onCreated 
                   const count = stockByModel.get(model) ?? 0
                   return (
                     <option key={model} value={model} disabled={count === 0}>
-                      {model}
+                      {model}{showAvailabilityCounts ? ` (${count} available)` : ""}
                     </option>
                   )
                 })}
