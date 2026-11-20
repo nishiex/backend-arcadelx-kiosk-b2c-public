@@ -50,7 +50,7 @@ type NavEntry = { kind: "link"; item: NavItem } | { kind: "network" }
 // Only destinations backed by a live API on this deployment are listed.
 const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Overview", href: "/", icon: LayoutGrid } },
-  { kind: "link", item: { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone } },
+  { kind: "link", item: { name: "Kiosks", href: "/kiosks", icon: MonitorSmartphone, show: (p) => p.orgType !== "IP_PARTY" } },
   // Hardware as Mothership reports it. Read scope matches revenue; the price write inside
   // is COMPANY OWNER/ADMIN only.
   { kind: "link", item: { name: "Devices", href: "/device-management", icon: Cpu, show: (p) => p.canViewDevices } },
@@ -427,7 +427,8 @@ export default function Sidebar() {
   const accountLabel = perms.isError || !perms.me ? null
     : perms.orgType === "DISTRIBUTOR" ? "Distributor"
       : perms.orgType === "PARTNER" ? "Partner"
-        : isMasterAdmin ? "Master Admin" : null
+        : perms.orgType === "IP_PARTY" ? "IP Partner"
+          : isMasterAdmin ? "Master Admin" : null
 
   return (
     <>

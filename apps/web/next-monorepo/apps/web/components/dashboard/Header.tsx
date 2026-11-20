@@ -40,7 +40,9 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const bellRef = React.useRef<HTMLButtonElement>(null)
   const isOwnerOrAdmin = role === "OWNER" || role === "ADMIN"
-  const canReview = me?.membership?.status === "ACTIVE" && isOwnerOrAdmin
+  // IP owners read royalty statements only; agreement and order review is an
+  // operator concern, so those header queries stay idle for them.
+  const canReview = me?.membership?.status === "ACTIVE" && isOwnerOrAdmin && me.membership.organization.type !== "IP_PARTY"
   const canViewPriceRequests = me?.membership?.status === "ACTIVE" &&
     (isOwnerOrAdmin || role === "MANAGER") &&
     ["COMPANY", "DISTRIBUTOR", "PARTNER"].includes(me.membership.organization.type)

@@ -9,7 +9,7 @@ import { fetchIpParties } from "@/lib/ip-api"
 import { retryOrganizationCredentials } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
-import IpPartyDashboard from "@/components/ip/IpPartyDashboard"
+import IpDashboardScreen from "@/components/ip/IpDashboardScreen"
 import CompanyIpTools from "@/components/ip/CompanyIpTools"
 
 const inputClass =
@@ -31,7 +31,7 @@ function SharePill({ ipSharePct }: { ipSharePct: number | undefined }) {
     return <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">No agreement</span>
   }
   return (
-    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+    <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
       IP {formatPct(ipSharePct)}
     </span>
   )
@@ -72,7 +72,7 @@ export default function IpPartiesScreen() {
     )
   }
 
-  if (me?.membership?.organization.type === "IP_PARTY") return <IpPartyDashboard />
+  if (me?.membership?.organization.type === "IP_PARTY") return <IpDashboardScreen />
 
   // The tab is hidden for everyone else; this covers a direct URL visit.
   if (!isMasterAdmin) {
@@ -237,8 +237,8 @@ export default function IpPartiesScreen() {
                         <span
                           className={
                             party.credentialsEmailSent
-                              ? "mb-1.5 block text-xs font-medium text-emerald-700 dark:text-emerald-300"
-                              : "mb-1.5 block text-xs font-medium text-amber-700 dark:text-amber-300"
+                              ? "mb-1.5 block text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                              : "mb-1.5 block text-xs font-medium text-amber-600 dark:text-amber-400"
                           }
                         >
                           {party.credentialsEmailSent ? "Sent" : "Not delivered"}

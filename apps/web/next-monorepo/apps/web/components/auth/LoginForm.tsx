@@ -10,10 +10,13 @@ import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { gsap, prefersReducedMotion, EASE } from "@/lib/gsap"
 import { beginMutationToast } from "@/lib/mutation-toast"
+import { fetchMe } from "@/lib/backend-api"
 
 type FormValues = { email: string; password: string }
 
-export default function LoginForm() {
+type LoginAudience = "operator" | "ip"
+
+export default function LoginForm({ audience = "operator" }: { audience?: LoginAudience }) {
   const router = useRouter()
   const params = useSearchParams()
   const queryClient = useQueryClient()
@@ -54,8 +57,15 @@ export default function LoginForm() {
       // Refresh identity so the dashboard picks up the new session.
       await queryClient.invalidateQueries({ queryKey: ["me"] })
       toast.success("Signed in")
-      const next = params.get("next") || "/"
-      router.replace(next)
+      const next = params.get("next")
+      if (!next && audience === "ip") {
+        // An IP owner lands on their royalty dashboard; anyone else who used this
+        // door still reaches the console they actually belong to.
+        const me = await queryClient.fetchQuery({ queryKey: ["me"], queryFn: fetchMe })
+        router.replace(me.membership?.organization.type === "IP_PARTY" ? "/ip" : "/")
+        return
+      }
+      router.replace(next || "/")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign in failed")
     } finally {
@@ -70,8 +80,12 @@ export default function LoginForm() {
     >
       <div data-reveal className="mb-6 flex flex-col items-center text-center">
         <img src="/logo.png" alt="ArcadeLX" className="mb-3 h-12 w-auto object-contain" />
-        <h1 className="text-xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to your ArcadeLX account</p>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {audience === "ip" ? "IP owner sign in" : "Welcome back"}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {audience === "ip" ? "Use the account tied to your IP organization" : "Sign in to your ArcadeLX account"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -85,7 +99,7 @@ export default function LoginForm() {
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder={audience === "ip" ? "you@studio.com" : "you@company.com"}
               className={cn(
                 "w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:ring-2 focus:ring-ring/40",
                 errors.email ? "border-destructive" : "border-input"
@@ -147,19 +161,30 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p data-reveal className="mt-6 text-center text-xs text-muted-foreground">
-        Own the games?{" "}
-        <Link href="/studio/login" className="font-medium text-primary hover:underline">
-          Studio sign in
-        </Link>
-      </p>
+      {audience === "ip" ? (
+        <p data-reveal className="mt-6 text-center text-xs text-muted-foreground">
+          Operator or partner?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Sign in to the console
+          </Link>
+        </p>
+      ) : (
+        <>
+          <p data-reveal className="mt-6 text-center text-xs text-muted-foreground">
+            Own the games?{" "}
+            <Link href="/studio/login" className="font-medium text-primary hover:underline">
+              Studio sign in
+            </Link>
+          </p>
 
-      <p data-reveal className="mt-3 text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link href="/join" className="font-medium text-primary hover:underline">
-          Sign up
-        </Link>
-      </p>
+          <p data-reveal className="mt-3 text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/join" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
+          </p>
+        </>
+      )}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { AlertCircle } from "lucide-react"
 import { useMe } from "@/hooks/useMe"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
 import DashboardWelcome from "./DashboardWelcome"
+import IpDashboardScreen from "@/components/ip/IpDashboardScreen"
 import StatGrid from "./StatGrid"
 import RevenueTrendChart from "./RevenueTrendChart"
 import InventoryBreakdown from "./InventoryBreakdown"
@@ -15,7 +16,7 @@ import MachineActivityLog from "./MachineActivityLog"
 
 export default function DashboardScreen() {
   const router = useRouter()
-  const { isError, isLoading, me, canViewRevenue } = useMe()
+  const { isError, isLoading, me, canViewRevenue, orgType } = useMe()
   const gridRef = useScrollReveal<HTMLDivElement>([isError])
 
   // Session invalid → bounce to login (preserve intent via ?next).
@@ -25,6 +26,10 @@ export default function DashboardScreen() {
       return () => clearTimeout(t)
     }
   }, [isError, router])
+
+  // IP owners share the console chrome but not the operator's fleet metrics, so the
+  // dashboard is swapped before any fleet query mounts.
+  if (orgType === "IP_PARTY") return <IpDashboardScreen />
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

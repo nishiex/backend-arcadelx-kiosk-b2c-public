@@ -3,20 +3,10 @@
 import React from "react"
 import Header from "@/components/dashboard/Header"
 import Sidebar from "@/components/dashboard/Sidebar"
-import IpStudioShell from "@/components/ip/IpStudioShell"
-import { useMe } from "@/hooks/useMe"
 
-// Chooses the chrome for the signed-in organization. Operators keep the familiar
-// sidebar console; IP owners get the studio surface, which shares no navigation,
-// colours or layout with it. While /me is still in flight the operator shell is
-// rendered, so the common case paints without waiting.
+// The console frame is shared by every organization type: operators keep the
+// sidebar console, and IP owners get the same chrome with an IP dashboard inside.
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { orgType } = useMe()
-
-  if (orgType === "IP_PARTY") {
-    return <IpStudioShell>{children}</IpStudioShell>
-  }
-
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <Sidebar />
