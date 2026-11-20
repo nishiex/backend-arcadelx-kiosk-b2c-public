@@ -102,7 +102,7 @@ function PriceSourceBadge({
             ? `Scheduled ${inr.format(update.price)} / replay ${inr.format(update.replayPrice)} for ${update.businessDate} ${update.scheduledTime} (${timezone}). The kiosk keeps charging ${inr.format(game.effectivePrice)} until then.`
             : `The kiosk price was set by the scheduled update for ${update.businessDate} ${update.scheduledTime} (${timezone}).`
         }
-        className="rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-700 dark:text-sky-300"
+        className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
       >
         Scheduled
       </span>
@@ -110,7 +110,7 @@ function PriceSourceBadge({
   }
   if (gameHasOverride(game)) {
     return (
-      <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
         Override
       </span>
     )
@@ -119,7 +119,7 @@ function PriceSourceBadge({
     return (
       <span
         title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} - this kiosk has not picked it up`}
-        className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+        className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
       >
         Catalog differs
       </span>
@@ -150,8 +150,8 @@ function EodStatus({ update, game }: { update: EodPriceUpdate; game: GamePriceVi
     : update.status === "FAILED"
       ? "text-destructive"
       : update.status === "APPLIED"
-        ? "text-emerald-700 dark:text-emerald-300"
-        : "text-amber-700 dark:text-amber-300"
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-amber-600 dark:text-amber-400"
   const title = replaced
     ? `This scheduled price was applied and has since been replaced; the kiosk now charges ${inr.format(game.effectivePrice)} / replay ${inr.format(game.effectiveReplayPrice)}.`
     : update.lastError ?? undefined
