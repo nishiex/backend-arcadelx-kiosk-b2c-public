@@ -476,7 +476,7 @@ export type Distributor = {
   phone: string | null;
   country: string | null;
   createdAt: string;
-  owner: { id: string; name: string; email: string } | null;
+  owner: { id: string; name: string; email: string; contact: string | null } | null;
   _count: { kiosks: number; memberships: number };
   agreementStatus: 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED' | null;
   partners?: DistributorPartner[];
@@ -495,7 +495,12 @@ export type DistributorPartner = {
 export async function fetchDistributors(): Promise<Distributor[]> {
   const res = await apiFetch('/api/network/distributors', { credentials: 'include' });
   const json = await handleRes<{ distributors: Distributor[] }>(res);
-  return json.distributors;
+  // The organization phone is optional, so fall back to the owner's contact number:
+  // the console should always surface a number the Company can actually call.
+  return json.distributors.map((distributor) => ({
+    ...distributor,
+    phone: distributor.phone ?? distributor.owner?.contact ?? null,
+  }));
 }
 
 export type Partner = {

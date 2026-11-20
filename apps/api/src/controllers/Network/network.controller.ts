@@ -315,6 +315,9 @@ export const getDistributors = asyncHandler(
             id: true,
             name: true,
             email: true,
+            // The organization phone is optional at registration; the owner's contact
+            // is the number the Company actually reached them on.
+            contact: true,
           },
         },
         _count: {
