@@ -669,9 +669,12 @@ async function setGameCatalogPrice(
       findGameOnDevice(rows, confirmed.game_id) ??
       rows.find((game) => game.displayName === confirmed.display_name);
     if (!row) continue;
-    const hasExplicitOverride =
-      row.hasOverride || row.overridePrice !== null || row.overrideReplayPrice !== null;
-    if (!hasExplicitOverride) continue;
+    // Do not trust `has_override` here. Mothership can report a device-level write as a
+    // plain `base_price` with both override columns empty (the same sparse shape the
+    // reset path guards against), which is exactly what a scheduled update looks like
+    // once it has been applied. Such a kiosk still charges its own price while reading
+    // as "no override", so compare the live price: anything not already on the new
+    // catalog value needs the explicit device write.
     if (
       samePrice(row.effectivePrice, input.price) &&
       samePrice(row.effectiveReplayPrice, replayPrice)
