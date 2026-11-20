@@ -68,10 +68,94 @@ function gameDiffersFromCatalog(game: GamePriceView): boolean {
   )
 }
 
-function EodStatus({ update }: { update: EodPriceUpdate }) {
-  const label = update.status === "PENDING" ? "Scheduled" : update.status === "PROCESSING" ? "Applying" : update.status === "APPLIED" ? "Applied" : "Failed"
-  const tone = update.status === "FAILED" ? "text-destructive" : update.status === "APPLIED" ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"
-  return <span className={`text-xs font-medium ${tone}`} title={update.lastError ?? undefined}>{label}: {inr.format(update.price)} · {update.businessDate} {update.scheduledTime}</span>
+/**
+ * Where the price the kiosk charges came from.
+ *
+ * A scheduled change is applied through the same device write as a manual override, so
+ * Mothership reports it as an override once the job runs. The EOD row is the only record
+ * that the operator scheduled it, so the Source column says "Scheduled" from the moment
+ * the update is queued -- not "Override" once the kiosk picks it up.
+ */
+function PriceSourceBadge({
+  game,
+  update,
+  timezone,
+}: {
+  game: GamePriceView
+  update: EodPriceUpdate | null
+  timezone: string
+}) {
+  const queued = update?.status === "PENDING" || update?.status === "PROCESSING"
+  // An applied row only names this price while the kiosk still charges it; a later manual
+  // change must fall back to the live source instead of keeping a stale "Scheduled".
+  const applied = Boolean(
+    update &&
+      update.status === "APPLIED" &&
+      Math.abs(update.price - game.effectivePrice) < 0.001 &&
+      Math.abs(update.replayPrice - game.effectiveReplayPrice) < 0.001,
+  )
+  if (update && (queued || applied)) {
+    return (
+      <span
+        title={
+          queued
+            ? `Scheduled ${inr.format(update.price)} / replay ${inr.format(update.replayPrice)} for ${update.businessDate} ${update.scheduledTime} (${timezone}). The kiosk keeps charging ${inr.format(game.effectivePrice)} until then.`
+            : `The kiosk price was set by the scheduled update for ${update.businessDate} ${update.scheduledTime} (${timezone}).`
+        }
+        className="rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-700 dark:text-sky-300"
+      >
+        Scheduled
+      </span>
+    )
+  }
+  if (gameHasOverride(game)) {
+    return (
+      <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+        Override
+      </span>
+    )
+  }
+  if (gameDiffersFromCatalog(game)) {
+    return (
+      <span
+        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} - this kiosk has not picked it up`}
+        className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+      >
+        Catalog differs
+      </span>
+    )
+  }
+  return <span className="text-xs text-muted-foreground">Default</span>
+}
+
+function EodStatus({ update, game }: { update: EodPriceUpdate; game: GamePriceView }) {
+  // An applied row only describes the kiosk while it still charges that price. After a
+  // reset, a later device write or a catalog change, "Applied" next to a different live
+  // price reads as if the schedule were still in force, so say it was replaced instead.
+  const replaced =
+    update.status === "APPLIED" &&
+    (Math.abs(update.price - game.effectivePrice) >= 0.001 ||
+      Math.abs(update.replayPrice - game.effectiveReplayPrice) >= 0.001)
+  const label = replaced
+    ? "Replaced"
+    : update.status === "PENDING"
+      ? "Scheduled"
+      : update.status === "PROCESSING"
+        ? "Applying"
+        : update.status === "APPLIED"
+          ? "Applied"
+          : "Failed"
+  const tone = replaced
+    ? "text-muted-foreground"
+    : update.status === "FAILED"
+      ? "text-destructive"
+      : update.status === "APPLIED"
+        ? "text-emerald-700 dark:text-emerald-300"
+        : "text-amber-700 dark:text-amber-300"
+  const title = replaced
+    ? `This scheduled price was applied and has since been replaced; the kiosk now charges ${inr.format(game.effectivePrice)} / replay ${inr.format(game.effectiveReplayPrice)}.`
+    : update.lastError ?? undefined
+  return <span className={`text-xs font-medium ${tone}`} title={title}>{label}: {inr.format(update.price)} · {update.businessDate} {update.scheduledTime}</span>
 }
 
 const TABS = [
@@ -1054,22 +1138,13 @@ function GamePriceTable({
                     {inr.format(game.effectiveReplayPrice)}
                   </td>
                   <td className="px-4 py-3">
-                    {gameHasOverride(game) ? (
-                      <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                        Override
-                      </span>
-                    ) : gameDiffersFromCatalog(game) ? (
-                      <span
-                        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} - this kiosk has not picked it up`}
-                        className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                      >
-                        Catalog differs
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Default</span>
-                    )}
+                    <PriceSourceBadge
+                      game={game}
+                      update={eod[game.gameId] ?? null}
+                      timezone={eodMeta.timezone}
+                    />
                   </td>
-                  <td className="px-4 py-3">{eod[game.gameId] ? <EodStatus update={eod[game.gameId]!} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                  <td className="px-4 py-3">{eod[game.gameId] ? <EodStatus update={eod[game.gameId]!} game={game} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   {(canWrite || canRequest) && (
                     <td className="px-4 py-3 text-right">
                       <button
@@ -1168,11 +1243,11 @@ function DeviceGamePriceEditor({
         scope: "DEVICE",
       }),
     onSuccess: async result => {
+      // This control only ever queues a scheduled update, and the API applies it at the
+      // chosen moment. Calling it "updated" here claimed a change the kiosk had not made.
       toast.success(
-        result.status === "PENDING"
-          ? `${result.displayName} scheduled for ${result.scheduledDate ?? scheduledDate} at ${result.scheduledTime ?? scheduledTime} ${eodMeta.timezone} on ${deviceId}: ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
-          : `${result.displayName} updated on ${deviceId} (this device only): ${inr.format(result.price)} / ${inr.format(result.replayPrice)}`
-      )
+        `${result.displayName} scheduled for ${result.scheduledDate ?? scheduledDate} at ${result.scheduledTime ?? scheduledTime} ${eodMeta.timezone} on ${deviceId}: ${inr.format(result.price)} / replay ${inr.format(result.replayPrice)}. The kiosk keeps its current price until then.`
+      );
       await onSaved()
     },
     onError: (error: unknown) =>
