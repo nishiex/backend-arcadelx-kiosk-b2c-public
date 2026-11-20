@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Search, Bell, Users, Share2, ClipboardList, ScrollText, LayoutDashboard, Monitor, UsersRound, Building2, Settings, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 import Avatar from "@/components/ui/avatar"
@@ -35,6 +35,7 @@ type Notice = {
 export default function Header() {
   const { me, role, canManageMembers, canReviewNetworkRequests, isCompany, isLoading: loadingMe } = useMe()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -97,6 +98,22 @@ export default function Header() {
     enabled: canViewPriceRequests,
     refetchInterval: 10_000,
   })
+
+  // SSE wakes the existing queries immediately when pending work changes. The
+  // 10-second query intervals remain as a fallback if a proxy/serverless host
+  // does not keep streaming responses open.
+  React.useEffect(() => {
+    if (typeof window === "undefined" || (!canManageMembers && !canReview)) return
+    const stream = new EventSource("/api/notifications/stream")
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ["pendingMembers"] })
+      void queryClient.invalidateQueries({ queryKey: ["review-requests"] })
+      void queryClient.invalidateQueries({ queryKey: ["orders", "UNDER_REVIEW"] })
+      void queryClient.invalidateQueries({ queryKey: ["device-price-requests"] })
+    }
+    stream.addEventListener("notifications", refresh)
+    return () => { stream.close() }
+  }, [canManageMembers, canReview, queryClient])
 
   const organizationId = me?.membership?.organizationId
   /**
