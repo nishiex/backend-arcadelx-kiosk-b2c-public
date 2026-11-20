@@ -103,7 +103,7 @@ export default function CreateOrderDialog({ organizationId, disabled, onCreated 
                   const count = stockByModel.get(model) ?? 0
                   return (
                     <option key={model} value={model} disabled={count === 0}>
-                      {model} ({count} available)
+                      {model}
                     </option>
                   )
                 })}
