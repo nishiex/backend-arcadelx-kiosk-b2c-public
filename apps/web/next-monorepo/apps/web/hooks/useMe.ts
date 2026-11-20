@@ -119,8 +119,7 @@ export function useMe(): Permissions {
     canReviewRequests: me?.membership?.status === "ACTIVE" && isOwnerOrAdmin,
     canReviewNetworkRequests: me?.membership?.status === "ACTIVE" && isMasterAdmin,
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
-      (isOwnerOrAdmin || role === "MANAGER") &&
-      (isCompany || isDistributor || orgType === "PARTNER"),
+      ((isOwnerOrAdmin || role === "MANAGER") && (isCompany || isDistributor || orgType === "PARTNER") || isIpParty),
     canManageGateways: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canViewAds: !isError && me?.membership?.status === "ACTIVE" && isCompany,
     canViewIp: !isError && me?.membership?.status === "ACTIVE" && (isCompany || isIpParty),

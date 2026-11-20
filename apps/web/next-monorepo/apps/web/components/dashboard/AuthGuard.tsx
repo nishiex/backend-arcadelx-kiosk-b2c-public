@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/dashboard/ui"
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { isLoading, isError } = useMe()
+  const { me, isLoading, isError } = useMe()
 
   React.useEffect(() => {
     if (isError) {
@@ -27,7 +27,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isError, queryClient, router])
 
-  if (isError) return null
+  React.useEffect(() => {
+    if (me?.mustChangePassword) router.replace("/change-password")
+  }, [me?.mustChangePassword, router])
+
+  if (isError || me?.mustChangePassword) return null
 
   if (isLoading) {
     return (

@@ -22,6 +22,7 @@ import {
   Skeleton,
 } from "@/components/dashboard/ui"
 import RevenueTrendChart from "@/components/dashboard/RevenueTrendChart"
+import IpDashboardScreen from "@/components/ip/IpDashboardScreen"
 import { downloadCsv, downloadPdf } from "@/lib/export-utils"
 
 const money = new Intl.NumberFormat("en-IN", {
@@ -146,7 +147,8 @@ function RateEditor({
 }
 
 export default function RevenueScreen() {
-  const { me, isLoading, isError, canViewRevenue, isCompany, role } = useMe()
+  const { me, isLoading, isError, canViewRevenue, isCompany, role, orgType } = useMe()
+  const isIpParty = orgType === "IP_PARTY"
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [machineSort, setMachineSort] = useState<"totalRevenue" | "thisMonth" | "today" | "machineCode">("totalRevenue")
@@ -168,19 +170,19 @@ export default function RevenueScreen() {
   const revenue = useQuery({
     queryKey: ["revenue-machines", ...scope],
     queryFn: fetchMachineRevenue,
-    enabled: canViewRevenue,
+    enabled: canViewRevenue && !isIpParty,
     staleTime: 60_000,
     retry: 1,
   })
   const rates = useQuery({
     queryKey: ratesKey,
     queryFn: fetchDeductionRates,
-    enabled: canViewRevenue,
+    enabled: canViewRevenue && !isIpParty,
     staleTime: 60_000,
     retry: 1,
   })
   const canEdit =
-    canViewRevenue && isCompany && (role === "OWNER" || role === "ADMIN")
+    canViewRevenue && !isIpParty && isCompany && (role === "OWNER" || role === "ADMIN")
   const payments = useQuery({
     queryKey: ["mothership-payments", ...scope],
     queryFn: ({ signal }) => fetchMothershipPayments(1, signal, 50),
@@ -249,6 +251,8 @@ export default function RevenueScreen() {
     return (
       <ErrorState message="Unable to verify your access. Refresh the page to try again." />
     )
+  if (isIpParty) return <IpDashboardScreen />
+
   if (!canViewRevenue)
     return (
       <EmptyState message="Revenue is available to active Owners, Admins and Managers." />
