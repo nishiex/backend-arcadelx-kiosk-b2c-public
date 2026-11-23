@@ -56,12 +56,18 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
   }
 
   const updatedKiosk = await prisma.$transaction(async (tx) => {
-    const kiosk = await tx.kiosk.update({
+    const pairedKiosk = await tx.kiosk.update({
       where: { machineCode },
       // Pairing is the point at which the hardware becomes operational, so the kiosk
       // moves to INSTALLED here (from the Backend branch). The ownership ledger below
       // is kept as well: it is what makes the kiosk's revenue attributable.
-      data: { externalDeviceId, status: 'INSTALLED' },
+      // Reserved/assigned kiosks have a non-null reservedOrderId and the database
+      // constraint requires them to keep their RESERVED/ASSIGNED lifecycle status.
+      // Only unreserved kiosks may transition to INSTALLED during pairing.
+      data: {
+        externalDeviceId,
+        ...(kiosk.reservedOrderId ? {} : { status: 'INSTALLED' as const }),
+      },
       select: {
         id: true,
         machineCode: true,
@@ -73,8 +79,8 @@ export const pairKioskDevice = asyncHandler(async (req: Request, res: Response) 
     // Pairing hardware is the point at which the device becomes operational, so it is
     // also when its ownership ledger starts (see kiosk-ownership.ts). Without this the
     // kiosk reports no revenue, because attribution only counts assigned windows.
-    await recordOpeningAssignments(tx, [{ id: kiosk.id, currentOrgId: kiosk.currentOrgId }], req.user?.id ?? null);
-    return kiosk;
+    await recordOpeningAssignments(tx, [{ id: pairedKiosk.id, currentOrgId: pairedKiosk.currentOrgId }], req.user?.id ?? null);
+    return pairedKiosk;
   });
 
   res.status(200).json(new ApiResponse(200, {
