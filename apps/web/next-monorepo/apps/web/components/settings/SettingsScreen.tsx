@@ -4,7 +4,7 @@ import React from "react"
 import { useForm } from "react-hook-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Building2, Lock, Loader2 } from "lucide-react"
+import { User, Building2, Lock, Loader2, Eye, EyeOff } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { changePassword, logout } from "@/lib/backend-api"
 import { useMe } from "@/hooks/useMe"
@@ -30,6 +30,10 @@ export default function SettingsScreen() {
   const { me, isLoading, orgName, orgType, role } = useMe()
   const queryClient = useQueryClient()
   const ref = useReveal<HTMLDivElement>([isLoading])
+  // Reveal toggles for the two fields an operator actually has to compare by eye. The
+  // current-password field stays masked: it is typed from memory, not proof-read.
+  const [showNewPassword, setShowNewPassword] = React.useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
 
   const {
     register,
@@ -115,17 +119,45 @@ export default function SettingsScreen() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">New password</label>
-                <input type="password" autoComplete="new-password" className={inputCls}
-                  {...register("newPassword", { required: "Required", minLength: { value: 8, message: "Min 8 characters" } })} />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    className={cn(inputCls, "pr-10")}
+                    {...register("newPassword", { required: "Required", minLength: { value: 8, message: "Min 8 characters" } })} />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((value) => !value)}
+                    aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                    aria-pressed={showNewPassword}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {errors.newPassword && <p className="mt-1 text-xs text-destructive">{errors.newPassword.message}</p>}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Confirm new password</label>
-                <input type="password" autoComplete="new-password" className={inputCls}
-                  {...register("confirmPassword", {
-                    required: "Required",
-                    validate: (v) => v === watch("newPassword") || "Passwords do not match",
-                  })} />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    className={cn(inputCls, "pr-10")}
+                    {...register("confirmPassword", {
+                      required: "Required",
+                      validate: (v) => v === watch("newPassword") || "Passwords do not match",
+                    })} />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                    aria-pressed={showConfirmPassword}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {errors.confirmPassword && <p className="mt-1 text-xs text-destructive">{errors.confirmPassword.message}</p>}
               </div>
             </div>
