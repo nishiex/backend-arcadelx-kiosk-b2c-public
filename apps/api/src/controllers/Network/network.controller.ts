@@ -468,6 +468,25 @@ export const getDistributors = asyncHandler(
       }
     }
 
+    // Kiosk numbers per distributor, from ownership *and* from partner placements.
+    // `_count.kiosks` only counts rows whose currentOrgId is the distributor itself, so a
+    // distributor that has placed its whole fleet with partners reported zero — the
+    // "kiosk numbers are not being shown of some distributors" report. Partner ids come
+    // from the association pass above, so the boundary matches the Partners tab.
+    const partnerIdsByDistributor = new Map(
+      [...partnersByDistributor].map(([distributorId, partners]) => [
+        distributorId,
+        partners.map((partner) => partner.id),
+      ]),
+    );
+    const partnerIds = [...new Set([...partnerIdsByDistributor.values()].flat())];
+    const kioskOwners = await prisma.kiosk.groupBy({
+      by: ["currentOrgId"],
+      where: { currentOrgId: { in: [...visibleDistributorIds, ...partnerIds] } },
+      _count: { _all: true },
+    });
+    const kiosksByOrg = new Map(kioskOwners.map((row) => [row.currentOrgId ?? "", row._count._all]));
+
     const distributors = organizations.map((organization) => ({
       ...organization,
       gstNumber: organization.gstNumber ?? null,
@@ -477,6 +496,17 @@ export const getDistributors = asyncHandler(
       statusManagementAvailable: availableProfileColumns.has("isActive") && availableProfileColumns.has("accessVersion"),
       agreementStatus: agreementStatusByDistributor.get(organization.id) ?? null,
       partners: partnersByDistributor.get(organization.id) ?? [],
+      // held = machines it still holds; placedWithPartners = machines it has put with its
+      // own Partners (still its fleet numerically). `_count.kiosks` stays for older
+      // clients and equals `held`.
+      kioskCounts: (() => {
+        const held = kiosksByOrg.get(organization.id) ?? 0;
+        const placedWithPartners = (partnerIdsByDistributor.get(organization.id) ?? []).reduce(
+          (sum, partnerId) => sum + (kiosksByOrg.get(partnerId) ?? 0),
+          0,
+        );
+        return { held, placedWithPartners, total: held + placedWithPartners };
+      })(),
     }));
 
     res

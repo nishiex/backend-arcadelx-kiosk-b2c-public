@@ -640,12 +640,15 @@ export const deliverOrder = asyncHandler(async (req, res) => {
       data: {
         currentOrgId: current.childOrgId,
         // Delivery transfers ownership; it must not return the kiosk to sellable stock.
-        // This write used to set AVAILABLE, which put a machine the partner now holds back
-        // into the supplier's requestable pool (REQUESTABLE_KIOSK_STATUSES includes AVAILABLE)
-        // while the inventory cards still showed it as assigned -- the "all are assigned but
-        // still shows available kiosk" report. ASSIGNED is the truthful state until pairing
-        // at the partner's site promotes it to INSTALLED (internal.controller.ts).
-        status: "ASSIGNED",
+        // This used to write AVAILABLE, which put a machine the partner now holds back into
+        // the supplier's requestable pool (REQUESTABLE_KIOSK_STATUSES includes AVAILABLE)
+        // while the inventory cards still showed it as assigned.
+        //
+        // It cannot be ASSIGNED either: the `kiosk_reservation_state` check constraint makes
+        // RESERVED/ASSIGNED equivalent to `reservedOrderId IS NOT NULL`, and delivery clears
+        // the reservation below. INSTALLED is the truthful post-delivery state (the machine
+        // is at the partner's site) and satisfies the constraint.
+        status: "INSTALLED",
         // The site the kiosks were delivered to. This is the only place a delivery
         // location is recorded, so the validated value is written onto every kiosk in
         // the same transaction that transfers ownership.

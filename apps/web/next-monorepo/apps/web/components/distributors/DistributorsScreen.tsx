@@ -85,7 +85,7 @@ export default function DistributorsScreen() {
   const bodyRef = useReveal<HTMLTableSectionElement>([distributors.length])
   const activeCount = distributors.filter((d) => d.isActive).length
   const activeAgreements = distributors.filter((d) => d.agreementStatus === "ACTIVE").length
-  const totalKiosks = distributors.reduce((sum, d) => sum + d._count.kiosks, 0)
+  const totalKiosks = distributors.reduce((sum, d) => sum + (d.kioskCounts?.total ?? d._count.kiosks), 0)
   const totalMembers = distributors.reduce((sum, d) => sum + d._count.memberships, 0)
 
   const kpis = [
@@ -258,7 +258,7 @@ export default function DistributorsScreen() {
                       {[d.city, d.state].filter(Boolean).join(", ") || <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3">{d.phone ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.kiosks)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d.kioskCounts?.total ?? d._count.kiosks)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{countFormat.format(d._count.memberships)}</td>
                     <td className="px-4 py-3">
                       <StatusPill active={d.isActive} />

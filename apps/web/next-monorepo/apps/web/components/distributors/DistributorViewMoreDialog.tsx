@@ -796,9 +796,16 @@ export default function DistributorViewMoreDialog({
                     <span className="text-xs font-medium tabular-nums">{distributor.partners?.length ?? 0}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-xs text-muted-foreground">Kiosks held</span>
-                    <span className="text-xs font-medium tabular-nums">{distributor._count.kiosks}</span>
+                    <span className="text-xs text-muted-foreground">Kiosks</span>
+                    <span className="text-xs font-medium tabular-nums">
+                      {distributor.kioskCounts?.total ?? distributor._count.kiosks}
+                    </span>
                   </div>
+                  {distributor.kioskCounts && distributor.kioskCounts.placedWithPartners > 0 && (
+                    <p className="mt-1 text-right text-[11px] text-muted-foreground">
+                      {distributor.kioskCounts.held} held · {distributor.kioskCounts.placedWithPartners} with partners
+                    </p>
+                  )}
                 </section>
               </aside>
             </div>

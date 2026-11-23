@@ -503,6 +503,8 @@ export type Distributor = {
   createdAt: string;
   owner: { id: string; name: string; email: string; contact: string | null } | null;
   _count: { kiosks: number; memberships: number };
+  /** Fleet split from the server: held by the distributor, and placed with its Partners. */
+  kioskCounts?: { held: number; placedWithPartners: number; total: number };
   agreementStatus: 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED' | 'REJECTED' | null;
   partners?: DistributorPartner[];
 };
