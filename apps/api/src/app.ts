@@ -50,6 +50,13 @@ function isAllowedOrigin(origin: string) {
 
 const app = express();
 
+// This API runs behind the TLS-terminating reverse proxy that serves the console.
+// Without this, Express reports `req.protocol` as http and `req.secure` as false for
+// requests the browser made over https, and `req.ip` (used by the audit log) becomes
+// the proxy's address. Downloads are served from this process, so the scheme the app
+// believes it is on has to match the scheme the browser used.
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin(origin, callback) {
     // Same-origin, curl and server-to-server calls send no Origin header.
