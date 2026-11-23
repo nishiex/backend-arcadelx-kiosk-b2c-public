@@ -837,6 +837,165 @@ async function setGameCatalogPrice(
   };
 }
 
+export type SetLocationGamePriceResult = {
+  location: string;
+  gameId: string;
+  displayName: string;
+  price: number;
+  replayPrice: number;
+  kiosks: number;
+  updated: string[];
+  alreadyAtPrice: string[];
+  failed: Array<{ deviceId: string; error: string }>;
+  unmatched: string[];
+};
+
+/**
+ * Reprice every kiosk recorded at one location.
+ *
+ * Mothership exposes no location scope, so this is a fan-out of per-device writes. It
+ * deliberately does not call `setDeviceGamePrice` once per kiosk: that function re-reads the
+ * whole fleet before and after every write, so a ten-kiosk location would cost hundreds of
+ * upstream calls. Here the catalog is read once, each kiosk is read once before its write,
+ * and the staging queue is flushed once.
+ *
+ * A kiosk whose write cannot be confirmed is returned in `failed` instead of `updated`:
+ * an offline machine in the middle of a location is a partial result, not a success.
+ */
+export async function setLocationGamePrice(
+  location: string,
+  kiosks: Array<{ machineCode: string; externalDeviceId: string | null }>,
+  gameId: string,
+  input: { price: number; replay_price?: number },
+): Promise<SetLocationGamePriceResult> {
+  if (kiosks.length === 0) {
+    throw new ApiError(404, 'No kiosks are recorded at this location', { location });
+  }
+
+  const { devices } = await listDevices();
+  const live = new Set(devices.map((device) => device.deviceId));
+  const targets: string[] = [];
+  const unmatched: string[] = [];
+  for (const kiosk of kiosks) {
+    // `machineCode` is the ADLX id Mothership prices. `externalDeviceId` is normally the
+    // hardware UUID, so it is only usable when Mothership happens to list that same value.
+    let resolved: string | null = null;
+    if (live.has(kiosk.machineCode)) resolved = kiosk.machineCode;
+    else if (kiosk.externalDeviceId && live.has(kiosk.externalDeviceId)) resolved = kiosk.externalDeviceId;
+    if (!resolved) {
+      unmatched.push(kiosk.machineCode);
+      continue;
+    }
+    if (!targets.includes(resolved)) targets.push(resolved);
+  }
+  if (targets.length === 0) {
+    throw new ApiError(409, 'None of the kiosks at this location are present in Mothership', {
+      location,
+      unmatched,
+    });
+  }
+
+  // `targets` is non-empty here, so the first entry is the reference device used to
+  // resolve the game's canonical id and display name once for the whole location.
+  const firstTarget = targets[0]!;
+  const catalogBefore = await getGameCatalog();
+  const firstPrices = await getDevicePrices(firstTarget, catalogBefore);
+  const gameOnFirst = findGameOnDevice(firstPrices, gameId);
+  if (!gameOnFirst) {
+    throw new ApiError(404, 'Game was not found on the kiosks at this location', { location, gameId });
+  }
+  const catalogGame = findCatalogGame(catalogBefore, gameOnFirst);
+  if (!catalogGame) {
+    throw new ApiError(404, "Game was not found in Mothership's catalog", {
+      gameId: gameOnFirst.gameId,
+      displayName: gameOnFirst.displayName,
+    });
+  }
+
+  const updated: string[] = [];
+  const alreadyAtPrice: string[] = [];
+  const failed: Array<{ deviceId: string; error: string }> = [];
+  const written: Array<{ deviceId: string; gameId: string; replayPrice: number }> = [];
+
+  for (const deviceId of targets) {
+    try {
+      const rows = deviceId === firstTarget ? firstPrices : await getDevicePrices(deviceId, catalogBefore);
+      const row =
+        findGameOnDevice(rows, gameId) ??
+        rows.find((game) => game.displayName === gameOnFirst.displayName);
+      if (!row) {
+        failed.push({ deviceId, error: 'Game is not offered on this kiosk' });
+        continue;
+      }
+      // Without an explicit replay price each kiosk keeps the one it already serves, so a
+      // location repricing cannot silently reset every machine's replay charge.
+      const replayPrice = input.replay_price ?? row.effectiveReplayPrice;
+      if (samePrice(row.effectivePrice, input.price) && samePrice(row.effectiveReplayPrice, replayPrice)) {
+        alreadyAtPrice.push(deviceId);
+        continue;
+      }
+      // Same body contract as the single-device write: `price` / `replay_price`. Mothership
+      // accepts the `override_*` keys with 200 and saves nothing.
+      await callMothership(
+        `/api/v1/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(row.gameId)}/price`,
+        {
+          method: 'POST',
+          body:
+            input.replay_price === undefined
+              ? { price: input.price }
+              : { price: input.price, replay_price: replayPrice },
+        },
+      );
+      written.push({ deviceId, gameId: row.gameId, replayPrice });
+    } catch (error) {
+      failed.push({ deviceId, error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  if (written.length > 0) {
+    // One flush for the whole location: Mothership stages device writes and each kiosk keeps
+    // its old price until the scheduler runs.
+    await callMothership('/api/v1/schedule/run-now', { method: 'POST' }).catch(() => null);
+
+    for (const item of written) {
+      const rows = await getDevicePrices(item.deviceId, catalogBefore).catch(() => null);
+      const row = rows ? findGameOnDevice(rows, item.gameId) : undefined;
+      if (
+        row &&
+        samePrice(row.effectivePrice, input.price) &&
+        samePrice(row.effectiveReplayPrice, item.replayPrice)
+      ) {
+        updated.push(item.deviceId);
+      } else {
+        failed.push({ deviceId: item.deviceId, error: 'Mothership did not confirm the new price' });
+      }
+    }
+  }
+
+  // A location write must never move the fleet price. If it did, the operator's intent was
+  // widened to every kiosk and that has to surface as an error, not a success.
+  const catalogAfter = await getGameCatalog();
+  if (!sameCatalogPrices(catalogBefore, catalogAfter)) {
+    throw new ApiError(502, 'A location price change altered the catalog price', {
+      location,
+      gameId: catalogGame.game_id,
+    });
+  }
+
+  return {
+    location,
+    gameId: catalogGame.game_id,
+    displayName: catalogGame.display_name,
+    price: input.price,
+    replayPrice: input.replay_price ?? catalogGame.replay_price,
+    kiosks: targets.length,
+    updated,
+    alreadyAtPrice,
+    failed,
+    unmatched,
+  };
+}
+
 /**
  * Set one game's price in the explicitly requested scope.
  *

@@ -11,6 +11,7 @@ import {
   ResetAllDevicePricesResultSchema,
   SetDeviceGamePriceSchema,
   SetDeviceGamePriceResultSchema,
+  SetLocationGamePriceSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
 import {  getDevicePrices,
   getLauncherServedPrices,
@@ -18,6 +19,7 @@ import {  getDevicePrices,
   resetDevicePrices,
   resetAllDevicePrices,
   setDeviceGamePrice,
+  setLocationGamePrice,
 } from '../../services/Mothership/devices.service';
 import { networkOrgIds } from '../../services/network-scope';
 import { assertDeviceNotRetired, BUSINESS_TIMEZONE, businessDate, cancelScheduledDevicePrice, eodRunForDate, getEodPricingTime, markGameScheduledUpdatesSuperseded, markScheduledUpdatesSuperseded, nextEod, pricingStatus, scheduleEodDevicePrice } from '../../services/Mothership/eod-pricing.service';
@@ -166,6 +168,39 @@ export const resetPricesForAllDevices = asyncHandler(async (req: Request, res: R
     result,
     result.gamesReset > 0 ? 'All device price overrides reset successfully' : 'No device price overrides to reset',
   ));
+});
+
+export const updateLocationGamePrice = asyncHandler(async (req: Request, res: Response) => {
+  assertCompanyAdmin(req);
+  const body = SetLocationGamePriceSchema.safeParse(req.body);
+  if (!body.success) throw new ApiError(400, 'Invalid price payload', body.error.issues);
+
+  // `location` is our own free-text column; Mothership knows nothing about it. Matching is
+  // trimmed and case-insensitive so "Phoenix Mall" and "phoenix mall" are one site, and
+  // retired kiosks are excluded because they cannot receive a price change.
+  const kiosks = await prisma.kiosk.findMany({
+    where: {
+      location: { equals: body.data.location, mode: 'insensitive' },
+      status: { not: 'RETIRED' },
+    },
+    select: { machineCode: true, externalDeviceId: true },
+    orderBy: { machineCode: 'asc' },
+  });
+
+  const result = await setLocationGamePrice(body.data.location, kiosks, body.data.gameId, {
+    price: body.data.price,
+    // `exactOptionalPropertyTypes` forbids passing an explicit `undefined` here.
+    ...(body.data.replay_price === undefined ? {} : { replay_price: body.data.replay_price }),
+  });
+
+  const message = result.failed.length
+    ? `Updated ${result.updated.length} of ${result.kiosks} kiosks at ${result.location}; ${result.failed.length} could not be confirmed`
+    : result.updated.length > 0
+      ? `Updated ${result.updated.length} kiosk${result.updated.length === 1 ? '' : 's'} at ${result.location}`
+      : `Every kiosk at ${result.location} already charges that price`;
+  // 207: the write is applied per kiosk, so a partial result is a real outcome.
+  const status = result.failed.length ? 207 : 200;
+  res.status(status).json(new ApiResponse(status, result, message));
 });
 
 export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {

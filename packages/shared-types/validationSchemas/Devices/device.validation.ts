@@ -145,6 +145,27 @@ export const SetDeviceGamePriceSchema = z.object({
 
 export type SetDeviceGamePriceInput = z.infer<typeof SetDeviceGamePriceSchema>;
 
+/**
+ * Reprice every kiosk recorded at one location.
+ *
+ * Mothership has no location dimension, so this is a fan-out of device-scoped writes.
+ * `location` is matched against our own free-text `Kiosk.location` (trimmed, case-
+ * insensitive) and is never sent upstream. `replay_price` is optional: when omitted each
+ * kiosk keeps the replay price it already serves.
+ */
+export const SetLocationGamePriceSchema = z.object({
+  location: z.string().trim().min(1, 'Location is required').max(200, 'Location is too long'),
+  gameId: z.string().trim().min(1, 'Game is required').max(200, 'Game id is too long'),
+  price: z.number().min(0, 'Price cannot be negative').max(100000, 'Price looks implausible'),
+  replay_price: z
+    .number()
+    .min(0, 'Replay price cannot be negative')
+    .max(100000, 'Replay price looks implausible')
+    .optional(),
+});
+
+export type SetLocationGamePriceInput = z.infer<typeof SetLocationGamePriceSchema>;
+
 /** Result returned after Mothership confirms a device-scoped override reset. */
 export const ResetDevicePricesResultSchema = z.object({
   deviceId: z.string(),

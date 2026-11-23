@@ -335,6 +335,33 @@ export async function setDeviceGamePrice(
   return handleRes<SetDeviceGamePriceResult>(res)
 }
 
+export type LocationGamePriceResult = {
+  location: string
+  gameId: string
+  displayName: string
+  price: number
+  replayPrice: number
+  kiosks: number
+  updated: string[]
+  alreadyAtPrice: string[]
+  failed: Array<{ deviceId: string; error: string }>
+  unmatched: string[]
+}
+
+/** Reprice every kiosk recorded at one location. Company OWNER/ADMIN only. */
+export async function setLocationGamePrice(
+  location: string,
+  gameId: string,
+  input: { price: number; replay_price?: number }
+): Promise<LocationGamePriceResult> {
+  const res = await apiFetch("/api/devices/prices/location", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ location, gameId, ...input }),
+  })
+  return handleRes<LocationGamePriceResult>(res)
+}
+
 export async function cancelScheduledDeviceGamePrice(deviceId: string, gameId: string): Promise<{ cancelled: number }> {
   const res = await apiFetch(
     `/api/devices/${encodeURIComponent(deviceId)}/games/${encodeURIComponent(gameId)}/scheduled`,

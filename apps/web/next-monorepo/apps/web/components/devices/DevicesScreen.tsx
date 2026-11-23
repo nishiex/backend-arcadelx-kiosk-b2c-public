@@ -18,6 +18,7 @@ import {
   resetAllDevicePrices,
   resetDevicePrices,
   setDeviceGamePrice,
+  setLocationGamePrice,
   type DeviceAdView,
   type DeviceView,
   type GamePriceView,
@@ -879,6 +880,16 @@ function PricingTab({
   canRequest: boolean
   onSaved: () => Promise<void>
 }) {
+  // A location is our own grouping: Mothership has no location dimension, so a location
+  // price is written to each kiosk at that site through the device-scoped endpoint.
+  const selected = devices.find(device => device.deviceId === selectedDevice)
+  const location = selected?.location?.trim() || null
+  const locationKioskCount = location
+    ? devices.filter(
+        device => (device.location ?? "").trim().toLowerCase() === location.toLowerCase()
+      ).length
+    : 0
+
   if (!devices.length) {
     return <EmptyState className="py-14" icon={<Gamepad2 size={28} />} message="No devices to price." />
   }
@@ -905,6 +916,8 @@ function PricingTab({
         <GamePriceTable
           deviceId={selectedDevice}
           games={prices.data.games}
+          location={location}
+          locationKioskCount={locationKioskCount}
           isRetired={prices.data.kioskStatus === "RETIRED"}
           eod={prices.data.eod}
           eodMeta={prices.data.eodMeta}
@@ -920,6 +933,8 @@ function PricingTab({
 function GamePriceTable({
   deviceId,
   games,
+  location,
+  locationKioskCount,
   isRetired,
   eod,
   eodMeta,
@@ -929,6 +944,8 @@ function GamePriceTable({
 }: {
   deviceId: string
   games: GamePriceView[]
+  location: string | null
+  locationKioskCount: number
   isRetired: boolean
   eod: Record<string, EodPriceUpdate | null>
   eodMeta: { timezone: string; runTime: string; nextExecutionAt: string }
@@ -940,6 +957,7 @@ function GamePriceTable({
   const [confirmingReset, setConfirmingReset] = React.useState(false)
   const [confirmingFleetReset, setConfirmingFleetReset] = React.useState(false)
   const [editingGame, setEditingGame] = React.useState<GamePriceView | null>(null)
+  const [locationEditing, setLocationEditing] = React.useState(false)
   const resetMutation = useMutation({
     mutationFn: () => resetDevicePrices(deviceId),
     onSuccess: async result => {
@@ -997,6 +1015,17 @@ function GamePriceTable({
             >
               {resetAllMutation.isPending ? "Resetting all…" : "Reset all kiosk overrides"}
             </button>
+            {location && locationKioskCount > 1 && (
+              <button
+                type="button"
+                onClick={() => setLocationEditing(true)}
+                disabled={resetMutation.isPending || resetAllMutation.isPending}
+                className={buttonClass}
+                title={`Write the same price to all ${locationKioskCount} kiosks recorded at ${location}`}
+              >
+                Apply price to {location}…
+              </button>
+            )}
             {overrides === 0 && (
               <span id={`${deviceId}-no-overrides`} className="text-xs text-muted-foreground">
                 This device has no price overrides to reset.
@@ -1198,6 +1227,165 @@ function GamePriceTable({
             ))}
           </tbody>
         </table>
+      </div>
+      {locationEditing && location && (
+        <LocationPriceDialog
+          location={location}
+          kioskCount={locationKioskCount}
+          games={games}
+          onCancel={() => setLocationEditing(false)}
+          onSaved={async () => {
+            setLocationEditing(false)
+            await onSaved()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Reprice one game across every kiosk recorded at a location.
+ *
+ * The write is a fan-out: Mothership has no location scope, so each kiosk gets its own
+ * device override and the API reports per-kiosk outcomes. The operator sees the count up
+ * front because this touches every machine at the site, not just the selected one.
+ */
+function LocationPriceDialog({
+  location,
+  kioskCount,
+  games,
+  onCancel,
+  onSaved,
+}: {
+  location: string
+  kioskCount: number
+  games: GamePriceView[]
+  onCancel: () => void
+  onSaved: () => Promise<void>
+}) {
+  const [gameId, setGameId] = React.useState(games[0]?.gameId ?? "")
+  const [price, setPrice] = React.useState(String(games[0]?.effectivePrice ?? ""))
+  const [replayPrice, setReplayPrice] = React.useState(String(games[0]?.effectiveReplayPrice ?? ""))
+  const game = games.find(item => item.gameId === gameId) ?? games[0]
+  const mutation = useMutation({
+    mutationFn: () =>
+      setLocationGamePrice(location, gameId, {
+        price: Number(price),
+        replay_price: Number(replayPrice),
+      }),
+    onSuccess: async result => {
+      const parts = [
+        `${result.updated.length} updated`,
+        result.alreadyAtPrice.length ? `${result.alreadyAtPrice.length} already at this price` : "",
+        result.failed.length ? `${result.failed.length} could not be confirmed` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+      const message = `${result.displayName} at ${result.location}: ${parts}`
+      if (result.failed.length) toast.warning(message)
+      else toast.success(message)
+      await onSaved()
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Couldn't update the location price"),
+  })
+  const priceValid =
+    price.trim() !== "" &&
+    replayPrice.trim() !== "" &&
+    Number.isFinite(Number(price)) &&
+    Number.isFinite(Number(replayPrice)) &&
+    Number(price) >= 0 &&
+    Number(replayPrice) >= 0 &&
+    Number(price) <= 100000 &&
+    Number(replayPrice) <= 100000
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Apply a price to kiosks at ${location}`}
+    >
+      <div className="w-full max-w-lg rounded-xl border border-border bg-background p-5 shadow-xl">
+        <h3 className="text-base font-semibold">Apply a price to {location}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {kioskCount} kiosks are recorded at this location. Each one is written as its own device
+          override and verified; the catalog price is not changed.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Game</span>
+            <select
+              className={inputClass}
+              value={gameId}
+              onChange={event => {
+                const next = games.find(item => item.gameId === event.target.value)
+                setGameId(event.target.value)
+                if (next) {
+                  setPrice(String(next.effectivePrice))
+                  setReplayPrice(String(next.effectiveReplayPrice))
+                }
+              }}
+            >
+              {games.map(item => (
+                <option key={item.gameId} value={item.gameId}>
+                  {item.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Price</span>
+              <input
+                type="number"
+                min={0}
+                max={100000}
+                className={inputClass}
+                value={price}
+                onChange={event => setPrice(event.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Replay price</span>
+              <input
+                type="number"
+                min={0}
+                max={100000}
+                className={inputClass}
+                value={replayPrice}
+                onChange={event => setReplayPrice(event.target.value)}
+              />
+            </label>
+          </div>
+          {game && (
+            <p className="text-xs text-muted-foreground">
+              Currently {inr.format(game.effectivePrice)} / replay{" "}
+              {inr.format(game.effectiveReplayPrice)} on {game.displayName}.
+            </p>
+          )}
+          {mutation.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {mutation.error instanceof Error
+                ? mutation.error.message
+                : "Couldn't update the location price"}
+            </p>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} disabled={mutation.isPending} className={buttonClass}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => mutation.mutate()}
+            disabled={!priceValid || mutation.isPending || !gameId}
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {mutation.isPending ? "Applying…" : `Apply to ${kioskCount} kiosks`}
+          </button>
+        </div>
       </div>
     </div>
   )

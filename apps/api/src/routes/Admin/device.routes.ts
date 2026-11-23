@@ -12,6 +12,7 @@ import {
   resetPricesForDevice,
   resetPricesForAllDevices,
   updateDeviceGamePrice,
+  updateLocationGamePrice,
   getDevicePriceRequests,
   approveDevicePriceRequest,
   rejectDevicePriceRequest,
@@ -71,6 +72,15 @@ router.post(
   requireOrgType('COMPANY'),
   requireRole('OWNER', 'ADMIN'),
   resetPricesForAllDevices,
+);
+
+// Reprice every kiosk at one location. Mothership has no location scope, so this fans out
+// the same per-game device writes; it never moves the catalog price.
+router.post(
+  '/prices/location',
+  requireOrgType('COMPANY'),
+  requireRole('OWNER', 'ADMIN'),
+  updateLocationGamePrice,
 );
 
 router.post(
