@@ -1142,6 +1142,14 @@ function GamePriceTable({
                         kiosk serves {inr.format(game.servedPrice ?? 0)}
                       </span>
                     )}
+                    {typeof game.fleetPrice === "number" && Math.abs(game.fleetPrice - game.effectivePrice) >= 0.01 && (
+                      <span
+                        className="mt-1 block text-[11px] text-muted-foreground"
+                        title="Fleet default from the global launcher feed (GET /api/v1/launcher/games)"
+                      >
+                        fleet {inr.format(game.fleetPrice)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">
                     {inr.format(game.effectiveReplayPrice)}

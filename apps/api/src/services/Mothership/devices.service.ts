@@ -37,6 +37,15 @@ import {
  * write is confirmed by re-reading the selected device and checking that the global catalog
  * and all other devices remain unchanged, so a silently-ignored write is caught instead of
  * reported as success.
+ *
+ * DO NOT WRITE TO `POST /api/v1/devices/{device_id}/price`.
+ * That endpoint replaces the whole device price map and is not the contract this product
+ * uses: it cannot be scoped to one game, a wrong body can blank a device's prices, and it
+ * hides the change from the per-game override semantics. Per-kiosk changes go through
+ * `/devices/{id}/games/{game_id}/price`; fleet-wide changes go through the catalog. Reads
+ * (`.../prices`) and resets (`.../prices/reset`) are fine. Enforced by
+ * `audits/pricing-endpoint-guard/check.cjs`.
+ *
  * A caller may instead request the explicit `GAME_CATALOG` scope, which updates the game's
  * catalog price (every kiosk offering the game) and is confirmed against
  * `GET /api/v1/games`. A device-scoped request never falls back to the catalog endpoint.
@@ -393,6 +402,11 @@ async function readServedPrice(
 ): Promise<Pick<SetDeviceGamePriceResult, 'kioskServedPrice' | 'kioskServedReplayPrice' | 'kioskServesNewPrice'>> {
   try {
     const served = await getLauncherServedPrices(kioskId);
+    // The launcher answers per device only for the devices it treats as containers. When it
+    // ignores kiosk_id it answers with the global feed (`device_id` null), and comparing that
+    // catalogue default to this device's expected price would report a phantom mismatch — or,
+    // worse, fail a write that actually landed. No echo, no claim.
+    if (!served.deviceId || served.deviceId.toLowerCase() !== kioskId.toLowerCase()) return {};
     const match =
       served.games.find((game) => game.gameId === gameId) ??
       served.games.find((game) => game.displayName === displayName);

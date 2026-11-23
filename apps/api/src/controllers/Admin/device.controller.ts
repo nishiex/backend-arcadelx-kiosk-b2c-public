@@ -83,20 +83,38 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   // What the kiosk itself serves. Stored overrides are Mothership's intent; the launcher
   // feed is what the machine charges, so a mismatch is shown next to the configured price
   // instead of hiding behind it.
+  //
+  // Only trusted when the feed echoes the requested device: for devices the launcher does not
+  // treat as containers it answers with the global default and `device_id: null`, and calling
+  // that "what this kiosk serves" would show a false mismatch on every such machine.
   const served = await getLauncherServedPrices(parsed.data.deviceId).catch(() => null);
-  const servedGames = served?.games ?? [];
+  // The global feed (`launcher/games` with no kiosk_id — the trailing `?` form is the same
+  // request) is the fleet default. Read it alongside the kiosk view so the operator can see
+  // which number is the default and which is this machine's own.
+  const fleet = await getLauncherServedPrices().catch(() => null);
+  const fleetGames = fleet?.games ?? [];
+  const servesThisDevice =
+    Boolean(served?.deviceId) &&
+    served!.deviceId.toLowerCase() === parsed.data.deviceId.toLowerCase();
+  const servedGames = servesThisDevice ? served!.games : [];
   const gamesWithServed = games.map((game) => {
     const match =
       servedGames.find((entry) => entry.gameId === game.gameId) ??
       servedGames.find((entry) => entry.displayName === game.displayName);
     if (!match) return game;
     const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
+    const fleetMatch =
+      fleetGames.find((entry) => entry.gameId === game.gameId) ??
+      fleetGames.find((entry) => entry.displayName === game.displayName);
     return {
       ...game,
       servedPrice: match.price,
       servedReplayPrice: match.replayPrice,
       servesConfiguredPrice:
         same(match.price, game.effectivePrice) && same(match.replayPrice, game.effectiveReplayPrice),
+      ...(fleetMatch
+        ? { fleetPrice: fleetMatch.price, fleetReplayPrice: fleetMatch.replayPrice }
+        : {}),
     };
   });
   const eod = await Promise.all(games.map(async game => ({ gameId: game.gameId, update: await pricingStatus(parsed.data.deviceId, game.gameId) })));
@@ -106,7 +124,7 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   });
   res
     .status(200)
-    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games: gamesWithServed, kioskStatus: kiosk?.status ?? null, launcher: served ? { deviceId: served.deviceId } : null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games: gamesWithServed, kioskStatus: kiosk?.status ?? null, launcher: servesThisDevice ? { deviceId: served!.deviceId } : null, fleet: fleet ? { games: fleet.games.length } : null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
 });
 
 export const cancelScheduledDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {

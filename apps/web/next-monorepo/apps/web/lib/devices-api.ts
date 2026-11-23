@@ -128,6 +128,9 @@ export type GamePriceView = {
   servedReplayPrice?: number
   /** False means the kiosk serves a different number than the one configured here. */
   servesConfiguredPrice?: boolean
+  /** Fleet default from the global launcher feed (`launcher/games`, no kiosk_id). */
+  fleetPrice?: number
+  fleetReplayPrice?: number
   iconUrl: string | null
   imageUrl: string | null
 }
