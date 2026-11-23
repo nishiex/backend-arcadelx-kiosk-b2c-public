@@ -190,6 +190,13 @@ export const SetDeviceGamePriceResultSchema = z.object({
   kioskServedPrice: z.number().optional(),
   kioskServedReplayPrice: z.number().optional(),
   kioskServesNewPrice: z.boolean().optional(),
+  /**
+   * GAME_CATALOG only: the fleet default read back from the global launcher feed
+   * (`GET /api/v1/launcher/games`, no kiosk_id). `globalServesNewPrice` false means the
+   * catalog row changed but the launcher still hands out the previous default.
+   */
+  globalServedPrice: z.number().optional(),
+  globalServesNewPrice: z.boolean().optional(),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
@@ -240,7 +247,8 @@ const LauncherServedGameSchema = z.object({
 });
 
 export const LauncherKioskGamesSchema = z.object({
-  device_id: z.string(),
+  // The global feed (`launcher/games` with no kiosk_id) sends `device_id: null`.
+  device_id: z.string().nullish(),
   status: z.string().optional(),
   games: z.array(LauncherServedGameSchema),
   coming_soon: z.array(LauncherServedGameSchema).optional(),

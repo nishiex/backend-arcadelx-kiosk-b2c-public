@@ -356,20 +356,20 @@ const PRICE_EPSILON = 0.001;
  * Mothership's stored override; only this one proves the change reached the kiosk, so a write
  * is not reported as applied until this feed agrees.
  */
-export async function getLauncherServedPrices(kioskId: string): Promise<{
+export async function getLauncherServedPrices(kioskId?: string): Promise<{
   deviceId: string;
   games: Array<{ gameId: string; displayName: string; price: number; replayPrice: number }>;
 }> {
-  const payload = await callMothership(
-    `/api/v1/launcher/games?kiosk_id=${encodeURIComponent(kioskId)}`,
-    { method: 'GET' },
-  );
+  // No kiosk_id = the global launcher feed: the default every kiosk inherits when it carries
+  // no override. With kiosk_id = what that machine actually serves.
+  const query = kioskId ? `?kiosk_id=${encodeURIComponent(kioskId)}` : '';
+  const payload = await callMothership(`/api/v1/launcher/games${query}`, { method: 'GET' });
   const parsed = LauncherKioskGamesSchema.safeParse(payload);
   if (!parsed.success) {
     throw new ApiError(502, 'Mothership launcher API returned an unexpected payload');
   }
   return {
-    deviceId: parsed.data.device_id,
+    deviceId: parsed.data.device_id ?? '',
     games: parsed.data.games.map((game) => ({
       gameId: game.GameId,
       displayName: game.GameName,
@@ -790,6 +790,25 @@ async function setGameCatalogPrice(
     });
   }
 
+  // `GET /api/v1/launcher/games` without a kiosk_id is the fleet default: what every kiosk
+  // inherits when it carries no override. The catalog row agreeing is necessary but not
+  // sufficient, so the global launcher feed is read too and a disagreement is reported.
+  let globalServedPrice: number | undefined;
+  let globalServesNewPrice: boolean | undefined;
+  try {
+    const global = await getLauncherServedPrices();
+    const match =
+      global.games.find((game) => game.gameId === confirmed.game_id) ??
+      global.games.find((game) => game.displayName === confirmed.display_name);
+    if (match) {
+      globalServedPrice = match.price;
+      globalServesNewPrice =
+        samePrice(match.price, input.price) && samePrice(match.replayPrice, replayPrice);
+    }
+  } catch {
+    // Informational only: the stored catalog write is already verified above.
+  }
+
   return {
     deviceId,
     gameId: confirmed.game_id,
@@ -799,6 +818,8 @@ async function setGameCatalogPrice(
     scope: 'GAME_CATALOG',
     devicesUpdated: overridden.length - devicesNotUpdated.length,
     devicesNotUpdated,
+    globalServedPrice,
+    globalServesNewPrice,
   };
 }
 
