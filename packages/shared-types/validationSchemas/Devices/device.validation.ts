@@ -182,6 +182,14 @@ export const SetDeviceGamePriceResultSchema = z.object({
   devicesUpdated: z.number().int().nonnegative().optional(),
   /** GAME_CATALOG only: kiosks that still did not read the catalog value back. */
   devicesNotUpdated: z.array(z.string()).optional(),
+  /**
+   * What the kiosk reports for this game on its launcher feed, read back after the write.
+   * `kioskServesNewPrice` false means Mothership stored the change but the machine still
+   * serves the previous price, so the write must not be reported as applied.
+   */
+  kioskServedPrice: z.number().optional(),
+  kioskServedReplayPrice: z.number().optional(),
+  kioskServesNewPrice: z.boolean().optional(),
 });
 
 export type SetDeviceGamePriceResult = z.infer<typeof SetDeviceGamePriceResultSchema>;
@@ -214,6 +222,28 @@ const LauncherGameAssetSchema = z.object({
 export const LauncherGamesResponseSchema = z.object({
   games: z.array(LauncherGameAssetSchema),
   coming_soon: z.array(LauncherGameAssetSchema).optional(),
+});
+
+/**
+ * `GET /api/v1/launcher/games?kiosk_id=<machine code>` — the price the kiosk itself serves.
+ *
+ * This is the acceptance surface for a price change: the per-device prices endpoint reports
+ * Mothership's stored override, while the launcher reports what the machine will actually
+ * charge. The two agreeing is the only proof that a write reached the kiosk.
+ */
+const LauncherServedGameSchema = z.object({
+  GameId: z.string(),
+  GameName: z.string(),
+  price: z.coerce.number(),
+  replayprice: z.coerce.number().nullish(),
+  isplayable: z.boolean().nullish(),
+});
+
+export const LauncherKioskGamesSchema = z.object({
+  device_id: z.string(),
+  status: z.string().optional(),
+  games: z.array(LauncherServedGameSchema),
+  coming_soon: z.array(LauncherServedGameSchema).optional(),
 });
 
 /** One upstream catalog entry (`GET /api/v1/games`), as parsed by the schema above. */

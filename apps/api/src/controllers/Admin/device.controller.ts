@@ -209,11 +209,14 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
         ? await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, result.price, result.replayPrice)
         : 0;
       // The flush is explicit but not guaranteed: if Mothership still reports the change as
-      // pending, say so instead of claiming it went live.
-      const applied = result.status !== 'PENDING';
+      // pending — or stores it while the kiosk's own launcher still serves the old number —
+      // say so instead of claiming it went live.
+      const applied = result.status !== 'PENDING' && result.kioskServesNewPrice !== false;
       const message = applied
         ? 'Device game price applied live and verified'
-        : `Price queued at Mothership for ${result.scheduledFor ?? 'the next scheduled run'}; the kiosk still reads its previous price`;
+        : result.kioskServesNewPrice === false
+          ? `Mothership stored the price but the kiosk still serves ${result.kioskServedPrice ?? '?'} / replay ${result.kioskServedReplayPrice ?? '?'}`
+          : `Price queued at Mothership for ${result.scheduledFor ?? 'the next scheduled run'}; the kiosk still reads its previous price`;
       return res.status(applied ? 200 : 202).json(new ApiResponse(applied ? 200 : 202, { ...result, appliedNow: applied, supersededSchedules }, message));
     }
     if (body.data.scheduled_date && body.data.scheduled_date < businessDate()) {

@@ -4,6 +4,7 @@ import {
   DevicePricesResponseSchema,
   GameCatalogResponseSchema,
   LauncherGamesResponseSchema,
+  LauncherKioskGamesSchema,
   type DeviceAdView,
   type DeviceView,
   type GamePriceView,
@@ -346,6 +347,66 @@ export async function getDevicePrices(
 
 /** Prices survive as floats; compare with a tolerance far below one paisa. */
 const PRICE_EPSILON = 0.001;
+
+/**
+ * What the kiosk actually serves, straight from its own launcher feed.
+ *
+ * `GET /api/v1/launcher/games?kiosk_id=<machine code>` returns `device_id`, the game list and
+ * the `price` / `replayprice` the machine will charge. The per-device prices endpoint reports
+ * Mothership's stored override; only this one proves the change reached the kiosk, so a write
+ * is not reported as applied until this feed agrees.
+ */
+export async function getLauncherServedPrices(kioskId: string): Promise<{
+  deviceId: string;
+  games: Array<{ gameId: string; displayName: string; price: number; replayPrice: number }>;
+}> {
+  const payload = await callMothership(
+    `/api/v1/launcher/games?kiosk_id=${encodeURIComponent(kioskId)}`,
+    { method: 'GET' },
+  );
+  const parsed = LauncherKioskGamesSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiError(502, 'Mothership launcher API returned an unexpected payload');
+  }
+  return {
+    deviceId: parsed.data.device_id,
+    games: parsed.data.games.map((game) => ({
+      gameId: game.GameId,
+      displayName: game.GameName,
+      price: game.price,
+      replayPrice: game.replayprice ?? 0,
+    })),
+  };
+}
+
+/**
+ * Read the launcher's view of one game after a write. Failures are not fatal: a scheduled
+ * or timed-out read must not turn a stored change into an error, it just leaves the served
+ * price unknown (`kioskServesNewPrice` omitted) rather than guessed.
+ */
+async function readServedPrice(
+  kioskId: string,
+  gameId: string,
+  displayName: string,
+  expectedPrice: number,
+  expectedReplayPrice: number,
+): Promise<Pick<SetDeviceGamePriceResult, 'kioskServedPrice' | 'kioskServedReplayPrice' | 'kioskServesNewPrice'>> {
+  try {
+    const served = await getLauncherServedPrices(kioskId);
+    const match =
+      served.games.find((game) => game.gameId === gameId) ??
+      served.games.find((game) => game.displayName === displayName);
+    if (!match) return {};
+    return {
+      kioskServedPrice: match.price,
+      kioskServedReplayPrice: match.replayPrice,
+      kioskServesNewPrice:
+        samePrice(match.price, expectedPrice) && samePrice(match.replayPrice, expectedReplayPrice),
+    };
+  } catch {
+    return {};
+  }
+}
 
 const samePrice = (a: number, b: number): boolean => Math.abs(a - b) < PRICE_EPSILON;
 
@@ -938,6 +999,18 @@ export async function setDeviceGamePrice(
     });
   }
 
+  // Mothership storing the override is not the same as the machine serving it. The kiosk's
+  // own launcher feed (`/api/v1/launcher/games?kiosk_id=`) is the acceptance surface, so the
+  // served price travels with the result and a disagreement becomes visible to the caller
+  // instead of being reported as a clean success.
+  const served = await readServedPrice(
+    deviceId,
+    gameAfter.gameId,
+    gameAfter.displayName,
+    gameAfter.effectivePrice,
+    gameAfter.effectiveReplayPrice,
+  );
+
   return {
     deviceId,
     gameId: gameAfter.gameId,
@@ -946,5 +1019,6 @@ export async function setDeviceGamePrice(
     replayPrice: gameAfter.effectiveReplayPrice,
     scope: 'DEVICE_GAME_OVERRIDE',
     status: 'APPLIED',
+    ...served,
   };
 }

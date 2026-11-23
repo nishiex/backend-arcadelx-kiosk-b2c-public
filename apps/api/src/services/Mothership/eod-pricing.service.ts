@@ -156,6 +156,14 @@ export async function processEodUpdate(id: string) {
     if (result.status !== 'APPLIED') {
       throw new Error('Mothership did not apply and verify the scheduled device price');
     }
+    // The stored row is not the outcome: the kiosk's launcher feed is. A row marked APPLIED
+    // while the machine still serves the old price is exactly the state QA reported as
+    // "data updated but the tag was not removed".
+    if (result.kioskServesNewPrice === false) {
+      throw new Error(
+        `The kiosk still serves ₹${result.kioskServedPrice ?? '?'} / replay ₹${result.kioskServedReplayPrice ?? '?'} after the scheduled write`,
+      );
+    }
     const applied = await prisma.eodDevicePriceUpdate.updateMany({
       where: { id, status: 'PROCESSING', processingAt: leaseAt },
       data: { status: 'APPLIED', processingAt: null, appliedAt: new Date(), lastError: null, verifiedPrice: result.price, verifiedReplayPrice: result.replayPrice },
