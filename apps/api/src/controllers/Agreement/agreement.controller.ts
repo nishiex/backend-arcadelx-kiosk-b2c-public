@@ -12,6 +12,7 @@ import {
   lockAgreementParties,
   requireAgreementSlot,
 } from "../../services/agreement-rules";
+import { notifyAgreementActivated } from "../../services/email/agreement.email";
 
 export const createAgreement = asyncHandler(async (req, res) => {
   const input = CreateAgreementSchema.parse(req.body);
@@ -124,6 +125,11 @@ export const createAgreement = asyncHandler(async (req, res) => {
       },
     });
   });
+  // The receiving organization is told about the terms. A mail outage must not
+  // undo an agreement that is already committed, so delivery is best-effort.
+  void notifyAgreementActivated(agreement.id).catch((error) => {
+    console.error("[agreement] activation email failed", error);
+  });
   res
     .status(201)
     .json(
@@ -165,6 +171,9 @@ export const approveAgreement = asyncHandler(async (req, res) => {
       where: { id },
       data: { status: "ACTIVE", effectiveFrom: new Date() },
     });
+  });
+  void notifyAgreementActivated(agreement.id).catch((error) => {
+    console.error("[agreement] activation email failed", error);
   });
   res
     .status(200)
