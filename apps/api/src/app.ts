@@ -16,6 +16,8 @@ import internalRoutes from './routes/Internal/internal.routes';
 import orderRoutes from './routes/Orders/order.route'
 import revenueRoutes from './routes/Revenue/revenue.routes';
 import adminGatewayRoutes from './routes/Admin/gateway.routes';
+import adsRoutes from './routes/Admin/ads.routes';
+import bannerAdsRoutes from './routes/Admin/banner-ads.routes';
 import deviceRoutes from './routes/Admin/device.routes';
 import reportsRoutes from './routes/Reports/reports.routes';
 import auditRoutes from './routes/Audit/audit.routes';
@@ -97,6 +99,13 @@ app.use('/api/ip/settlements', ipSettlementRoutes);
 // Payment-gateway administration (proxied to Mothership). Session-authenticated and
 // limited to COMPANY OWNER/ADMIN inside the router.
 app.use('/api/admin/gateways', adminGatewayRoutes);
+// Regular Ads management, backed by Mothership's /api/v1/ads API.
+app.use('/api/ads', adsRoutes);
+app.use('/api/v1/ads', adsRoutes);
+// Banner Ads administration (proxied to Mothership). Session-authenticated and
+// limited to COMPANY OWNER/ADMIN inside the router.
+app.use('/api/banner-ads', bannerAdsRoutes);
+app.use('/api/v1/banner-ads', bannerAdsRoutes);
 // Device fleet and per-device game pricing (proxied to Mothership). Reads are open to
 // COMPANY/DISTRIBUTOR/PARTNER; the price write is limited to COMPANY OWNER/ADMIN inside
 // the router, because it changes what a live kiosk charges.

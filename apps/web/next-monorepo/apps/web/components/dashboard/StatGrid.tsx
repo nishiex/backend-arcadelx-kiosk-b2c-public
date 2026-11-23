@@ -16,6 +16,7 @@ import {
   fetchOrders,
 } from "@/lib/backend-api"
 import { fetchMothershipAds } from "@/lib/mothership-ads-api"
+import { fetchBannerAds } from "@/lib/mothership-banner-ads-api"
 import { useMe } from "@/hooks/useMe"
 import { useReveal } from "@/hooks/useReveal"
 import StatCard from "./StatCard"
@@ -44,6 +45,12 @@ export default function StatGrid() {
   const ads = useQuery({
     queryKey: ["mothership-ads"],
     queryFn: ({ signal }) => fetchMothershipAds(signal),
+    enabled: canViewAds,
+    refetchInterval: 15_000,
+  })
+  const bannerAds = useQuery({
+    queryKey: ["banner-ads"],
+    queryFn: ({ signal }) => fetchBannerAds(signal),
     enabled: canViewAds,
     refetchInterval: 15_000,
   })
@@ -102,7 +109,14 @@ export default function StatGrid() {
       value: ads.data?.ads.length ?? 0,
       icon: <Megaphone size={18} />,
       iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-      hint: "In your library",
+      hint: "Regular Ads library",
+    })
+    cards.push({
+      label: "Banner Ads",
+      value: bannerAds.data?.ads.length ?? 0,
+      icon: <Megaphone size={18} />,
+      iconClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+      hint: "Banner Ads library",
     })
   }
 

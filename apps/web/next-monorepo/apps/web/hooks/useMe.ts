@@ -43,11 +43,11 @@ export type Permissions = {
   canViewRevenue: boolean
   /** Payment gateway administration is COMPANY + OWNER/ADMIN only. */
   canManageGateways: boolean
-  /** Company members may read the Mothership Ads library. */
+  /** Active Company OWNER/ADMIN members may view the Mothership Ads library. */
   canViewAds: boolean
   /** Company members and IP Party members may access IP views. */
   canViewIp: boolean
-  /** Uploading, editing, and deleting Ads is limited to Company OWNER/ADMIN. */
+  /** Uploading, editing, and deleting Ads is limited to the Company OWNER. */
   canManageAds: boolean
   /** Devices are visible for the current org; Company fleet visibility is master-admin only. */
   canViewDevices: boolean
@@ -121,9 +121,9 @@ export function useMe(): Permissions {
     canViewRevenue: !isError && me?.membership?.status === "ACTIVE" &&
       ((isOwnerOrAdmin || role === "MANAGER") && (isCompany || isDistributor || orgType === "PARTNER") || isIpParty),
     canManageGateways: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
-    canViewAds: !isError && me?.membership?.status === "ACTIVE" && isCompany,
+    canViewAds: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
     canViewIp: !isError && me?.membership?.status === "ACTIVE" && (isCompany || isIpParty),
-    canManageAds: !isError && me?.membership?.status === "ACTIVE" && isCompany && isOwnerOrAdmin,
+    canManageAds: !isError && me?.membership?.status === "ACTIVE" && isMasterAdmin,
     /**
      * The Mothership device fleet is operational data the whole network already sees, so it
      * matches the revenue read scope: COMPANY/DISTRIBUTOR/PARTNER OWNER/ADMIN/MANAGER.

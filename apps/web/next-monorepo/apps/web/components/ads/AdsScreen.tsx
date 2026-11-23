@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Check, Clapperboard, Megaphone, Pencil, RefreshCw, Trash2, Upload, UploadCloud, X } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState, ErrorState, Panel, Skeleton } from "@/components/dashboard/ui"
-import BannerAdsPanel from "@/components/ads/BannerAdsPanel"
 import KioskSelectionPicker from "@/components/ads/KioskSelectionPicker"
 import { useMe } from "@/hooks/useMe"
 import {
@@ -166,9 +165,6 @@ export default function AdsScreen() {
         result = await updateMothershipAd(editing, { title: title.trim(), start_date: startDate, days_to_live: daysToLive, ...(uploadId ? { upload_id: uploadId, original_name: file?.name } : {}) })
         adId = editing
       }
-      // Mothership's current API has no /api/v1/ads/:id/assign route. Active ads
-      // are delivered automatically to reporting kiosks, so do not issue the
-      // unsupported assignment request after a successful upload/update.
       return result
     },
     onSuccess: (result) => {
@@ -257,7 +253,6 @@ export default function AdsScreen() {
       <Panel title="3. Advertisement library" subtitle={selectedDeviceIds.length ? `${selectedDeviceIds.length} kiosk${selectedDeviceIds.length === 1 ? "" : "s"} ready to assign.` : `${ads.data?.kiosks_reporting ?? 0} kiosks reporting`} action={<div className="flex flex-wrap items-center gap-2"><input aria-label="Search advertisements" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40 sm:w-52" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search advertisements" /><button className={buttonClass} onClick={() => void ads.refetch()}><RefreshCw size={16} /> Refresh</button></div>}>
         {ads.isPending ? <Skeleton className="h-64" /> : ads.isError ? <ErrorState message={ads.error.message} onRetry={() => void ads.refetch()} /> : !filteredAds.length ? <EmptyState icon={<Clapperboard size={28} />} message={search ? "No advertisements match your search." : "No advertisements have been uploaded yet."} /> : <div className="grid gap-4 lg:grid-cols-2">{filteredAds.map((ad) => <AdvertisementCard key={ad.id} ad={ad} kiosksReporting={ads.data?.kiosks_reporting ?? 0} selectedCount={selectedDeviceIds.length} canManageAds={canManageAds} isAssigning={assign.isPending} isDeleting={remove.isPending} onEdit={() => beginEdit(ad)} onDelete={() => { if (window.confirm(`Delete ${ad.title}? This removes it from the server and kiosks on their next check-in.`)) remove.mutate(ad.id) }} onAssign={() => assign.mutate({ adId: ad.id, deviceIds: selectedDeviceIds })} />)}</div>}
       </Panel>
-      <BannerAdsPanel canManage={canManageAds} />
     </div>
   )
 }

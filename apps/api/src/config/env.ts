@@ -34,6 +34,7 @@ const envSchema = z.object({
   BUSINESS_TIMEZONE: z.string().default('Asia/Kolkata'),
   EOD_PRICE_JOBS_ENABLED: z.enum(['true', 'false']).default('false'),
   MOTHERSHIP_ANALYTICS_SUMMARY_URL: z.string().url().default('https://main.arcadelx.games/api/v1/analytics/summary'),
+  MOTHERSHIP_API_URL: z.string().url().default('http://200.234.43.147:8080'),
 });
 
 const productionSchema = envSchema.extend({
