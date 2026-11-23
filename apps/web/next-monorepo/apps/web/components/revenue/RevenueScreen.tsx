@@ -8,12 +8,15 @@ import { useMe } from "@/hooks/useMe"
 import {
   fetchDeductionRates,
   fetchMachineRevenue,
+  fetchRevenueSplits,
   fetchMothershipPayments,
   downloadMothershipPaymentsExport,
   openMothershipPaymentsInGoogleSheets,
   syncMothershipPayments,
   updateDeductionRates,
   type DeductionRates,
+  type RevenueSplitPeriod,
+  type RevenueSplits,
 } from "@/lib/backend-api"
 import {
   EmptyState,
@@ -146,6 +149,21 @@ function RateEditor({
   )
 }
 
+function RevenueSplitPanel({ data, isLoading, isError, onRetry }: { data: RevenueSplits | undefined; isLoading: boolean; isError: boolean; onRetry: () => void }) {
+  if (isLoading) return <Panel title="Agreement revenue split"><Skeleton className="h-40 w-full" /></Panel>
+  if (isError || !data) return <Panel title="Agreement revenue split"><ErrorState message="Couldn’t load agreement revenue splits." onRetry={onRetry} /></Panel>
+  const moneyValue = (value: number) => money.format(value)
+  const labels = data.organizationType === "COMPANY" ? ["Company retained", "Distributor share", "Partner share"] : data.organizationType === "DISTRIBUTOR" ? ["Company share", "Your distributor share", "Partner share"] : ["Company share", "Distributor share", "Your partner share"]
+  const values = [data.organizationType === "COMPANY" ? data.totals.yourShare : data.totals.companyShare, data.totals.distributorShare, data.totals.partnerShare]
+  return <Panel title="Agreement revenue split" subtitle={`Calculated from resolved transaction splits · ${data.rows.length} machines · ${data.unresolvedCount} unresolved transactions`}>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      {[["Gross revenue", data.totals.gross], ["Net revenue", data.totals.net], [labels[0]!, values[0]!], [labels[1]!, values[1]!], [labels[2]!, values[2]!], ["Final payout", data.totals.finalPayout]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-border bg-background px-3 py-2"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold tabular-nums">{moneyValue(Number(value))}</p></div>)}
+    </div>
+    <div className="mt-4 overflow-x-auto rounded-lg border border-border/70"><table className="w-full min-w-[900px] text-sm whitespace-nowrap"><thead><tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">{["Machine", "Gross", "Net", "Company", "Distributor", "Partner", "Your share", "TDS", "Final payout"].map((label) => <th key={label} className="px-3 py-3 font-medium">{label}</th>)}</tr></thead><tbody>{data.rows.map((row) => <tr key={row.machineCode} className="border-b border-border/60 last:border-0"><th className="px-3 py-3 text-left font-medium">{row.machineCode}</th>{[row.gross, row.net, row.companyShare, row.distributorShare, row.partnerShare, row.yourShare, row.tds, row.finalPayout].map((value, index) => <td key={index} className="px-3 py-3 tabular-nums">{moneyValue(value)}</td>)}</tr>)}</tbody></table></div>
+    <p className="mt-3 text-xs text-muted-foreground">TDS is {data.tdsPercentage}% for distributor/partner payouts. Company retained share already accounts for IP royalty where applicable.</p>
+  </Panel>
+}
+
 export default function RevenueScreen() {
   const { me, isLoading, isError, canViewRevenue, isCompany, role, orgType } = useMe()
   const isIpParty = orgType === "IP_PARTY"
@@ -170,6 +188,14 @@ export default function RevenueScreen() {
   const revenue = useQuery({
     queryKey: ["revenue-machines", ...scope],
     queryFn: fetchMachineRevenue,
+    enabled: canViewRevenue && !isIpParty,
+    staleTime: 60_000,
+    retry: 1,
+  })
+  const splitPeriod: RevenueSplitPeriod = selectedPeriod ?? "totalRevenue"
+  const revenueSplits = useQuery({
+    queryKey: ["revenue-splits", ...scope, splitPeriod],
+    queryFn: () => fetchRevenueSplits(splitPeriod),
     enabled: canViewRevenue && !isIpParty,
     staleTime: 60_000,
     retry: 1,
@@ -357,6 +383,7 @@ export default function RevenueScreen() {
           </div>
           {rates.isSuccess && <p className="-mt-3 text-xs text-muted-foreground">Estimate applies gateway fees to gross, then estimates TDS on the remaining amount. GST is not charged. Actual TDS and payouts vary by distributor/partner agreements; finalized statements are authoritative.</p>}
           <RevenueTrendChart />
+          <RevenueSplitPanel data={revenueSplits.data} isLoading={revenueSplits.isLoading} isError={revenueSplits.isError} onRetry={() => void revenueSplits.refetch()} />
           <Panel title="Machine revenue" subtitle={`${filtered.length} ${selectedPeriod ? `${selectedPeriod === "today" ? "today" : selectedPeriod === "thisMonth" ? "this-month" : "all-time"} revenue machines` : "machines"} · gross recognized revenue by assignment window`}>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <div className="min-w-56 flex-1"><label htmlFor="revenue-search" className="mb-1.5 block text-xs font-medium text-muted-foreground">Find a machine</label><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><input id="revenue-search" className={`${inputClass} pl-9`} placeholder="Machine, location, distributor or partner" value={search} onChange={(event) => { setSearch(event.target.value); setMachinePage(1) }}/></div></div>

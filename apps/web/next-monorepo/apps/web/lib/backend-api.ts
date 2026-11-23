@@ -649,6 +649,34 @@ export async function fetchMachineRevenue(): Promise<MachineRevenue[]> {
   return (await handleRes<{ kiosks: MachineRevenue[] }>(res)).kiosks;
 }
 
+export type RevenueSplitPeriod = "today" | "thisMonth" | "totalRevenue";
+export type RevenueSplitRow = {
+  machineCode: string;
+  location: string;
+  gross: number;
+  net: number;
+  companyShare: number;
+  distributorShare: number;
+  partnerShare: number;
+  yourShare: number;
+  tds: number;
+  finalPayout: number;
+  transactions: number;
+};
+export type RevenueSplits = {
+  period: RevenueSplitPeriod;
+  organizationType: "COMPANY" | "DISTRIBUTOR" | "PARTNER";
+  tdsPercentage: number;
+  unresolvedCount: number;
+  totals: Omit<RevenueSplitRow, "machineCode" | "location" | "transactions">;
+  rows: RevenueSplitRow[];
+};
+
+export async function fetchRevenueSplits(period: RevenueSplitPeriod): Promise<RevenueSplits> {
+  const res = await apiFetch(`/api/revenue/splits?period=${period}`, { credentials: "include", cache: "no-store" });
+  return handleRes<RevenueSplits>(res);
+}
+
 export type MothershipPayment = {
   txnid: string;
   device_id: string;

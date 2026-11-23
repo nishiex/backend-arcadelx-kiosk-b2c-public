@@ -15,6 +15,7 @@ import {
   Activity,
   CreditCard,
   Megaphone,
+  RectangleHorizontal,
   Settings,
   Menu,
   X,
@@ -45,7 +46,7 @@ type NavItem = {
   tab?: string
 }
 
-type NavEntry = { kind: "link"; item: NavItem } | { kind: "network" }
+type NavEntry = { kind: "link"; item: NavItem } | { kind: "network" } | { kind: "ads" }
 
 // Only destinations backed by a live API on this deployment are listed.
 const NAV: NavEntry[] = [
@@ -70,8 +71,7 @@ const NAV: NavEntry[] = [
   { kind: "link", item: { name: "Revenue", href: "/revenue", icon: IndianRupee, show: (p) => p.canViewRevenue } },
   { kind: "link", item: { name: "Analytics", href: "/analytics", icon: Activity, show: (p) => p.canViewAnalytics } },
   { kind: "link", item: { name: "Gateways", href: "/gateways", icon: CreditCard, show: (p) => p.canManageGateways } },
-  { kind: "link", item: { name: "Ads", href: "/ads", icon: Megaphone, show: (p) => p.canViewAds } },
-  { kind: "link", item: { name: "Banner Ads", href: "/banner-ads", icon: Megaphone, show: (p) => p.canViewAds } },
+  { kind: "ads" },
   { kind: "link", item: { name: "IP & Royalties", href: "/ip", icon: Gamepad2, show: (p) => p.canViewIp } },
   // IP parties and royalties are Company-only, and limited to the OWNER (master admin).
   // The Distributors section: the row itself is the distributor list, and it expands
@@ -373,6 +373,13 @@ function NavList({
   return (
     <ul className="space-y-1">
       {NAV.map((entry) => {
+        if (entry.kind === "ads") {
+          return (
+            <li key="ads-section">
+              <NavAdsSection perms={perms} onNavigate={onNavigate} />
+            </li>
+          )
+        }
         if (entry.kind === "link") {
           if (entry.item.show && !entry.item.show(perms)) return null
           return (
@@ -405,6 +412,47 @@ function NavLinks({ perms, onNavigate }: { perms: Perms; onNavigate?: () => void
         <NavListWithTab perms={perms} onNavigate={onNavigate} />
       </Suspense>
     </nav>
+  )
+}
+
+function NavAdsSection({ perms, onNavigate }: { perms: Perms; onNavigate?: () => void }) {
+  const pathname = usePathname()
+  const active = pathname === "/ads" || pathname.startsWith("/ads/") || pathname === "/banner-ads" || pathname.startsWith("/banner-ads/")
+  const [expanded, setExpanded] = useState(active)
+
+  React.useEffect(() => {
+    if (active) setExpanded(true)
+  }, [active])
+
+  if (!perms.canViewAds) return null
+
+  return (
+    <div>
+      <div
+        className={cn(
+          "flex items-center rounded-lg transition-colors",
+          active ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+        )}
+      >
+        <Link href="/ads" onClick={onNavigate} aria-current={pathname === "/ads" ? "page" : undefined} className="flex flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium">
+          <Megaphone size={18} className="shrink-0" />
+          <span>Ads</span>
+        </Link>
+        <button type="button" aria-expanded={expanded} aria-label="Toggle Ads menu" onClick={() => setExpanded((value) => !value)} className="mr-1.5 rounded-md p-1.5 transition-colors hover:bg-foreground/10">
+          <ChevronDown size={16} className={`shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      <div className={cn("overflow-hidden transition-[max-height,opacity] duration-200", expanded ? "max-h-20 opacity-100" : "max-h-0 opacity-0")}>
+        <ul className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+          <li>
+            <Link href="/banner-ads" onClick={onNavigate} aria-current={pathname.startsWith("/banner-ads") ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg py-2 pl-3 pr-3 text-sm font-medium transition-colors", pathname.startsWith("/banner-ads") ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground")}>
+              <RectangleHorizontal size={16} className="shrink-0" />
+              <span>Banner Ads</span>
+            </Link>
+          </li>
+        </ul>
+      </div>
+    </div>
   )
 }
 

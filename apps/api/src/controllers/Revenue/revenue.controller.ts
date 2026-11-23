@@ -113,6 +113,98 @@ export const getMachineWiseRevenue = asyncHandler(async (req, res) => {
   }
   res.json(new ApiResponse(200, { kiosks: [...rows.values()] }, 'Machine-wise revenue fetched successfully'));
 });
+
+/** Agreement-aware revenue shares for the authenticated organization's scope. */
+export const getRevenueSplits = asyncHandler(async (req, res) => {
+  const period = typeof req.query.period === 'string' ? req.query.period : 'totalRevenue';
+  if (!['today', 'thisMonth', 'totalRevenue'].includes(period)) {
+    throw new ApiError(400, 'Invalid revenue split period');
+  }
+
+  const orgId = req.membership!.organizationId;
+  const orgType = req.membership!.type;
+  let organizationIds = [orgId];
+  if (orgType === 'COMPANY') {
+    organizationIds = [];
+  } else if (orgType === 'DISTRIBUTOR') {
+    const children = await prisma.agreement.findMany({
+      where: { parentOrgId: orgId, status: { in: ['ACTIVE', 'TERMINATED'] } },
+      select: { childOrgId: true },
+    });
+    organizationIds.push(...children.map((agreement) => agreement.childOrgId));
+  }
+
+  const assignmentWhere = organizationIds.length
+    ? { organizationId: { in: organizationIds } }
+    : {};
+  const assignments = await prisma.kioskAssignment.findMany({
+    where: assignmentWhere,
+    select: { id: true, kiosk: { select: { machineCode: true, location: true } } },
+  });
+  const assignmentIds = assignments.map((assignment) => assignment.id);
+  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+
+  const now = new Date();
+  let dateWhere = {};
+  if (period === 'today') {
+    const calendar = indiaCalendar(now);
+    const start = new Date(Date.UTC(calendar.year, calendar.month - 1, calendar.day) - 330 * 60000);
+    dateWhere = { businessDate: { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) } };
+  } else if (period === 'thisMonth') {
+    const calendar = indiaCalendar(now);
+    const month = revenueMonth(calendar.month, calendar.year);
+    dateWhere = { businessDate: { gte: month.start, lt: month.end } };
+  }
+
+  const [splits, unresolvedCount, settings] = assignmentIds.length
+    ? await Promise.all([
+        prisma.transactionSplit.findMany({ where: { status: 'RESOLVED', kioskAssignmentId: { in: assignmentIds }, ...dateWhere }, select: { grossAmount: true, gstAmount: true, pgFeeAmount: true, netAmount: true, companyShare: true, distributorShare: true, partnerShare: true, companyRetainedShare: true, kioskAssignmentId: true } }),
+        prisma.transactionSplit.count({ where: { status: { in: ['PENDING', 'UNRESOLVED'] }, kioskAssignmentId: { in: assignmentIds }, ...dateWhere } }),
+        prisma.systemSettings.findUnique({ where: { id: 'default' }, select: { tdsPercentage: true } }),
+      ])
+    : [[], 0, await prisma.systemSettings.findUnique({ where: { id: 'default' }, select: { tdsPercentage: true } })] as const;
+
+  const tdsRate = Number(settings?.tdsPercentage ?? 2) / 100;
+  const zero = () => new Prisma.Decimal(0);
+  const totals = { gross: zero(), gst: zero(), pgFee: zero(), net: zero(), companyShare: zero(), distributorShare: zero(), partnerShare: zero(), yourShare: zero(), tds: zero(), finalPayout: zero() };
+  const rowMap = new Map<string, { machineCode: string; location: string; gross: Prisma.Decimal; net: Prisma.Decimal; companyShare: Prisma.Decimal; distributorShare: Prisma.Decimal; partnerShare: Prisma.Decimal; yourShare: Prisma.Decimal; tds: Prisma.Decimal; finalPayout: Prisma.Decimal; transactions: number }>();
+  const add = (target: Prisma.Decimal, value: unknown) => target.plus(value == null ? 0 : Number(value));
+
+  for (const split of splits) {
+    const assignment = assignmentById.get(split.kioskAssignmentId!);
+    if (!assignment) continue;
+    const companyShare = split.companyRetainedShare ?? split.companyShare ?? 0;
+    const distributorShare = split.distributorShare ?? 0;
+    const partnerShare = split.partnerShare ?? 0;
+    const yourShare = orgType === 'COMPANY' ? companyShare : orgType === 'DISTRIBUTOR' ? distributorShare : partnerShare;
+    const tds = orgType === 'COMPANY' ? 0 : Number(yourShare) * tdsRate;
+    totals.gross = add(totals.gross, split.grossAmount);
+    totals.gst = add(totals.gst, split.gstAmount);
+    totals.pgFee = add(totals.pgFee, split.pgFeeAmount);
+    totals.net = add(totals.net, split.netAmount);
+    totals.companyShare = add(totals.companyShare, split.companyShare);
+    totals.distributorShare = add(totals.distributorShare, distributorShare);
+    totals.partnerShare = add(totals.partnerShare, partnerShare);
+    totals.yourShare = add(totals.yourShare, yourShare);
+    totals.tds = add(totals.tds, tds);
+    totals.finalPayout = add(totals.finalPayout, Number(yourShare) - tds);
+    const key = assignment.kiosk.machineCode;
+    const row = rowMap.get(key) ?? { machineCode: key, location: assignment.kiosk.location ?? '-', gross: zero(), net: zero(), companyShare: zero(), distributorShare: zero(), partnerShare: zero(), yourShare: zero(), tds: zero(), finalPayout: zero(), transactions: 0 };
+    row.gross = add(row.gross, split.grossAmount); row.net = add(row.net, split.netAmount); row.companyShare = add(row.companyShare, split.companyShare); row.distributorShare = add(row.distributorShare, distributorShare); row.partnerShare = add(row.partnerShare, partnerShare); row.yourShare = add(row.yourShare, yourShare); row.tds = add(row.tds, tds); row.finalPayout = add(row.finalPayout, Number(yourShare) - tds); row.transactions += 1;
+    rowMap.set(key, row);
+  }
+
+  const numeric = (value: Prisma.Decimal) => value.toDecimalPlaces(2).toNumber();
+  const result = {
+    period,
+    organizationType: orgType,
+    tdsPercentage: Number((tdsRate * 100).toFixed(2)),
+    unresolvedCount,
+    totals: Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, numeric(value)])),
+    rows: [...rowMap.values()].map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value instanceof Prisma.Decimal ? numeric(value) : value]))),
+  };
+  res.json(new ApiResponse(200, result, 'Agreement-aware revenue splits fetched successfully'));
+});
 const defaults = { id: 'default', gstPercentage: 0, pgFeePercentage: 2.5, tdsPercentage: 2 };
 /**
  * Revenue trend for the dashboard chart.

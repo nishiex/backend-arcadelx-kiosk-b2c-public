@@ -71,12 +71,22 @@ async function deliverRevenueStatement(statementId: string) {
   const file = path.resolve(root, statement.pdfPath);
   if (!file.startsWith(root + path.sep)) throw new Error('Invalid report path');
   const buffer = await fs.readFile(file);
+  const money = (value: unknown) => `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const summary = [
+    `Gross revenue: ${money(statement.GrossRevenue)}`,
+    `Net revenue: ${money(statement.netRevenue)}`,
+    `Company share: ${money(statement.companyShare)}`,
+    `Distributor share: ${money(statement.distributorShare)}`,
+    `Partner share: ${money(statement.partnerShare)}`,
+    `TDS: ${money(statement.tdsAmount)}`,
+    `Final payout: ${money(statement.finalPayout)}`,
+  ].join('\n');
   await sendEmail({
     to: statement.organization.owner.email,
     subject: `ArcadeLX Monthly Revenue Statement: ${statement.Month}/${statement.Year}`,
     text:
-      `Your revenue statement for ${statement.Month}/${statement.Year} is attached. ` +
-      'Please review it and the payout calculations.',
+      `Your revenue statement for ${statement.Month}/${statement.Year} is attached.\n\n` +
+      `${summary}\n\nPlease review the attached statement for the machine-level payout calculations.`,
     html: emailShell({
       preheader: `Your revenue statement for ${statement.Month}/${statement.Year}`,
       heading: 'Monthly revenue statement',
@@ -88,6 +98,13 @@ async function deliverRevenueStatement(statementId: string) {
         emailDataRows([
           { label: 'Statement', value: path.basename(file), mono: false },
           { label: 'Period', value: `${statement.Month}/${statement.Year}`, mono: false },
+          { label: 'Gross revenue', value: money(statement.GrossRevenue), mono: false },
+          { label: 'Net revenue', value: money(statement.netRevenue), mono: false },
+          { label: 'Company share', value: money(statement.companyShare), mono: false },
+          { label: 'Distributor share', value: money(statement.distributorShare), mono: false },
+          { label: 'Partner share', value: money(statement.partnerShare), mono: false },
+          { label: 'TDS', value: money(statement.tdsAmount), mono: false },
+          { label: 'Final payout', value: money(statement.finalPayout), mono: false },
         ]),
       ].join(''),
     }),

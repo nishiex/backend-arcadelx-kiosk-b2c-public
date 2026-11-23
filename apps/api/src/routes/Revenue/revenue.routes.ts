@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, loadMembership,requireOrgType,requireRole } from "../../middlewares/auth";
-import { getMachineWiseRevenue,getSystemSettings,updateSystemSettings,getRevenueSeries,getMothershipPaymentsFeed,syncMothershipPayments } from "../../controllers/Revenue/revenue.controller";
+import { getMachineWiseRevenue,getRevenueSplits,getSystemSettings,updateSystemSettings,getRevenueSeries,getMothershipPaymentsFeed,syncMothershipPayments } from "../../controllers/Revenue/revenue.controller";
 
 const router = Router();
 
@@ -8,6 +8,7 @@ router.use(requireAuth, loadMembership);
 
 // Route for Machine-Wise Revenue Data Table
 router.get("/machine-wise",requireOrgType("COMPANY","DISTRIBUTOR","PARTNER") ,requireRole("OWNER","ADMIN","MANAGER") ,getMachineWiseRevenue);
+router.get("/splits",requireOrgType("COMPANY","DISTRIBUTOR","PARTNER") ,requireRole("OWNER","ADMIN","MANAGER") ,getRevenueSplits);
 
 // Revenue trend for the dashboard chart. Same guards and scoping as machine-wise.
 router.get("/series",requireOrgType("COMPANY","DISTRIBUTOR","PARTNER") ,requireRole("OWNER","ADMIN","MANAGER") ,getRevenueSeries);

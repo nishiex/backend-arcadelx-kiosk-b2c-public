@@ -19,7 +19,6 @@ import {
   requireCanCreateOrganization,
   requireRole,
 } from "../middlewares/auth";
-import { authRateLimiter } from "../middlewares/Rate-Limiter/rateLimiter";
 
 const router = Router();
 router.post(
@@ -41,10 +40,10 @@ router.post(
 
 router.post("/join", joinOrganization);
 
-router.post("/login", authRateLimiter, login);
+router.post("/login", login);
 
-router.post("/phone/send-otp", authRateLimiter, sendPhoneOtp);
-router.post("/phone/verify-otp", authRateLimiter, verifyPhoneOtp);
+router.post("/phone/send-otp", sendPhoneOtp);
+router.post("/phone/verify-otp", verifyPhoneOtp);
 
 router.post("/refresh", refresh);
 // Existing refresh cookies are scoped here, so this path receives them too.
@@ -54,10 +53,8 @@ router.get("/me", requireAuth, getMe);
 
 router.post("/change-password", requireAuth, changePassword);
 
-// Unauthenticated credential-recovery endpoints: throttled because they are
-// guessable and, before this, had no limit at all.
-router.post("/forgot-password", authRateLimiter, forgotPassword);
-router.post("/verify-reset-otp", authRateLimiter, verifyResetOtp);
-router.post("/reset-password", authRateLimiter, completeForgotPassword);
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-reset-otp", verifyResetOtp);
+router.post("/reset-password", completeForgotPassword);
 
 export default router;
