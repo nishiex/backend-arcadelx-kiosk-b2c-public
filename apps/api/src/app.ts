@@ -24,6 +24,7 @@ import auditRoutes from './routes/Audit/audit.routes';
 import workflowRoutes from './routes/Workflow/workflow.routes';
 import analyticsRoutes from './routes/Analytics/analytics.routes';
 import notificationsRoutes from './routes/notifications.routes';
+import geoRoutes from './routes/Geo/geo.routes';
 import ipRoutes from './IP/routes/registerRoute';
 import ipGameRoutes from './IP/routes/IpGamesRoutes';
 import ipRevenueRoutes from './IP/routes/ipRevenue.routes';
@@ -86,6 +87,7 @@ app.use('/api/kiosks', kioskRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/geo', geoRoutes);
 // Crucial: These routes bypass standard JWT auth because they are server-to-server
     app.use('/api/internal', internalRoutes);
 

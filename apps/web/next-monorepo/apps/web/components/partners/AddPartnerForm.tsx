@@ -9,7 +9,8 @@ import { FullScreenDialog } from "@/components/common/FullScreenDialog"
 import { cn } from "@workspace/ui/lib/utils"
 import { useMe } from "@/hooks/useMe"
 import { createPartner, retryOrganizationCredentials, type CreatePartnerInput } from "@/lib/backend-api"
-import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
+import { STATE_NAMES, citiesForStateWith } from "@/lib/india-locations"
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill"
 
 const fields = [
   { name: "orgName", label: "Business name", min: 2, max: 100 },
@@ -27,7 +28,30 @@ function PartnerForm({ modal }: { modal: boolean }) {
   const busy = React.useRef(false)
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CreatePartnerInput>()
   const selectedState = watch("state")
-  const cityOptions = React.useMemo(() => citiesForState(selectedState), [selectedState])
+  // A valid PIN fills the state and city; the resolved city stays selectable even
+  // when the PIN's district is outside the curated major-city list.
+  const pincodeAutofill = usePincodeAutofill(
+    String(watch("pincode") ?? ""),
+    React.useCallback(
+      (location: { state: string; city: string }) => {
+        setValue("state", location.state, { shouldValidate: true })
+        // The city select is disabled until a state is chosen and only then gains
+        // the resolved option, so writing the city has to wait for that render.
+        window.setTimeout(() => {
+          setValue("city", location.city, { shouldValidate: true })
+        }, 0)
+      },
+      [setValue],
+    ),
+  )
+  // Keep the selected city in the list even when it came from a PIN and is not a
+  // curated major city; otherwise the select falls back to its first option and
+  // shows a different city than the one the form would submit.
+  const selectedCity = watch("city")
+  const cityOptions = React.useMemo(
+    () => citiesForStateWith(selectedState, pincodeAutofill.city, selectedCity),
+    [selectedState, pincodeAutofill.city, selectedCity],
+  )
   const create = useMutation({
     mutationFn: createPartner,
     onSuccess: () => {
@@ -127,6 +151,11 @@ function PartnerForm({ modal }: { modal: boolean }) {
                 validate: value => (Number.isInteger(value) && value >= 100000 && value <= 999999) || "Enter a valid 6-digit PIN code",
               })} />
               {errors.pincode && <p id="pincode-error" className="mt-1 text-xs text-destructive">{errors.pincode.message}</p>}
+              {pincodeAutofill.message && (
+                <p role="status" className={`mt-1 text-xs ${pincodeAutofill.status === "not-found" || pincodeAutofill.status === "error" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                  {pincodeAutofill.message}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="gstNumber" className="mb-1.5 block text-sm font-medium">GST number <span className="text-xs font-normal text-muted-foreground">(optional)</span></label>

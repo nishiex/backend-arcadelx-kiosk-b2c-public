@@ -8,8 +8,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react"
 import { registerIpParty, type RegisterIpPartyInput } from "@/lib/ip-api"
-import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
+import { STATE_NAMES, citiesForStateWith } from "@/lib/india-locations"
 import { useMe } from "@/hooks/useMe"
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill"
 import { EmptyState, Panel } from "@/components/dashboard/ui"
 
 const inputCls =
@@ -106,7 +107,24 @@ export default function RegisterIpForm() {
   })
 
   const state = useWatch({ control, name: "state" })
-  const cities = React.useMemo(() => (state ? citiesForState(state) : []), [state])
+  const pincodeValue = useWatch({ control, name: "pincode" })
+  // A valid PIN fills the state and city; the city input keeps the resolved value
+  // in its suggestion list even when the district is not a curated major city.
+  const pincodeAutofill = usePincodeAutofill(
+    String(pincodeValue ?? ""),
+    React.useCallback(
+      (location: { state: string; city: string }) => {
+        setValue("state", location.state, { shouldValidate: true })
+        setValue("city", location.city, { shouldValidate: true })
+      },
+      [setValue],
+    ),
+  )
+  const cityValue = useWatch({ control, name: "city" })
+  const cities = React.useMemo(
+    () => (state ? citiesForStateWith(state, pincodeAutofill.city, cityValue) : []),
+    [state, pincodeAutofill.city, cityValue],
+  )
 
   const mutation = useMutation({
     mutationFn: registerIpParty,
@@ -215,6 +233,11 @@ export default function RegisterIpForm() {
               maxLength={6}
               autoComplete="postal-code"
             />
+            {pincodeAutofill.message && (
+              <p role="status" className={`mt-1 text-xs ${pincodeAutofill.status === "not-found" || pincodeAutofill.status === "error" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                {pincodeAutofill.message}
+              </p>
+            )}
           </Field>
 
           <Field label="State" required error={errors.state?.message}>

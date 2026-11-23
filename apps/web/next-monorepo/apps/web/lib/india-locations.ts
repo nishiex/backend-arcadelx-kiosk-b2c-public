@@ -46,7 +46,81 @@ export const INDIA_STATES: IndiaState[] = [
 
 export const STATE_NAMES: string[] = INDIA_STATES.map((s) => s.name)
 
+/**
+ * The public PIN dataset still uses older spellings ("Orissa", "Pondicherry",
+ * "Andaman & Nicobar"). Registrations submit the names used by the dropdown, so a
+ * resolved PIN is mapped onto STATE_NAMES first. An unrecognised name returns
+ * null and the form asks the user to choose the state themselves.
+ */
+const PIN_STATE_ALIASES: Record<string, string> = {
+  "orissa": "Odisha",
+  "pondicherry": "Puducherry",
+  "uttaranchal": "Uttarakhand",
+  "andaman & nicobar": "Andaman and Nicobar Islands",
+  "andaman & nicobar islands": "Andaman and Nicobar Islands",
+  "jammu & kashmir": "Jammu and Kashmir",
+  "nct of delhi": "Delhi",
+  "new delhi": "Delhi",
+  "dadra & nagar haveli": "Dadra and Nagar Haveli and Daman and Diu",
+  "daman & diu": "Dadra and Nagar Haveli and Daman and Diu",
+  "dadra and nagar haveli": "Dadra and Nagar Haveli and Daman and Diu",
+  "daman and diu": "Dadra and Nagar Haveli and Daman and Diu",
+  "telengana": "Telangana",
+  "chattisgarh": "Chhattisgarh",
+}
+
+/** Current state name for a name coming from the PIN lookup, or null when unknown. */
+export function canonicalStateName(value: string): string | null {
+  const trimmed = value.trim()
+  if (STATE_NAMES.includes(trimmed)) return trimmed
+  return PIN_STATE_ALIASES[trimmed.toLowerCase()] ?? null
+}
+
+/**
+ * PIN districts use their own older spellings ("Bangalore", "Bombay",
+ * "Trivandrum"). Map the common ones onto the curated city names so the city
+ * select reuses an existing option instead of collecting a near-duplicate.
+ */
+const PIN_CITY_ALIASES: Record<string, string> = {
+  "bangalore": "Bengaluru",
+  "bombay": "Mumbai",
+  "madras": "Chennai",
+  "calcutta": "Kolkata",
+  "cochin": "Kochi",
+  "mysore": "Mysuru",
+  "mangalore": "Mangaluru",
+  "belgaum": "Belagavi",
+  "gulbarga": "Kalaburagi",
+  "hubli": "Hubballi",
+  "trichy": "Tiruchirappalli",
+  "trivandrum": "Thiruvananthapuram",
+  "gurgaon": "Gurugram",
+  "allahabad": "Prayagraj",
+  "pondicherry": "Puducherry",
+}
+
+export function normalizeCityName(city: string): string {
+  const trimmed = city.trim()
+  return PIN_CITY_ALIASES[trimmed.toLowerCase()] ?? trimmed
+}
+
 /** Cities for the given state name (empty when the state is unknown/blank). */
 export function citiesForState(state: string): string[] {
   return INDIA_STATES.find((s) => s.name === state)?.cities ?? []
+}
+
+/**
+ * Curated cities for the state plus a city resolved from a PIN code. A PIN's
+ * district is often outside the curated major-city list, and the select still has
+ * to be able to show what the lookup filled in.
+ */
+export function citiesForStateWith(state: string, ...extras: Array<string | null | undefined>): string[] {
+  const cities = [...citiesForState(state)]
+  for (const extra of extras) {
+    const trimmed = extra?.trim()
+    if (!trimmed) continue
+    if (cities.some((city) => city.toLowerCase() === trimmed.toLowerCase())) continue
+    cities.push(trimmed)
+  }
+  return cities
 }

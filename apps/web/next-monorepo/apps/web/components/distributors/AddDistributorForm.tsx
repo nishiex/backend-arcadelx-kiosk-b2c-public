@@ -9,8 +9,9 @@ import { toast } from "sonner"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { createDistributor, generateCompanyInviteCode, retryOrganizationCredentials, type CreateDistributorInput } from "@/lib/backend-api"
-import { STATE_NAMES, citiesForState } from "@/lib/india-locations"
+import { STATE_NAMES, citiesForStateWith } from "@/lib/india-locations"
 import { useMe } from "@/hooks/useMe"
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill"
 import { companyInviteCodeKey } from "./CompanyInviteCodeDialog"
 
 type FormValues = {
@@ -87,7 +88,30 @@ export default function AddDistributorForm() {
 
   // City list cascades off the chosen state.
   const selectedState = watch("state")
-  const cityOptions = React.useMemo(() => citiesForState(selectedState), [selectedState])
+  // A valid PIN fills the state and city; the resolved city stays selectable even
+  // when the PIN's district is outside the curated major-city list.
+  const pincodeAutofill = usePincodeAutofill(
+    String(watch("pincode") ?? ""),
+    React.useCallback(
+      (location: { state: string; city: string }) => {
+        setValue("state", location.state, { shouldValidate: true })
+        // The city select is disabled until a state is chosen and only then gains
+        // the resolved option, so writing the city has to wait for that render.
+        window.setTimeout(() => {
+          setValue("city", location.city, { shouldValidate: true })
+        }, 0)
+      },
+      [setValue],
+    ),
+  )
+  // Keep the selected city in the list even when it came from a PIN and is not a
+  // curated major city; otherwise the select falls back to its first option and
+  // shows a different city than the one the form would submit.
+  const selectedCity = watch("city")
+  const cityOptions = React.useMemo(
+    () => citiesForStateWith(selectedState, pincodeAutofill.city, selectedCity),
+    [selectedState, pincodeAutofill.city, selectedCity],
+  )
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -269,6 +293,14 @@ export default function AddDistributorForm() {
                   pattern: { value: /^\d{6}$/, message: "Enter a valid 6-digit PIN code" },
                 })}
               />
+              {pincodeAutofill.message && (
+                <p
+                  role="status"
+                  className={`mt-1 text-xs ${pincodeAutofill.status === "not-found" || pincodeAutofill.status === "error" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}
+                >
+                  {pincodeAutofill.message}
+                </p>
+              )}
             </Field>
             <Field label="Country">
               <input

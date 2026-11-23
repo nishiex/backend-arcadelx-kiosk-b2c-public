@@ -201,6 +201,25 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
   return sessionApiFetch(input, init);
 }
 
+export type PincodeLocation = {
+  pincode: string;
+  state: string;
+  district: string;
+  city: string;
+};
+
+/**
+ * Resolve a six-digit PIN code to its state and district. An unknown PIN is a
+ * normal answer for an address form, so a 404 returns null instead of throwing
+ * and the caller keeps manual entry available.
+ */
+export async function lookupPincode(pincode: string, signal?: AbortSignal): Promise<PincodeLocation | null> {
+  const res = await apiFetch(`/api/geo/pincode/${encodeURIComponent(pincode)}`, { credentials: 'include', signal });
+  if (res.status === 404) return null;
+  const json = await handleRes<{ location: PincodeLocation }>(res);
+  return json.location;
+}
+
 export async function fetchInventorySummary(): Promise<InventorySummaryResponse> {
   const res = await apiFetch('/api/kiosks/summary', { credentials: 'include' });
   return handleRes<InventorySummaryResponse>(res);

@@ -153,9 +153,9 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">{isCompany ? "The Partner Owner must approve before kiosks can be sent." : "These Distributor-to-Partner terms take effect immediately for this Partner."}</p>
+                <p className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">These {isCompany ? "Company-to-Partner" : "Distributor-to-Partner"} terms activate immediately for this Partner.</p>
                 <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
-                  <label className="text-xs font-medium">Company share (%)<input type="number" min="0" max="100" step="0.01" value={parentShare} onChange={event => setParentShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
+                  <label className="text-xs font-medium">{isCompany ? "Company" : "Distributor"} share (%)<input type="number" min="0" max="100" step="0.01" value={parentShare} onChange={event => setParentShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Partner share (%)<input type="number" min="0" max="100" step="0.01" value={childShare} onChange={event => setChildShare(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Collection per kiosk (INR)<input type="number" min="0" step="1" value={deposit} onChange={event => setDeposit(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
                   <label className="text-xs font-medium">Non-refundable fee (INR)<input type="number" min="0" step="1" value={nonRefundable} onChange={event => setNonRefundable(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" /></label>
