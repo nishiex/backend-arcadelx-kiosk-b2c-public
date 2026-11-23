@@ -38,6 +38,19 @@ export const CreateAgreementSchema = z
         "Both parent and child share percentages must be provided and must sum up to 100",
       path: ["parentSharePct"],
     },
+  )
+  // The non-refundable portion is deducted from the collection, so it can never exceed it.
+  // Without this, a ₹1,00,000 collection with a ₹2,00,000 non-refundable fee was stored as
+  // ACTIVE and every order against the agreement failed later at creation.
+  .refine(
+    (data) =>
+      data.depositAmountPerMachine === undefined ||
+      data.nonRefundableAmountPerMachine === undefined ||
+      data.nonRefundableAmountPerMachine <= data.depositAmountPerMachine,
+    {
+      message: "Non-refundable fee cannot exceed the total collection per kiosk",
+      path: ["nonRefundableAmountPerMachine"],
+    },
   );
 
 /**
@@ -78,5 +91,15 @@ export const UpdateAgreementSchema = z
     {
       message: "Both per-kiosk amounts must be provided together",
       path: ["depositAmountPerMachine"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.depositAmountPerMachine === undefined ||
+      data.nonRefundableAmountPerMachine === undefined ||
+      data.nonRefundableAmountPerMachine <= data.depositAmountPerMachine,
+    {
+      message: "Non-refundable fee cannot exceed the total collection per kiosk",
+      path: ["nonRefundableAmountPerMachine"],
     },
   );

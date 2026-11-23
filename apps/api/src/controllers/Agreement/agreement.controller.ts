@@ -9,6 +9,7 @@ import {
 } from "@shared-types/validationSchemas/agreement.validation";
 import { PaginationQuerySchema } from "@shared-types/validationSchemas/member.validation";
 import {
+  assertRefundableTerms,
   lockAgreementParties,
   requireAgreementSlot,
 } from "../../services/agreement-rules";
@@ -108,6 +109,10 @@ export const createAgreement = asyncHandler(async (req, res) => {
       depositAmountPerMachine = input.depositAmountPerMachine;
       nonRefundableAmountPerMachine = input.nonRefundableAmountPerMachine;
     }
+    // Checked on the resolved pair, not only on the request body: a Distributor that omits
+    // the amounts inherits them from its upstream agreement, and that path never passed
+    // through the create/update schema.
+    assertRefundableTerms(depositAmountPerMachine, nonRefundableAmountPerMachine);
     // Terms are approved by the supplying organization at creation time. Activating
     // immediately keeps the relationship ready for allocations without requiring a
     // second Owner action from the receiving organization.
@@ -298,6 +303,7 @@ export const updateAgreement = asyncHandler(async (req, res) => {
       };
     }
 
+    assertRefundableTerms(terms.depositAmountPerMachine, terms.nonRefundableAmountPerMachine);
     const agreement = await replaceActiveAgreement(tx, current, effectiveAt, terms);
     let cascadedAgreements = 0;
 

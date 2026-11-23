@@ -198,6 +198,10 @@ export default function DistributorAgreementDialog({
       setFormError("Enter whole amounts of 0 or more for both per-kiosk charges.")
       return
     }
+    if (nonRefundable > deposit) {
+      setFormError("The non-refundable fee cannot exceed the total collection per kiosk.")
+      return
+    }
     setFormError(null)
     draft.mutate({
       childOrgId: distributor.id,
@@ -224,6 +228,10 @@ export default function DistributorAgreementDialog({
     }
     if (!Number.isInteger(deposit) || deposit < 0 || !Number.isInteger(nonRefundable) || nonRefundable < 0) {
       setFormError("Enter whole amounts of 0 or more for both per-kiosk charges.")
+      return
+    }
+    if (nonRefundable > deposit) {
+      setFormError("The non-refundable fee cannot exceed the total collection per kiosk.")
       return
     }
     setFormError(null)

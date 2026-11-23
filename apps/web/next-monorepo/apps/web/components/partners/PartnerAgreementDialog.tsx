@@ -115,6 +115,11 @@ export default function PartnerAgreementDialog({ partner, organizationId }: { pa
       toast.error("Enter valid non-negative per-kiosk amounts")
       return
     }
+    // The non-refundable fee is deducted from the collection, so it cannot exceed it.
+    if (nonRefundableAmount > depositAmount) {
+      toast.error("The non-refundable fee cannot exceed the total collection per kiosk")
+      return
+    }
     update.mutate()
   }
 

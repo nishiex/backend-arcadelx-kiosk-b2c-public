@@ -132,3 +132,27 @@ export async function requireAgreementSlot(
       "An active or pending agreement already occupies this relationship",
     );
 }
+
+/**
+ * The per-kiosk collection is the gross amount taken from the customer; the non-refundable
+ * portion is deducted from it, so the refundable remainder cannot go negative:
+ *
+ *   refundable = collection - nonRefundable       must be >= 0
+ *
+ * A pair that breaks this (₹1,00,000 collection with a ₹2,00,000 non-refundable fee) is
+ * accepted by the shape-only Zod schemas, becomes ACTIVE, and then every order against the
+ * agreement is refused at creation with "Total collection must cover the non-refundable
+ * fee" — a message that names neither amount, which is why the QA report read as if the
+ * two figures were being compared the other way round.
+ */
+export function assertRefundableTerms(
+  depositAmountPerMachine: number,
+  nonRefundableAmountPerMachine: number,
+) {
+  if (nonRefundableAmountPerMachine > depositAmountPerMachine) {
+    throw new ApiError(
+      400,
+      `Non-refundable fee per kiosk (₹${nonRefundableAmountPerMachine}) cannot exceed the total collection per kiosk (₹${depositAmountPerMachine})`,
+    );
+  }
+}
