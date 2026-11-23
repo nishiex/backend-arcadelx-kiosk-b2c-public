@@ -13,6 +13,7 @@ import {
   SetDeviceGamePriceResultSchema,
 } from '@shared-types/validationSchemas/Devices/device.validation';
 import {  getDevicePrices,
+  getLauncherServedPrices,
   listDevices,
   resetDevicePrices,
   resetAllDevicePrices,
@@ -79,6 +80,25 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
 
   await assertDeviceVisible(req, parsed.data.deviceId);
   const games = await getDevicePrices(parsed.data.deviceId);
+  // What the kiosk itself serves. Stored overrides are Mothership's intent; the launcher
+  // feed is what the machine charges, so a mismatch is shown next to the configured price
+  // instead of hiding behind it.
+  const served = await getLauncherServedPrices(parsed.data.deviceId).catch(() => null);
+  const servedGames = served?.games ?? [];
+  const gamesWithServed = games.map((game) => {
+    const match =
+      servedGames.find((entry) => entry.gameId === game.gameId) ??
+      servedGames.find((entry) => entry.displayName === game.displayName);
+    if (!match) return game;
+    const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
+    return {
+      ...game,
+      servedPrice: match.price,
+      servedReplayPrice: match.replayPrice,
+      servesConfiguredPrice:
+        same(match.price, game.effectivePrice) && same(match.replayPrice, game.effectiveReplayPrice),
+    };
+  });
   const eod = await Promise.all(games.map(async game => ({ gameId: game.gameId, update: await pricingStatus(parsed.data.deviceId, game.gameId) })));
   const kiosk = await prisma.kiosk.findFirst({
     where: { OR: [{ externalDeviceId: parsed.data.deviceId }, { machineCode: parsed.data.deviceId }] },
@@ -86,7 +106,7 @@ export const getPricesForDevice = asyncHandler(async (req: Request, res: Respons
   });
   res
     .status(200)
-    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games, kioskStatus: kiosk?.status ?? null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
+    .json(new ApiResponse(200, { deviceId: parsed.data.deviceId, games: gamesWithServed, kioskStatus: kiosk?.status ?? null, launcher: served ? { deviceId: served.deviceId } : null, eod: Object.fromEntries(eod.map(item => [item.gameId, item.update])), eodMeta: { timezone: BUSINESS_TIMEZONE, runTime: getEodPricingTime(), nextExecutionAt: nextEod() } }, 'Prices fetched successfully'));
 });
 
 export const cancelScheduledDeviceGamePrice = asyncHandler(async (req: Request, res: Response) => {

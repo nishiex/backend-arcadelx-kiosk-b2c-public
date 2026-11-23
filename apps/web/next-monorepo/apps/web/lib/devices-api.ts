@@ -123,6 +123,11 @@ export type GamePriceView = {
   mergedRows: number
   /** Device price differs from the catalog price. Drift, not an override. */
   differsFromCatalog: boolean
+  /** What the kiosk reports on its own launcher feed; absent when that feed could not be read. */
+  servedPrice?: number
+  servedReplayPrice?: number
+  /** False means the kiosk serves a different number than the one configured here. */
+  servesConfiguredPrice?: boolean
   iconUrl: string | null
   imageUrl: string | null
 }

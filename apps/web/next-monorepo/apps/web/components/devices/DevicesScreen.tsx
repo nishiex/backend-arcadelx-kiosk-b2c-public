@@ -1132,7 +1132,17 @@ function GamePriceTable({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 tabular-nums">{inr.format(game.effectivePrice)}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {inr.format(game.effectivePrice)}
+                    {game.servesConfiguredPrice === false && (
+                      <span
+                        className="mt-1 block text-[11px] font-medium text-destructive"
+                        title="Reported by the kiosk's launcher feed (GET /api/v1/launcher/games)"
+                      >
+                        kiosk serves {inr.format(game.servedPrice ?? 0)}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">
                     {inr.format(game.effectiveReplayPrice)}
                   </td>
