@@ -143,7 +143,7 @@ export default function StatGrid() {
   return (
     <div
       ref={ref}
-      className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-6  2xl:grid-cols-6"
+      className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-2 xl:grid-cols-7  2xl:grid-cols-7"
     >
       {cards.map((c) => (
         <StatCard
