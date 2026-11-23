@@ -60,75 +60,6 @@ function gameHasOverride(game: GamePriceView): boolean {
   )
 }
 
-/** A device that has not caught up with the catalog still deserves a review badge. */
-function gameDiffersFromCatalog(game: GamePriceView): boolean {
-  return (
-    game.differsFromCatalog ||
-    Math.abs(game.effectivePrice - game.basePrice) >= 0.001 ||
-    Math.abs(game.effectiveReplayPrice - game.baseReplayPrice) >= 0.001
-  )
-}
-
-/**
- * Where the price the kiosk charges came from.
- *
- * A scheduled change is applied through the same device write as a manual override, so
- * Mothership reports it as an override once the job runs. The EOD row is the only record
- * that the operator scheduled it, so the Source column says "Scheduled" from the moment
- * the update is queued -- not "Override" once the kiosk picks it up.
- */
-function PriceSourceBadge({
-  game,
-  update,
-  timezone,
-}: {
-  game: GamePriceView
-  update: EodPriceUpdate | null
-  timezone: string
-}) {
-  const queued = update?.status === "PENDING" || update?.status === "PROCESSING"
-  // An applied row only names this price while the kiosk still charges it; a later manual
-  // change must fall back to the live source instead of keeping a stale "Scheduled".
-  const applied = Boolean(
-    update &&
-      update.status === "APPLIED" &&
-      Math.abs(update.price - game.effectivePrice) < 0.001 &&
-      Math.abs(update.replayPrice - game.effectiveReplayPrice) < 0.001,
-  )
-  if (update && (queued || applied)) {
-    return (
-      <span
-        title={
-          queued
-            ? `Scheduled ${inr.format(update.price)} / replay ${inr.format(update.replayPrice)} for ${update.businessDate} ${update.scheduledTime} (${timezone}). The kiosk keeps charging ${inr.format(game.effectivePrice)} until then.`
-            : `The kiosk price was set by the scheduled update for ${update.businessDate} ${update.scheduledTime} (${timezone}).`
-        }
-        className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
-      >
-        Scheduled
-      </span>
-    )
-  }
-  if (gameHasOverride(game)) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-        Override
-      </span>
-    )
-  }
-  if (gameDiffersFromCatalog(game)) {
-    return (
-      <span
-        title={`Catalog ${inr.format(game.basePrice)} / replay ${inr.format(game.baseReplayPrice)} - this kiosk has not picked it up`}
-        className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-      >
-        Catalog differs
-      </span>
-    )
-  }
-  return <span className="text-xs text-muted-foreground">Default</span>
-}
-
 function EodStatus({ update, game }: { update: EodPriceUpdate; game: GamePriceView }) {
   // An applied row only describes the kiosk while it still charges that price. After a
   // reset, a later device write or a catalog change, "Applied" next to a different live
@@ -1139,7 +1070,6 @@ function GamePriceTable({
               <th className="px-4 py-3 font-medium">Game</th>
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Replay price</th>
-              <th className="px-4 py-3 font-medium">Source</th>
               <th className="px-4 py-3 font-medium">Update Price</th>
               {(canWrite || canRequest) && <th className="px-4 py-3 text-right font-medium">Change</th>}
             </tr>
@@ -1183,13 +1113,6 @@ function GamePriceTable({
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">
                     {inr.format(game.effectiveReplayPrice)}
                   </td>
-                  <td className="px-4 py-3">
-                    <PriceSourceBadge
-                      game={game}
-                      update={eod[game.gameId] ?? null}
-                      timezone={eodMeta.timezone}
-                    />
-                  </td>
                   <td className="px-4 py-3">{eod[game.gameId] ? <EodStatus update={eod[game.gameId]!} game={game} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                   {(canWrite || canRequest) && (
                     <td className="px-4 py-3 text-right">
@@ -1207,7 +1130,7 @@ function GamePriceTable({
                 </tr>
                 {editingGame?.gameId === game.gameId && (
                   <tr>
-                    <td colSpan={canWrite || canRequest ? 6 : 5} className="p-3">
+                    <td colSpan={canWrite || canRequest ? 5 : 4} className="p-3">
                       <DeviceGamePriceEditor
                         deviceId={deviceId}
                         game={game}
