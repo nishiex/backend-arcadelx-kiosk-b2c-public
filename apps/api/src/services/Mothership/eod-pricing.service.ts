@@ -174,7 +174,12 @@ export async function processEodUpdate(id: string) {
 
 export async function pricingStatus(deviceId: string, gameId: string) {
   const update = await prisma.eodDevicePriceUpdate.findFirst({
-    where: { deviceId, gameId },
+    // Only a still-actionable row belongs in the pricing table. Returning APPLIED rows made
+    // the amber "Scheduled" chip survive the run that had already applied the price, with no
+    // way to clear it short of a manual cancel ("data is been updated of schedule for price
+    // update but tag is not removed"). History stays in the table for audit; it is simply no
+    // longer presented as a pending schedule.
+    where: { deviceId, gameId, status: { in: ['PENDING', 'PROCESSING', 'FAILED'] } },
     orderBy: [{ businessDate: 'desc' }, { createdAt: 'desc' }],
   });
   return update ? { id: update.id, businessDate: update.businessDate.toISOString().slice(0, 10), scheduledTime: update.scheduledTime, status: update.status, price: Number(update.price), replayPrice: Number(update.replayPrice), attempts: update.attempts, lastError: update.lastError, appliedAt: update.appliedAt, createdAt: update.createdAt } : null;

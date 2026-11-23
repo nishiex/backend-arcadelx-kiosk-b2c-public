@@ -360,7 +360,10 @@ export default function KiosksScreen() {
                     <td className="px-4 py-3">
                       <div className="font-mono font-medium">{k.machineCode}</div>
                       <div className="text-xs text-muted-foreground">
-                        {k.serialNumber ?? `SN-${k.id.slice(0, 8).toUpperCase()}`}
+                        {/* Never invent an identifier. The old fallback printed
+                            SN-<first 8 chars of the row's UUID>, which QA read as the kiosk
+                            being created with a random number instead of its machine code. */}
+                        {k.serialNumber ?? "No serial recorded"}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -377,7 +380,10 @@ export default function KiosksScreen() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={k.status} />
+                      <StatusBadge
+                        status={k.status}
+                        assignedToType={k.assignedOrg?.type ?? k.currentOrg?.type ?? null}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <AssignedCell k={k} myOrgId={myOrgId} viewerIsDistributor={orgType === "DISTRIBUTOR"} />

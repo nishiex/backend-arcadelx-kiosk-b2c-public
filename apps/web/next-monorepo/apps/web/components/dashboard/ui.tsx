@@ -135,16 +135,25 @@ export const STATUS_META: Record<KioskStatus, { label: string; dot: string; text
   RETIRED: { label: "Retired", dot: "bg-slate-500", text: "text-slate-600 dark:text-slate-400", pill: "bg-slate-500/10 text-slate-600 dark:text-slate-400", hex: "#64748b" },
 }
 
-export function StatusBadge({ status }: { status: KioskStatus }) {
+export function StatusBadge({ status, assignedToType }: { status: KioskStatus; assignedToType?: string | null }) {
   const meta = STATUS_META[status] ?? {
     label: status,
     dot: "bg-muted-foreground",
     text: "text-muted-foreground",
     pill: "bg-muted text-muted-foreground",
   }
+  // Company -> Distributor and Distributor -> Partner both landed on "Assigned", so a
+  // machine held by a distributor and one the distributor had already placed with a partner
+  // read identically in the table. The storage enum stays the same; only the wording differs.
+  const label =
+    status === "ASSIGNED" && assignedToType === "PARTNER"
+      ? "Placed with partner"
+      : status === "ASSIGNED" && assignedToType === "DISTRIBUTOR"
+        ? "Assigned to distributor"
+        : meta.label
   return (
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", meta.pill)}>
-      {meta.label}
+      {label}
     </span>
   )
 }

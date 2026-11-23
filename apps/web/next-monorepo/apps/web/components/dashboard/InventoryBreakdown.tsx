@@ -51,7 +51,7 @@ function Donut({ segments, total }: { segments: Segment[]; total: number }) {
           {total}
         </span>
         <span className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-          Total kiosks
+          Registered kiosks
         </span>
       </div>
     </div>
@@ -67,7 +67,12 @@ export default function InventoryBreakdown() {
   const rootRef = React.useRef<HTMLDivElement>(null)
 
   const summary = data?.summary ?? {}
-  const total = Object.values(summary).reduce((a, b) => a + (b || 0), 0)
+  const total = data?.total ?? Object.values(summary).reduce((a, b) => a + (b || 0), 0)
+  // Registered rows and paired rows are different populations. A machine code minted in the
+  // console has no hardware behind it until Mothership pairs it, so the fleet headline must
+  // say which one it is counting — the dashboard showed "206" while the fleet was 106.
+  const paired = data?.paired ?? total
+  const unpaired = data?.unpaired ?? Math.max(0, total - paired)
   const segments: Segment[] = KIOSK_STATUSES.map((status) => ({
     status,
     count: summary[status] || 0,
@@ -100,7 +105,11 @@ export default function InventoryBreakdown() {
     <Panel
       title="Fleet composition"
       className="flex h-full flex-col"
-      subtitle={total ? `${inField}% of your fleet is installed in the field` : undefined}
+      subtitle={
+        total
+          ? `${inField}% installed · ${paired} of ${total} paired${unpaired ? ` · ${unpaired} without hardware` : ""}`
+          : undefined
+      }
     >
       {isLoading ? (
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">

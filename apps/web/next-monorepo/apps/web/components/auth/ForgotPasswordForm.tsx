@@ -12,7 +12,7 @@ import { beginMutationToast } from "@/lib/mutation-toast"
 type Step = "email" | "otp" | "reset"
 
 async function post(path: string, body: unknown) {
-  const mutationToast = beginMutationToast({ method: "POST" })
+  const mutationToast = beginMutationToast({ method: "POST" }, "Sending code…")
   try {
     const res = await fetch(path, {
       method: "POST",

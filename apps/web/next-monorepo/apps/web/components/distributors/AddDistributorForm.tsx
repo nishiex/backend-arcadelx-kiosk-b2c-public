@@ -215,8 +215,8 @@ export default function AddDistributorForm() {
               })}
             />
           </Field>
-          <Field label="Contact Person" required error={errors.ownerName?.message}>
-            <input className={inputCls} {...register("ownerName", { required: "Contact person is required" })} />
+          <Field label="Contact Person Name" required error={errors.ownerName?.message}>
+            <input className={inputCls} {...register("ownerName", { required: "Contact person name is required" })} />
           </Field>
           <Field label="Email Address" required error={errors.ownerEmail?.message}>
             <input

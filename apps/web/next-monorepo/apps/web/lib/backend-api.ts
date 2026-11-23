@@ -59,6 +59,12 @@ export type NetworkRequestsResponse = {
 
 export type InventorySummaryResponse = {
   summary: Record<string, number>;
+  /** Every kiosk row in the caller's network scope, paired or not. */
+  total?: number;
+  /** Rows carrying a Mothership hardware UUID — the only count comparable with its fleet. */
+  paired?: number;
+  /** Registered machine codes with no hardware behind them yet. */
+  unpaired?: number;
 }
 
 export type AnalyticsEvent = {

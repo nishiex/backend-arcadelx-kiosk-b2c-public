@@ -206,6 +206,11 @@ export const getRequestModelAvailability = asyncHandler(async (req, res) => {
                 ),
               }],
         )
+        // A model whose entire stock is already committed by pending requests is not
+        // orderable; listing it with 0 told the requester the kiosk count was available
+        // ("showing count of kiosk if number of kiosk not available"). Omit the row so
+        // the picker shows only what can actually be requested.
+        .filter((row) => row.availableQuantity > 0)
         .sort((a, b) => a.model.localeCompare(b.model)),
     };
   });
@@ -634,7 +639,13 @@ export const deliverOrder = asyncHandler(async (req, res) => {
       where: { id: { in: ids } },
       data: {
         currentOrgId: current.childOrgId,
-        status: "AVAILABLE",
+        // Delivery transfers ownership; it must not return the kiosk to sellable stock.
+        // This write used to set AVAILABLE, which put a machine the partner now holds back
+        // into the supplier's requestable pool (REQUESTABLE_KIOSK_STATUSES includes AVAILABLE)
+        // while the inventory cards still showed it as assigned -- the "all are assigned but
+        // still shows available kiosk" report. ASSIGNED is the truthful state until pairing
+        // at the partner's site promotes it to INSTALLED (internal.controller.ts).
+        status: "ASSIGNED",
         // The site the kiosks were delivered to. This is the only place a delivery
         // location is recorded, so the validated value is written onto every kiosk in
         // the same transaction that transfers ownership.

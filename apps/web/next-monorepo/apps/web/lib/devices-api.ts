@@ -279,7 +279,9 @@ export async function fetchDevicePriceRequests(): Promise<{ requests: DevicePric
   return handleRes<{ requests: DevicePriceRequest[] }>(res)
 }
 
-export type PriceApprovalMode = "APPLY_NOW" | "SCHEDULED" | "ALL_KIOSKS"
+// Approval controls *when* a request applies, never *where*: a partner's request is always
+// device-scoped. The former `ALL_KIOSKS` mode executed a game-catalog write.
+export type PriceApprovalMode = "APPLY_NOW" | "SCHEDULED"
 
 export async function approveDevicePriceRequest(
   requestId: string,

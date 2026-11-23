@@ -42,7 +42,7 @@ export default function LoginForm({ audience = "operator" }: { audience?: LoginA
   }, [])
 
   const onSubmit = async (values: FormValues) => {
-    const mutationToast = beginMutationToast({ method: "POST" })
+    const mutationToast = beginMutationToast({ method: "POST" }, "Signing in…")
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -128,7 +128,7 @@ export default function LoginForm({ audience = "operator" }: { audience?: LoginA
               id="password"
               type={showPw ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="••••••••"
+              placeholder="Enter your password"
               className={cn(
                 "w-full rounded-lg border bg-background py-2.5 pl-9 pr-10 text-sm outline-none transition focus:ring-2 focus:ring-ring/40",
                 errors.password ? "border-destructive" : "border-input"

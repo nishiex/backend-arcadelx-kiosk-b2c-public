@@ -43,7 +43,7 @@ export default function JoinForm() {
   }, [])
 
   const onSubmit = async (values: FormValues) => {
-    const mutationToast = beginMutationToast({ method: "POST" })
+    const mutationToast = beginMutationToast({ method: "POST" }, "Creating account…")
     try {
       const res = await fetch("/api/auth/join", {
         method: "POST",

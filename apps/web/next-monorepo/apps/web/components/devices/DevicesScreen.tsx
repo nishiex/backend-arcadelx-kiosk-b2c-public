@@ -337,7 +337,7 @@ function PriceRequestQueue({
     mutationFn: ({ requestId, mode, scheduled_date, scheduled_time }: { requestId: string; mode: PriceApprovalMode; scheduled_date?: string; scheduled_time?: string }) =>
       approveDevicePriceRequest(requestId, { mode, scheduled_date, scheduled_time }),
     onSuccess: async () => {
-      toast.success(approvalMode === "APPLY_NOW" ? "Price request approved and applied now" : approvalMode === "ALL_KIOSKS" ? "Price request applied to all kiosks" : "Price request approved and scheduled")
+      toast.success(approvalMode === "APPLY_NOW" ? "Price request approved and applied now" : "Price request approved and scheduled")
       setApprovalRequest(null)
       await onChanged()
     },
@@ -421,7 +421,6 @@ function PriceRequestQueue({
                 <select value={approvalMode} onChange={event => setApprovalMode(event.target.value as PriceApprovalMode)} className={inputClass}>
                   <option value="SCHEDULED">Schedule for a date and time</option>
                   <option value="APPLY_NOW">Apply now to this kiosk</option>
-                  <option value="ALL_KIOSKS">Apply now to all kiosks</option>
                 </select>
               </label>
               {approvalMode === "SCHEDULED" && (
@@ -430,7 +429,7 @@ function PriceRequestQueue({
                   <label className="space-y-1.5 text-sm font-medium"><span>Time</span><input type="time" value={approvalTime} onChange={event => setApprovalTime(event.target.value)} className={inputClass} /></label>
                 </div>
               )}
-              {approvalMode === "ALL_KIOSKS" && <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">This changes the game catalog price for every kiosk offering this game.</p>}
+              {approvalMode === "SCHEDULED" && <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">The change applies to this kiosk only, at the selected date and time.</p>}
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className={buttonClass} disabled={approve.isPending} onClick={() => setApprovalRequest(null)}>Cancel</button>

@@ -89,6 +89,25 @@ export default function DistributorAgreementDialog({
   const [open, setOpen] = React.useState(false)
   const [parentSharePct, setParentSharePct] = React.useState("60")
   const [childSharePct, setChildSharePct] = React.useState("40")
+
+  // The two shares are one number split in two. Editing them independently let 70 / 40 sit in
+  // the form until submit, which is what "editing company share should automatically update
+  // distributors share" reported: changing one side never moved the other.
+  function setSupplierShare(value: string) {
+    setParentSharePct(value)
+    const numeric = Number(value)
+    if (value.trim() !== "" && Number.isFinite(numeric) && numeric >= 0 && numeric <= 100) {
+      setChildSharePct(String(100 - numeric))
+    }
+  }
+
+  function setRecipientShare(value: string) {
+    setChildSharePct(value)
+    const numeric = Number(value)
+    if (value.trim() !== "" && Number.isFinite(numeric) && numeric >= 0 && numeric <= 100) {
+      setParentSharePct(String(100 - numeric))
+    }
+  }
   const [depositAmount, setDepositAmount] = React.useState("")
   const [nonRefundableAmount, setNonRefundableAmount] = React.useState("")
   const [formError, setFormError] = React.useState<string | null>(null)
@@ -346,11 +365,11 @@ export default function DistributorAgreementDialog({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <label htmlFor={`edit-parentShare-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Supplier share (%)</label>
-                        <input id={`edit-parentShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={parentSharePct} onChange={event => setParentSharePct(event.target.value)} />
+                        <input id={`edit-parentShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={parentSharePct} onChange={event => setSupplierShare(event.target.value)} />
                       </div>
                       <div>
                         <label htmlFor={`edit-childShare-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Recipient share (%)</label>
-                        <input id={`edit-childShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={childSharePct} onChange={event => setChildSharePct(event.target.value)} />
+                        <input id={`edit-childShare-${distributor.id}`} inputMode="numeric" className={inputCls} value={childSharePct} onChange={event => setRecipientShare(event.target.value)} />
                       </div>
                       <div>
                         <label htmlFor={`edit-deposit-${distributor.id}`} className="mb-1.5 block text-sm font-medium">Total collection per kiosk</label>
@@ -395,7 +414,7 @@ export default function DistributorAgreementDialog({
                           inputMode="numeric"
                           className={inputCls}
                           value={parentSharePct}
-                          onChange={event => setParentSharePct(event.target.value)}
+                          onChange={event => setSupplierShare(event.target.value)}
                         />
                       </div>
                       <div>
@@ -407,7 +426,7 @@ export default function DistributorAgreementDialog({
                           inputMode="numeric"
                           className={inputCls}
                           value={childSharePct}
-                          onChange={event => setChildSharePct(event.target.value)}
+                          onChange={event => setRecipientShare(event.target.value)}
                         />
                       </div>
                       <div>

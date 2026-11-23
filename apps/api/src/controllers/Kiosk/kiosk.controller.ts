@@ -317,26 +317,28 @@ export const getInventorySummary = asyncHandler(async (req: Request, res: Respon
     const currentOrgId = req.membership!.organizationId;
     const orgType = req.membership!.type;
 
-    // Company dashboards match the Kiosks page and cover the whole company fleet.
-    // A Distributor's fleet is the machines it still holds plus the ones it has placed
-    // with its Partners: counting only its own inventory hid every installed kiosk.
-    let scope: Prisma.KioskWhereInput = { currentOrgId };
-    if (orgType === "COMPANY") {
-      scope = {};
-    } else if (orgType === "DISTRIBUTOR") {
-      const partners = await prisma.organization.findMany({
-        where: { parentOrgId: currentOrgId, type: "PARTNER" },
-        select: { id: true },
-      });
-      scope = { currentOrgId: { in: [currentOrgId, ...partners.map((partner) => partner.id)] } };
-    }
-    const summary = await prisma.kiosk.groupBy({
-      by: ["status"],
-      where: scope,
-      _count: {
-        status: true,
-      },
-    });
+    // One scope for every fleet number the dashboard shows. It used to be `{}` for a Company
+    // (every row in the table, including machines that belong to no organization) and
+    // `parentOrgId` children for a Distributor (missing partners linked by agreement or
+    // connection), so the donut total, the admin count and the Kiosks page disagreed.
+    // `networkOrgIds` is the resolver the inventory list already uses.
+    const scopeIds = await networkOrgIds(currentOrgId, orgType);
+    const scope: Prisma.KioskWhereInput = { currentOrgId: { in: scopeIds } };
+    const [summary, total, paired] = await Promise.all([
+      prisma.kiosk.groupBy({
+        by: ["status"],
+        where: scope,
+        _count: {
+          status: true,
+        },
+      }),
+      prisma.kiosk.count({ where: scope }),
+      // "Paired" is the only figure comparable with Mothership's fleet: a row is paired once
+      // its hardware UUID is linked. Registered-but-unpaired rows are machine codes minted in
+      // this console with no hardware behind them yet, which is why a dashboard total of 206
+      // never matched the 106 devices Mothership reports.
+      prisma.kiosk.count({ where: { ...scope, externalDeviceId: { not: null } } }),
+    ]);
 
     // Transform Prisma's group payload into a clean object: { AVAILABLE: 50, INSTALLED: 12 }
     const formattedSummary = summary.reduce(
@@ -347,6 +349,11 @@ export const getInventorySummary = asyncHandler(async (req: Request, res: Respon
       {} as Record<string, number>,
     );
 
-    res.status(200).json(new ApiResponse(200,{ summary: formattedSummary },"Inventory summary fetched",),);
+    res.status(200).json(new ApiResponse(200,{
+        summary: formattedSummary,
+        total,
+        paired,
+        unpaired: total - paired,
+      },"Inventory summary fetched",),);
   },
 );

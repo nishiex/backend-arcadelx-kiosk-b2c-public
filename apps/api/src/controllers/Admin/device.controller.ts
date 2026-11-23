@@ -261,7 +261,12 @@ export const updateDeviceGamePrice = asyncHandler(async (req: Request, res: Resp
 const requestParamsSchema = z.object({ requestId: z.string().uuid() });
 const reviewBodySchema = z.object({ reason: z.string().trim().min(1).max(1000) });
 const approvePriceRequestBodySchema = z.object({
-  mode: z.enum(['APPLY_NOW', 'SCHEDULED', 'ALL_KIOSKS']).default('SCHEDULED'),
+  // Approval decides *when*, never *where*. `ALL_KIOSKS` used to be offered here and
+  // executed as a game-catalog write, so approving a partner's per-kiosk request changed the
+  // price on every kiosk offering that game — the reported "changes universal" behaviour, and
+  // the reason Brick Blast currently reads 1000 on unrelated machines. A fleet price stays
+  // available through the explicit company write path with `scope: 'GAME_CATALOG'`.
+  mode: z.enum(['APPLY_NOW', 'SCHEDULED']).default('SCHEDULED'),
   scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Scheduled date must use YYYY-MM-DD').optional(),
   scheduled_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Scheduled time must use HH:mm').optional(),
 }).superRefine((value, context) => {
@@ -409,18 +414,17 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
     const price = Number(request.price);
     const replayPrice = Number(request.replayPrice);
     if (body.data.mode === 'APPLY_NOW') {
-      await setDeviceGamePrice(request.deviceId, request.gameId, {
+      const result = await setDeviceGamePrice(request.deviceId, request.gameId, {
         price,
         replay_price: replayPrice,
         scope: 'DEVICE',
         apply_now: true,
       });
-    } else if (body.data.mode === 'ALL_KIOSKS') {
-      await setDeviceGamePrice(request.deviceId, request.gameId, {
-        price,
-        replay_price: replayPrice,
-        scope: 'GAME_CATALOG',
-      });
+      // An immediate write supersedes any still-queued EOD row for this device+game.
+      // The direct write path below has always done this; the approval path did not, so an
+      // approved request read as applied and then the next scheduled run re-applied the
+      // older queued price on top of it.
+      await markScheduledUpdatesSuperseded(result.deviceId, result.gameId, price, replayPrice);
     } else {
       await scheduleEodDevicePrice({
         deviceId: request.deviceId,
@@ -439,9 +443,7 @@ export const approveDevicePriceRequest = asyncHandler(async (req: Request, res: 
     });
     const message = body.data.mode === 'APPLY_NOW'
       ? 'Price request approved and applied now'
-      : body.data.mode === 'ALL_KIOSKS'
-        ? 'Price request approved and applied to all kiosks'
-        : 'Price request approved and scheduled';
+      : 'Price request approved and scheduled';
     res.json(new ApiResponse(200, { request: serializePriceRequest(approved) }, message));
   } catch (error) {
     await prisma.devicePriceRequest.updateMany({
