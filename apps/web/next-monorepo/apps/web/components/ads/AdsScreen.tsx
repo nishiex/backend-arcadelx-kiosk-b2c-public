@@ -165,7 +165,9 @@ export default function AdsScreen() {
         result = await updateMothershipAd(editing, { title: title.trim(), start_date: startDate, days_to_live: daysToLive, ...(uploadId ? { upload_id: uploadId, original_name: file?.name } : {}) })
         adId = editing
       }
-      if (selectedDeviceIds.length) await assignMothershipAd(adId, selectedDeviceIds)
+      // Mothership's current API has no /api/v1/ads/:id/assign route. Active ads
+      // are delivered automatically to reporting kiosks, so do not issue the
+      // unsupported assignment request after a successful upload/update.
       return result
     },
     onSuccess: (result) => {
